@@ -105,8 +105,8 @@ export default function ReportsPage() {
           {[
             { label: "Week Revenue", value: formatCurrency(dashboard.weekRevenue) },
             { label: "Week Profit", value: formatCurrency(dashboard.weekProfit) },
-            { label: "Profit Margin", value: `${dashboard.profitMargin.toFixed(1)}%` },
-            { label: "Week Sales", value: `${dashboard.weekSalesCount} orders` },
+            { label: "Profit Margin", value: `${(dashboard.profitMargin ?? 0).toFixed(1)}%` },
+            { label: "Week Sales", value: `${dashboard.weekSalesCount ?? 0} orders` },
           ].map((k) => (
             <Card key={k.label}>
               <CardContent className="pt-4 pb-4">
@@ -193,10 +193,10 @@ export default function ReportsPage() {
       {prodSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Total Produced", value: `${prodSummary.totalProduced} loaves` },
-            { label: "Total Waste", value: `${prodSummary.totalWaste} loaves` },
-            { label: "Waste %", value: `${prodSummary.wastePercentage.toFixed(1)}%` },
-            { label: "Efficiency", value: `${prodSummary.efficiency.toFixed(1)}%` },
+            { label: "Total Produced", value: `${prodSummary.totalProduced ?? 0} loaves` },
+            { label: "Total Waste", value: `${prodSummary.totalWaste ?? 0} loaves` },
+            { label: "Waste %", value: `${(prodSummary.wastePercentage ?? 0).toFixed(1)}%` },
+            { label: "Efficiency", value: `${(prodSummary.efficiency ?? 0).toFixed(1)}%` },
           ].map((k) => (
             <Card key={k.label}>
               <CardContent className="pt-4 pb-4">
