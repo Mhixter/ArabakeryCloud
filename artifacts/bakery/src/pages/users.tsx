@@ -242,10 +242,10 @@ export default function UsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Branch (optional)</Label>
-                <Select value={form.branchId} onValueChange={(v) => setForm({...form, branchId: v})}>
+                <Select value={form.branchId || "none"} onValueChange={(v) => setForm({...form, branchId: v === "none" ? "" : v})}>
                   <SelectTrigger><SelectValue placeholder="Any branch" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No branch</SelectItem>
+                    <SelectItem value="none">No branch</SelectItem>
                     {(branches ?? []).map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -282,10 +282,10 @@ export default function UsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Branch</Label>
-                <Select value={editForm.branchId} onValueChange={(v) => setEditForm({...editForm, branchId: v})}>
+                <Select value={editForm.branchId || "none"} onValueChange={(v) => setEditForm({...editForm, branchId: v === "none" ? "" : v})}>
                   <SelectTrigger><SelectValue placeholder="No branch" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No branch</SelectItem>
+                    <SelectItem value="none">No branch</SelectItem>
                     {(branches ?? []).map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
