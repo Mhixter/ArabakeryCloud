@@ -48,7 +48,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const queryClient = useQueryClient();
   const user = getStoredUser();
@@ -63,7 +63,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     clearToken();
     clearStoredUser();
     queryClient.clear();
-    window.location.href = import.meta.env.BASE_URL + "login";
+    setLocation("/login");
   };
 
   const SidebarContent = () => (

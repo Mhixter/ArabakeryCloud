@@ -55,4 +55,24 @@ router.patch("/branches/:id", authenticate, requireRole("managing_director"), as
   res.json(formatBranch(branch));
 });
 
+router.delete("/branches/:id", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [branch] = await db.delete(branchesTable).where(eq(branchesTable.id, id)).returning();
+  if (!branch) { res.status(404).json({ error: "Branch not found" }); return; }
+
+  await logAudit({
+    req,
+    userId: (req as AuthenticatedRequest).user!.userId,
+    action: "BRANCH_DELETED",
+    entityType: "branch",
+    entityId: id,
+    details: `Deleted branch ${branch.name}`,
+  });
+
+  res.json({ success: true });
+});
+
 export default router;
