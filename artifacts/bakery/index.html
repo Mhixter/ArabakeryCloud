@@ -2,12 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- Mobile-first viewport — prevents zoom on Android/iOS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, viewport-fit=cover" />
+
     <title>Ara Bakery Cloud</title>
+    <meta name="description" content="Complete bakery management platform — production, inventory, sales and reports. Built for Nigerian bakeries." />
+
+    <!-- PWA / App metadata -->
+    <meta name="application-name" content="Ara Bakery Cloud" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Ara Bakery" />
+    <meta name="theme-color" content="#f59e0b" />
+    <meta name="msapplication-TileColor" content="#f59e0b" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ara Bakery Cloud" />
+    <meta property="og:description" content="Complete bakery management for Nigerian bakeries — production, inventory, sales and reports." />
+    <meta property="og:image" content="/opengraph.jpg" />
+
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Android splash / status bar -->
+    <meta name="msapplication-navbutton-color" content="#f59e0b" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body>
     <div id="root"></div>
