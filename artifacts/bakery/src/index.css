@@ -295,3 +295,41 @@
     display: none;
   }
 }
+
+/* ===== MULTI-TENANT THEME SYSTEM ===== */
+[data-theme="orange"] {
+  --primary: 20 90% 52%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar-primary: 20 90% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 20 90% 58%;
+}
+[data-theme="blue"] {
+  --primary: 215 80% 50%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar: 220 35% 14%;
+  --sidebar-primary: 215 80% 56%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 215 80% 56%;
+  --sidebar-border: 220 30% 20%;
+}
+[data-theme="green"] {
+  --primary: 142 65% 38%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar: 145 30% 13%;
+  --sidebar-primary: 142 65% 44%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 142 65% 44%;
+  --sidebar-border: 145 25% 20%;
+}
+[data-theme="slate"] {
+  --primary: 210 50% 45%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar: 215 35% 12%;
+  --sidebar-primary: 210 50% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-ring: 210 50% 55%;
+  --sidebar-border: 215 30% 20%;
+  --background: 210 15% 95%;
+  --foreground: 215 30% 12%;
+}

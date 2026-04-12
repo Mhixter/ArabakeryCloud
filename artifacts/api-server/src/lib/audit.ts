@@ -6,6 +6,7 @@ interface AuditParams {
   req?: Request;
   userId?: number | null;
   userName?: string | null;
+  companyId?: number | null;
   action: string;
   entityType: string;
   entityId?: number | null;
@@ -22,6 +23,7 @@ export async function logAudit(params: AuditParams): Promise<void> {
       : null;
 
     await db.insert(auditLogsTable).values({
+      companyId: params.companyId ?? null,
       userId: params.userId,
       userName: params.userName,
       action: params.action,

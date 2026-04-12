@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
-import { setToken, setStoredUser } from "@/lib/auth";
+import { setToken, setStoredUser, setStoredCompany } from "@/lib/auth";
+import { applyTheme } from "@/lib/theme";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,10 @@ export default function LoginPage() {
         onSuccess: (data) => {
           setToken(data.token);
           setStoredUser(data.user);
+          if ((data as { company?: { themeColor?: string } }).company) {
+            setStoredCompany((data as { company: unknown }).company);
+            applyTheme(((data as { company: { themeColor?: string } }).company).themeColor ?? "amber");
+          }
           setLocation("/dashboard");
         },
         onError: (error) => {
@@ -101,7 +106,11 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-sm text-muted-foreground mt-4">
+          New bakery?{" "}
+          <button onClick={() => setLocation("/register")} className="text-primary font-medium hover:underline">Register for free trial</button>
+        </p>
+        <p className="text-center text-xs text-muted-foreground mt-3">
           New Model Bread &copy; {new Date().getFullYear()}
         </p>
       </div>

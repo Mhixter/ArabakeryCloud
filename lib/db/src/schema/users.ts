@@ -2,12 +2,14 @@ import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { branchesTable } from "./branches";
+import { companiesTable } from "./companies";
 
 export const userRoleEnum = ["managing_director", "manager", "receptionist", "production_staff"] as const;
 export type UserRole = typeof userRoleEnum[number];
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),

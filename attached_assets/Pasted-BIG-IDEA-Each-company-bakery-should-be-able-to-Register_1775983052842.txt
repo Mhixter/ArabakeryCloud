@@ -1,0 +1,862 @@
+BIG IDEA
+Each company (bakery) should be able to:
+
+✅ Register their business
+✅ Customize their identity (name, logo, color, phone)
+✅ Create their own staff (users)
+✅ Control what each staff can do
+
+👉 You are building a self-service platform
+
+🏢 1. COMPANY PROFILE SYSTEM (VERY IMPORTANT)
+Each bakery will have its own profile.
+
+What they can manage:
+Company Name (editable)
+
+Phone Number
+
+Logo upload
+
+Theme color (at least 5 options)
+
+Example Database:
+companies
+
+id
+name
+phone
+logoUrl
+themeColor
+createdAt
+🎨 Theme Colors
+Give them options like:
+
+Brown (bread theme 🍞)
+
+Orange
+
+Dark
+
+Blue
+
+Green
+
+👉 When they select a color:
+
+UI changes automatically (Tailwind dynamic theme)
+
+🧾 2. RECEIPT CUSTOMIZATION (VERY SMART IDEA)
+When printing receipt:
+
+It should include:
+
+Company Name
+
+Logo
+
+Phone number
+
+Date & time
+
+Receipt number
+
+Example:
+NEW MODEL BREAD
+Phone: 080xxxxxxx
+
+Receipt No: 000123
+Date: Today
+
+2 Bread = ₦1,000
+
+Thank you!
+👉 This makes your system look professional and branded
+
+👥 3. USER CREATION SYSTEM (YES, FULLY POSSIBLE)
+Each company can create their own users.
+
+Example Roles:
+Receptionist → sales only
+
+Production Staff → production only
+
+Manager → reports + inventory
+
+MD → full control
+
+Database:
+users
+
+id
+name
+email
+password
+role
+companyId
+isActive
+👉 IMPORTANT:
+
+Every user must belong to a company:
+
+companyId
+🔐 4. HOW USERS GET THEIR LOGIN DETAILS
+You have 2 options:
+
+✅ OPTION 1 (Simple & Recommended)
+Company admin (MD) creates users manually:
+
+Example:
+
+Name: John
+
+Email: john@gmail.com
+
+Password: 123456
+
+👉 Then give login details to staff
+
+✅ OPTION 2 (Advanced)
+Send invite:
+
+Enter email
+
+System sends link
+
+User sets password
+
+👉 Start with Option 1 (simpler)
+
+🔑 5. LOGIN SYSTEM FLOW
+When user logs in:
+
+System checks:
+
+Email
+
+Password
+
+Then loads:
+
+Their company
+
+Their role
+
+👉 Example:
+
+User: John
+Role: Receptionist
+Company: ABC Bakery
+🚫 6. VERY IMPORTANT SECURITY RULE
+User from one company:
+
+❌ MUST NOT see another company data
+
+How to enforce:
+Every query must include:
+
+WHERE companyId = user.companyId
+👉 This is called multi-tenancy isolation
+
+⚙️ 7. ROLE-BASED ACCESS CONTROL (RBAC)
+Example logic:
+
+Receptionist:
+Can:
+- Create sales
+- Print receipt
+
+Cannot:
+- See inventory
+- See reports
+Production Staff:
+Can:
+- Record production
+
+Cannot:
+- See sales
+👉 You enforce this using middleware
+
+📱 8. REAL FLOW (VERY CLEAR)
+Step 1:
+Company registers:
+
+Company Name: ABC Bakery
+Phone: 080xxxx
+Step 2:
+They choose:
+
+Color
+
+Upload logo
+
+Step 3:
+They create users:
+
+John → Receptionist
+Mary → Production
+Step 4:
+Users login and see only their dashboard
+
+Step 5:
+Receipts show:
+
+ABC Bakery
+Logo
+Phone number
+🔥 FINAL ADVICE
+What you're describing is:
+
+👉 A full SaaS ERP system
+
+To do it properly:
+
+MUST HAVE:
+✅ Company table
+✅ User table (with roles)
+✅ Subscription system
+✅ Theme customization
+✅ Logo upload
+✅ Strict data isolation
+
+⚠️ COMMON MISTAKE (AVOID THIS)
+❌ Don’t hardcode anything
+❌ Don’t share data across companies
+❌ Don’t skip role checks
+
+🎯 SIMPLE SUMMARY
+Companies create accounts ✅
+
+Companies customize branding ✅
+
+Companies create users ✅
+
+Users login with their own roles ✅
+
+System shows company-specific data only ✅
+
+🚀 NEXT STEP
+If you're ready, I can now build:
+
+👉 Company system + user system + RBAC (backend + frontend)
+
+Just say:
+
+👉 "BUILD COMPANY & USER SYSTEM"
+
+And I’ll give you production-ready code step-by-step.
+
+
+Best on what I described just provide me with updated prompt 
+
+Got it—you want a clean, powerful prompt you can reuse (for yourself or any AI/dev team) that includes everything you described plus the subscription SaaS model.
+
+Here is your UPDATED PRODUCTION-LEVEL PROMPT 👇
+
+Writing
+Build a full production-ready SaaS Bakery Management System named "New Model Bread", focused strictly on bread production and sales.
+
+The system must be a multi-tenant, subscription-based web application with PWA support, allowing multiple bakeries (companies) to register, customize their system, create staff accounts, and pay a monthly subscription to access the platform.
+
+🌐 CORE ARCHITECTURE
+Multi-tenant system (each company has isolated data)
+
+SaaS subscription model (₦3,000/month default plan)
+
+Offline-first architecture with background sync
+
+PWA (installable on desktop and Android)
+
+Real-time updates (WebSocket or polling)
+
+Role-Based Access Control (RBAC)
+
+Audit logging system
+
+🏢 COMPANY (TENANT) SYSTEM
+Each company (bakery) can:
+
+Register with:
+
+Company name
+
+Phone number
+
+Admin (MD) account
+
+Edit company profile:
+
+Update company name
+
+Upload logo
+
+Change phone number
+
+Select UI theme color (minimum 5 preset colors)
+
+All data must be isolated using companyId
+
+🎨 BRANDING & CUSTOMIZATION
+Support at least 5 theme colors (e.g., brown, orange, blue, green, dark)
+
+Store company branding:
+
+logoUrl
+
+themeColor
+
+Apply branding dynamically across UI
+
+Use company branding in receipts and dashboard
+
+👥 USER MANAGEMENT SYSTEM
+Each company can create and manage users:
+
+Roles:
+
+Managing Director (MD)
+
+Manager
+
+Receptionist (Sales)
+
+Production Staff
+
+Features:
+
+Create/edit/delete users
+
+Assign roles
+
+Activate/deactivate users
+
+Each user belongs to a company (companyId)
+
+Authentication:
+
+JWT-based login
+
+Password hashing
+
+Role-based middleware
+
+🔐 ROLE PERMISSIONS
+MD: Full access (settings, users, reports, logs)
+
+Manager: Production + inventory + reports
+
+Receptionist: Sales + receipts only
+
+Production Staff: Production only
+
+💳 SUBSCRIPTION SYSTEM (CRITICAL)
+Implement SaaS billing:
+
+Default plan: ₦3,000/month
+
+Subscription table:
+
+companyId
+
+plan
+
+status (active, expired, trial)
+
+startDate
+
+endDate
+
+Features:
+
+7-day free trial
+
+Payment integration (Paystack)
+
+Auto-renewal logic (manual or automated)
+
+Middleware to enforce access:
+
+Block actions if subscription expired
+
+Allow read-only access after expiry
+
+Grace period (3–7 days)
+
+🍞 PRODUCTION MANAGEMENT
+Record production batches:
+
+Bread type (standard loaf)
+
+Quantity
+
+Waste/defective units
+
+Date/time
+
+Staff responsible
+
+Auto-update inventory usage
+
+📦 INVENTORY MANAGEMENT
+Track raw materials:
+
+Flour, yeast, sugar, salt, others
+
+Features:
+
+Add/edit/delete items
+
+Auto deduction during production
+
+Low stock alerts
+
+Inventory logs/history
+
+💰 SALES SYSTEM (RECEPTION)
+Record sales:
+
+Quantity
+
+Price
+
+Payment method (cash/transfer)
+
+Prevent overselling beyond stock
+
+Generate printable receipt
+
+🧾 RECEIPT SYSTEM
+Receipts must include:
+
+Company logo
+
+Company name
+
+Phone number
+
+Receipt number
+
+Date & time
+
+Items purchased
+
+Total amount
+
+📊 DASHBOARD & REPORTS
+Real-time metrics:
+
+Production
+
+Sales
+
+Revenue
+
+Inventory levels
+
+Filters (daily, weekly, custom range)
+
+Export (PDF/CSV)
+
+📜 AUDIT LOGS
+Track all activities:
+
+Login/logout
+
+Sales
+
+Production
+
+Inventory updates
+
+User actions
+
+Accessible only by MD
+
+📡 OFFLINE-FIRST SUPPORT
+Use IndexedDB (Dexie.js)
+
+Queue actions when offline
+
+Sync when internet is restored
+
+Conflict resolution (last-write-wins or versioning)
+
+⚙️ TECH STACK
+Frontend:
+
+React (Vite)
+
+Tailwind CSS
+
+PWA (service worker)
+
+Backend:
+
+Node.js (Express)
+
+REST API
+
+Database:
+
+PostgreSQL
+
+Prisma ORM
+
+Optional:
+
+Redis (caching & queues)
+
+🔌 API STRUCTURE
+Auth:
+
+POST /auth/register
+
+POST /auth/login
+
+Company:
+
+GET /company
+
+PUT /company
+
+Users:
+
+CRUD /users
+
+Production:
+
+POST /production
+
+GET /production
+
+Sales:
+
+POST /sales
+
+GET /sales
+
+Inventory:
+
+GET /inventory
+
+POST /inventory
+
+PUT /inventory/
+
+Reports:
+
+GET /reports/dashboard
+
+Subscription:
+
+GET /subscription
+
+POST /subscription/renew
+
+🔐 SECURITY
+Input validation
+
+Rate limiting
+
+JWT auth
+
+HTTPS-ready
+
+Environment variables for secrets
+
+No hardcoded credentials
+
+🚀 DEPLOYMENT
+Docker-ready setup
+
+.env.example included
+
+Database migrations (Prisma)
+
+Seed data
+
+Deployable to VPS / Replit
+
+🎯 FINAL GOAL
+Build a scalable SaaS bakery platform where:
+
+Multiple companies can register
+
+Each company manages its own staff and operations
+
+Subscription controls access
+
+System works offline and syncs automatically
+
+UI is modern, clean, and professional
+
+Ensure the system runs end-to-end without missing components and is production-ready.
+
+🔥 Why this prompt is powerful
+This version now includes:
+
+✅ Multi-company system
+✅ Subscription billing
+✅ Branding (logo, colors, receipt identity)
+✅ User creation per company
+✅ Full SaaS architecture
+
+🎯 What you can do with it
+Use it with AI (like me) to generate full code
+
+Give it to developers
+
+Use it as your official product spec
+
+If you want next level:
+
+👉 I can now start generating the actual full system (backend + frontend + DB) based on THIS exact prompt.
+
+Just say:
+
+"START FULL BUILD FROM THIS PROMPT"
+
+
+Have you included with super admin for my own that I can configure the payment gateway also view all the company's and billed history 
+
+Good catch — that’s a critical missing piece for a real SaaS system.
+
+👉 Right now, your prompt is almost complete, but without a Super Admin (Platform Owner Panel), you won’t have control over:
+
+Payments
+
+Companies
+
+Revenue
+
+System configuration
+
+So yes — you must add this, and I’ll give you the exact upgrade to include.
+
+🧠 WHAT IS SUPER ADMIN (IN YOUR CASE)
+This is YOU (the platform owner).
+
+Not a bakery user.
+
+👉 You control the entire system globally.
+
+🔐 SUPER ADMIN CAPABILITIES
+You should be able to:
+
+🏢 Company Management
+View all registered companies
+
+Activate / deactivate companies
+
+Delete or suspend abusive accounts
+
+💳 Subscription & Billing Control
+View all subscriptions
+
+See payment history
+
+Manually:
+
+Activate subscription
+
+Extend expiry
+
+Change plan
+
+⚙️ Payment Gateway Configuration
+Add/edit:
+
+Paystack keys
+
+Flutterwave keys
+
+Switch payment provider ON/OFF
+
+📊 Revenue Dashboard
+Total earnings
+
+Monthly revenue
+
+Active vs expired subscriptions
+
+👥 System Monitoring
+Total users
+
+Total companies
+
+System usage stats
+
+📜 Global Logs
+See activities across all companies
+
+🧱 HOW TO IMPLEMENT IT
+1️⃣ Add SUPER ADMIN ROLE
+In your system:
+
+role = SUPER_ADMIN
+👉 This role is separate from company users
+
+2️⃣ Separate TABLE (IMPORTANT)
+Do NOT mix with normal users.
+
+super_admins
+
+id
+email
+password
+3️⃣ GLOBAL ACCESS (NO companyId)
+Super admin:
+
+❌ Does NOT belong to any company
+✅ Can see ALL companies
+
+4️⃣ NEW TABLES YOU NEED
+Billing History:
+billing_history
+
+id
+companyId
+amount
+paymentMethod
+status
+transactionRef
+createdAt
+Payment Config:
+payment_config
+
+provider (paystack/flutterwave)
+publicKey
+secretKey
+isActive
+🧭 SUPER ADMIN DASHBOARD (PAGES)
+Add new section:
+
+🧑‍💼 Super Admin Panel
+Pages:
+
+Dashboard
+
+Companies
+
+Subscriptions
+
+Billing History
+
+Payment Settings
+
+System Logs
+
+🔄 FLOW (VERY CLEAR)
+Example:
+Bakery pays ₦3,000
+
+Payment recorded in:
+→ billing_history
+
+Subscription updated:
+→ active
+
+You (Super Admin) can:
+
+See payment
+
+Edit if needed
+
+🔥 UPDATE TO YOUR PROMPT (ADD THIS SECTION)
+You should add this to your main prompt 👇
+
+Writing
+🧑‍💼 SUPER ADMIN (PLATFORM OWNER PANEL)
+Implement a Super Admin system for the platform owner with full global control.
+
+Features:
+1. Authentication
+Separate login for Super Admin
+
+Not tied to any company
+
+2. Company Management
+View all registered companies
+
+Activate / deactivate companies
+
+Suspend or delete companies
+
+3. Subscription Management
+View all subscriptions
+
+Manually activate or extend subscriptions
+
+Change company plans
+
+4. Billing & Payment History
+View all payments made by companies
+
+Track:
+
+Amount
+
+Payment method
+
+Transaction reference
+
+Date
+
+Store in billing_history table
+
+5. Payment Gateway Configuration
+Configure Paystack / Flutterwave keys
+
+Enable/disable payment providers
+
+Store securely in database or environment variables
+
+6. Revenue Dashboard
+Total revenue
+
+Monthly earnings
+
+Active vs expired subscriptions
+
+7. Global Activity Logs
+View logs across all companies
+
+Database Tables:
+super_admins
+
+billing_history
+
+payment_config
+
+Security:
+Super Admin routes must be protected
+
+Only accessible by SUPER_ADMIN role
+
+Never exposed to normal users
+
+⚠️ FINAL ADVICE
+Without Super Admin:
+
+❌ You lose control
+❌ You can’t manage payments
+❌ You can’t scale
+
+With Super Admin:
+
+✅ You control everything
+✅ You track revenue
+✅ You run it like a real SaaS company
+
+🎯 FINAL SUMMARY
+Now your system has:
+
+Companies (bakeries) ✅
+
+Users (staff) ✅
+
+Subscription system ✅
+
+Payment integration ✅
+
+Super Admin (YOU) ✅

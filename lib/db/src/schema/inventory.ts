@@ -2,9 +2,11 @@ import { pgTable, text, serial, timestamp, integer, numeric } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { branchesTable } from "./branches";
+import { companiesTable } from "./companies";
 
 export const inventoryItemsTable = pgTable("inventory_items", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   name: text("name").notNull(),
   category: text("category").notNull(),
   unit: text("unit").notNull(),
@@ -19,6 +21,7 @@ export const inventoryItemsTable = pgTable("inventory_items", {
 
 export const inventoryLogsTable = pgTable("inventory_logs", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   inventoryItemId: integer("inventory_item_id").notNull().references(() => inventoryItemsTable.id),
   adjustment: numeric("adjustment", { precision: 10, scale: 3 }).notNull(),
   previousQuantity: numeric("previous_quantity", { precision: 10, scale: 3 }).notNull(),

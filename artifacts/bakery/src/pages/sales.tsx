@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { getStoredUser } from "@/lib/auth";
+import { getStoredUser, getStoredCompany } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,7 @@ interface ReceiptData {
 }
 
 function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => void }) {
+  const company = getStoredCompany();
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
@@ -51,7 +52,11 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
         {/* Printable receipt */}
         <div className="border border-border rounded-lg p-5 space-y-3 text-sm" id="receipt-print-area">
           <div className="text-center border-b border-border pb-3">
-            <p className="font-serif font-bold text-lg">New Model Bread</p>
+            {company?.logoUrl && (
+              <img src={company.logoUrl} alt="Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
+            )}
+            <p className="font-serif font-bold text-lg">{company?.name ?? "New Model Bread"}</p>
+            {company?.phone && <p className="text-muted-foreground text-xs">{company.phone}</p>}
             <p className="text-muted-foreground text-xs">{sale.branchName}</p>
           </div>
           <div className="space-y-1.5">

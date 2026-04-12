@@ -3,9 +3,11 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { branchesTable } from "./branches";
+import { companiesTable } from "./companies";
 
 export const productionBatchesTable = pgTable("production_batches", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   breadType: text("bread_type").notNull(),
   quantityProduced: integer("quantity_produced").notNull(),
   wasteQuantity: integer("waste_quantity").notNull().default(0),

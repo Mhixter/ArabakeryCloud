@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { db, branchesTable, usersTable, inventoryItemsTable, productionBatchesTable, salesTable } from "@workspace/db";
+import { db, companiesTable, subscriptionsTable, branchesTable, usersTable, inventoryItemsTable, productionBatchesTable, salesTable } from "@workspace/db";
 
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -10,25 +10,48 @@ function hashPassword(password: string): string {
 async function seed() {
   console.log("Starting seed...");
 
-  // Check if already seeded
-  const existingUsers = await db.select().from(usersTable).limit(1);
-  if (existingUsers.length > 0) {
+  const existingCompanies = await db.select().from(companiesTable).limit(1);
+  if (existingCompanies.length > 0) {
     console.log("Database already seeded, skipping.");
     return;
   }
 
+  // Create demo company
+  const [company] = await db.insert(companiesTable).values({
+    name: "New Model Bread",
+    phone: "08012345678",
+    themeColor: "amber",
+    address: "12 Broad Street, Lagos Island, Lagos",
+  }).returning();
+
+  console.log("Company created:", company.name);
+
+  // Create subscription (active for demo)
+  const now = new Date();
+  const periodEnd = new Date(now);
+  periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+  await db.insert(subscriptionsTable).values({
+    companyId: company.id,
+    plan: "starter",
+    status: "active",
+    priceMonthly: "3000",
+    currentPeriodStart: now,
+    currentPeriodEnd: periodEnd,
+  });
+
   // Create branches
   const [mainBranch] = await db.insert(branchesTable).values({
+    companyId: company.id,
     name: "Lagos Mainland",
-    address: "12 Broad Street, Lagos Island, Lagos",
-    phone: "08012345678",
+    location: "12 Broad Street, Lagos Island, Lagos",
     isActive: true,
   }).returning();
 
   const [secondBranch] = await db.insert(branchesTable).values({
+    companyId: company.id,
     name: "Ikeja Branch",
-    address: "5 Allen Avenue, Ikeja, Lagos",
-    phone: "08098765432",
+    location: "5 Allen Avenue, Ikeja, Lagos",
     isActive: true,
   }).returning();
 
@@ -36,157 +59,79 @@ async function seed() {
 
   // Create users
   const users = await db.insert(usersTable).values([
-    {
-      username: "admin",
-      passwordHash: hashPassword("admin123"),
-      fullName: "Chukwuemeka Obi",
-      role: "managing_director" as const,
-      branchId: null,
-      isActive: true,
-    },
-    {
-      username: "manager1",
-      passwordHash: hashPassword("manager123"),
-      fullName: "Adaeze Nwosu",
-      role: "manager" as const,
-      branchId: mainBranch.id,
-      isActive: true,
-    },
-    {
-      username: "receptionist1",
-      passwordHash: hashPassword("staff123"),
-      fullName: "Fatima Bello",
-      role: "receptionist" as const,
-      branchId: mainBranch.id,
-      isActive: true,
-    },
-    {
-      username: "production1",
-      passwordHash: hashPassword("staff123"),
-      fullName: "Kehinde Afolabi",
-      role: "production_staff" as const,
-      branchId: mainBranch.id,
-      isActive: true,
-    },
-    {
-      username: "manager2",
-      passwordHash: hashPassword("manager123"),
-      fullName: "Emeka Eze",
-      role: "manager" as const,
-      branchId: secondBranch.id,
-      isActive: true,
-    },
+    { companyId: company.id, username: "admin", passwordHash: hashPassword("admin123"), fullName: "Chukwuemeka Obi", role: "managing_director" as const, branchId: mainBranch.id, isActive: true },
+    { companyId: company.id, username: "manager1", passwordHash: hashPassword("manager123"), fullName: "Adaeze Nwosu", role: "manager" as const, branchId: mainBranch.id, isActive: true },
+    { companyId: company.id, username: "receptionist1", passwordHash: hashPassword("staff123"), fullName: "Fatima Bello", role: "receptionist" as const, branchId: mainBranch.id, isActive: true },
+    { companyId: company.id, username: "production1", passwordHash: hashPassword("staff123"), fullName: "Kehinde Afolabi", role: "production_staff" as const, branchId: mainBranch.id, isActive: true },
+    { companyId: company.id, username: "manager2", passwordHash: hashPassword("manager123"), fullName: "Emeka Eze", role: "manager" as const, branchId: secondBranch.id, isActive: true },
   ]).returning();
 
-  console.log(`${users.length} users created`);
+  console.log("Users created:", users.map(u => u.username).join(", "));
 
-  const productionUser = users.find(u => u.role === "production_staff")!;
-  const receptionistUser = users.find(u => u.role === "receptionist")!;
+  const admin = users[0];
+  const receptionist = users[2];
+  const production = users[3];
 
   // Create inventory items
-  await db.insert(inventoryItemsTable).values([
-    { name: "All-Purpose Flour", category: "Flour", unit: "kg", currentQuantity: "250", minimumQuantity: "50", costPerUnit: "650", branchId: mainBranch.id },
-    { name: "Whole Wheat Flour", category: "Flour", unit: "kg", currentQuantity: "80", minimumQuantity: "30", costPerUnit: "750", branchId: mainBranch.id },
-    { name: "Active Dry Yeast", category: "Yeast", unit: "kg", currentQuantity: "5", minimumQuantity: "2", costPerUnit: "8500", branchId: mainBranch.id },
-    { name: "Refined Sugar", category: "Sugar", unit: "kg", currentQuantity: "120", minimumQuantity: "25", costPerUnit: "450", branchId: mainBranch.id },
-    { name: "Table Salt", category: "Salt", unit: "kg", currentQuantity: "20", minimumQuantity: "5", costPerUnit: "200", branchId: mainBranch.id },
-    { name: "Vegetable Margarine", category: "Fat/Oil", unit: "kg", currentQuantity: "60", minimumQuantity: "20", costPerUnit: "1200", branchId: mainBranch.id },
-    { name: "Eggs", category: "Eggs", unit: "pcs", currentQuantity: "4", minimumQuantity: "24", costPerUnit: "60", branchId: mainBranch.id },
-    { name: "Vanilla Extract", category: "Flavoring", unit: "liters", currentQuantity: "2", minimumQuantity: "1", costPerUnit: "3500", branchId: mainBranch.id },
-    { name: "Bread Bags", category: "Packaging", unit: "pcs", currentQuantity: "500", minimumQuantity: "100", costPerUnit: "25", branchId: mainBranch.id },
-    { name: "All-Purpose Flour", category: "Flour", unit: "kg", currentQuantity: "180", minimumQuantity: "40", costPerUnit: "650", branchId: secondBranch.id },
-    { name: "Active Dry Yeast", category: "Yeast", unit: "kg", currentQuantity: "3", minimumQuantity: "2", costPerUnit: "8500", branchId: secondBranch.id },
-  ]);
-  console.log("Inventory created");
+  const inventoryData = [
+    { name: "Wheat Flour (50kg bag)", category: "Raw Material", unit: "bags", currentQuantity: "45", minimumQuantity: "10", costPerUnit: "22000", branchId: mainBranch.id },
+    { name: "Yeast (500g)", category: "Raw Material", unit: "packs", currentQuantity: "8", minimumQuantity: "5", costPerUnit: "1500", branchId: mainBranch.id },
+    { name: "Sugar (50kg bag)", category: "Raw Material", unit: "bags", currentQuantity: "3", minimumQuantity: "5", costPerUnit: "38000", branchId: mainBranch.id },
+    { name: "Salt (1kg)", category: "Raw Material", unit: "packs", currentQuantity: "15", minimumQuantity: "8", costPerUnit: "300", branchId: mainBranch.id },
+    { name: "Palm Oil (25L)", category: "Raw Material", unit: "gallons", currentQuantity: "2", minimumQuantity: "4", costPerUnit: "12000", branchId: mainBranch.id },
+    { name: "Bread Improver", category: "Additive", unit: "kg", currentQuantity: "6", minimumQuantity: "2", costPerUnit: "2500", branchId: mainBranch.id },
+    { name: "Bread Bags (pack of 100)", category: "Packaging", unit: "packs", currentQuantity: "4", minimumQuantity: "5", costPerUnit: "800", branchId: mainBranch.id },
+    { name: "Wheat Flour (50kg bag)", category: "Raw Material", unit: "bags", currentQuantity: "20", minimumQuantity: "8", costPerUnit: "22000", branchId: secondBranch.id },
+    { name: "Yeast (500g)", category: "Raw Material", unit: "packs", currentQuantity: "3", minimumQuantity: "4", costPerUnit: "1500", branchId: secondBranch.id },
+    { name: "Sugar (50kg bag)", category: "Raw Material", unit: "bags", currentQuantity: "6", minimumQuantity: "4", costPerUnit: "38000", branchId: secondBranch.id },
+    { name: "Salt (1kg)", category: "Raw Material", unit: "packs", currentQuantity: "10", minimumQuantity: "6", costPerUnit: "300", branchId: secondBranch.id },
+  ];
 
-  // Create production batches for the past week
-  const now = new Date();
-  for (let daysAgo = 6; daysAgo >= 0; daysAgo--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - daysAgo);
-    date.setHours(6, 30, 0, 0);
+  await db.insert(inventoryItemsTable).values(inventoryData.map(item => ({ companyId: company.id, ...item })));
+  console.log("Inventory created:", inventoryData.length, "items");
 
-    const qty = 180 + Math.floor(Math.random() * 60);
-    const waste = Math.floor(qty * 0.03 + Math.random() * 5);
-
-    await db.insert(productionBatchesTable).values([
-      {
-        breadType: "Standard White Loaf",
-        quantityProduced: qty,
-        wasteQuantity: waste,
-        staffId: productionUser.id,
-        branchId: mainBranch.id,
-        productionDate: date,
-      },
-      {
-        breadType: "Agege Bread",
-        quantityProduced: Math.floor(qty * 0.6),
-        wasteQuantity: Math.floor(Math.random() * 4),
-        staffId: productionUser.id,
-        branchId: mainBranch.id,
-        productionDate: new Date(date.getTime() + 3600000),
-      },
-    ]);
-  }
-  console.log("Production batches created");
-
-  // Create sales for the past 2 weeks
-  const breadPrices: Record<string, number> = {
-    "Standard White Loaf": 800,
-    "Agege Bread": 600,
-    "Whole Wheat Loaf": 1000,
-    "Sweet Bread": 500,
-  };
-
-  let receiptCounter = 1000;
-
-  for (let daysAgo = 13; daysAgo >= 0; daysAgo--) {
-    const baseDate = new Date(now);
-    baseDate.setDate(baseDate.getDate() - daysAgo);
-
-    const salesPerDay = 8 + Math.floor(Math.random() * 10);
-
-    for (let s = 0; s < salesPerDay; s++) {
-      const saleDate = new Date(baseDate);
-      saleDate.setHours(8 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60), 0, 0);
-
-      const breadTypes = Object.keys(breadPrices);
-      const breadType = breadTypes[Math.floor(Math.random() * breadTypes.length)];
-      const pricePerUnit = breadPrices[breadType];
-      const quantity = 1 + Math.floor(Math.random() * 10);
-      const totalAmount = pricePerUnit * quantity;
-      const costAmount = pricePerUnit * 0.45 * quantity;
-      const profitAmount = totalAmount - costAmount;
-      const paymentMethod = Math.random() > 0.4 ? "cash" : "transfer";
-
-      receiptCounter++;
-      const receiptDate = `${saleDate.getFullYear()}${String(saleDate.getMonth() + 1).padStart(2, "0")}${String(saleDate.getDate()).padStart(2, "0")}`;
-      const receiptNumber = `NMB-${receiptDate}-${String(receiptCounter).padStart(4, "0")}`;
-
-      await db.insert(salesTable).values({
-        receiptNumber,
-        breadType,
-        quantity,
-        pricePerUnit: pricePerUnit.toString(),
-        totalAmount: totalAmount.toString(),
-        costAmount: costAmount.toString(),
-        profitAmount: profitAmount.toString(),
-        paymentMethod: paymentMethod as "cash" | "transfer",
-        cashierId: receptionistUser.id,
-        branchId: mainBranch.id,
-        saleDate,
-      });
+  // Create production batches (last 7 days)
+  const productionData = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(6, 0, 0, 0);
+    productionData.push({ companyId: company.id, breadType: "Standard White Loaf", quantityProduced: Math.floor(Math.random() * 100) + 150, wasteQuantity: Math.floor(Math.random() * 10) + 2, staffId: production.id, branchId: mainBranch.id, productionDate: date });
+    if (i % 2 === 0) {
+      productionData.push({ companyId: company.id, breadType: "Agege Bread", quantityProduced: Math.floor(Math.random() * 60) + 80, wasteQuantity: Math.floor(Math.random() * 8) + 1, staffId: production.id, branchId: mainBranch.id, productionDate: new Date(date.getTime() + 2 * 60 * 60 * 1000) });
     }
   }
-  console.log("Sales created");
+  await db.insert(productionBatchesTable).values(productionData);
+  console.log("Production batches created:", productionData.length);
 
-  console.log("\n=== SEED COMPLETE ===");
+  // Create sales (last 14 days)
+  const salesData = [];
+  const breadTypes = ["Standard White Loaf", "Agege Bread", "Sweet Bread", "Whole Wheat Loaf"];
+  const prices = [500, 400, 600, 700];
+  let receiptCounter = 1;
+  for (let i = 13; i >= 0; i--) {
+    const numSales = Math.floor(Math.random() * 8) + 5;
+    for (let j = 0; j < numSales; j++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      date.setHours(8 + j, Math.floor(Math.random() * 59), 0, 0);
+      const typeIdx = Math.floor(Math.random() * breadTypes.length);
+      const qty = Math.floor(Math.random() * 5) + 1;
+      const price = prices[typeIdx];
+      const total = qty * price;
+      const dateStr = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}`;
+      salesData.push({ companyId: company.id, receiptNumber: `NMB-${dateStr}-${String(receiptCounter++).padStart(4,"0")}`, breadType: breadTypes[typeIdx], quantity: qty, pricePerUnit: price.toString(), totalAmount: total.toString(), costAmount: "0", profitAmount: total.toString(), paymentMethod: Math.random() > 0.4 ? "cash" as const : "transfer" as const, cashierId: receptionist.id, branchId: mainBranch.id, saleDate: date });
+    }
+  }
+  await db.insert(salesTable).values(salesData);
+  console.log("Sales created:", salesData.length);
+
+  console.log("\n✅ Seed complete!");
   console.log("Login credentials:");
-  console.log("  Managing Director: admin / admin123");
-  console.log("  Manager:           manager1 / manager123");
-  console.log("  Receptionist:      receptionist1 / staff123");
-  console.log("  Production Staff:  production1 / staff123");
-  console.log("===================");
+  console.log("  admin / admin123 (Managing Director)");
+  console.log("  manager1 / manager123 (Manager)");
+  console.log("  receptionist1 / staff123 (Receptionist)");
+  console.log("  production1 / staff123 (Production Staff)");
 }
 
-seed().catch(console.error).finally(() => process.exit(0));
+seed().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });

@@ -13,12 +13,14 @@ import {
   Menu,
   X,
   AlertTriangle,
+  Building2,
+  CreditCard,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { clearToken, clearStoredUser, getStoredUser } from "@/lib/auth";
+import { clearToken, clearStoredUser, getStoredUser, clearStoredCompany, getStoredCompany } from "@/lib/auth";
+import { initTheme } from "@/lib/theme";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
 
@@ -38,6 +40,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/users", label: "Users", icon: Users, roles: ["managing_director"] },
   { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, roles: ["managing_director"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["managing_director"] },
+  { href: "/company-settings", label: "Company", icon: Building2, roles: ["managing_director"] },
+  { href: "/subscription", label: "Subscription", icon: CreditCard, roles: ["managing_director"] },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -52,7 +56,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const queryClient = useQueryClient();
   const user = getStoredUser();
+  const company = getStoredCompany();
   const userRole = user?.role ?? "";
+
+  useEffect(() => { initTheme(); }, []);
 
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
@@ -62,6 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     clearToken();
     clearStoredUser();
+    clearStoredCompany();
     queryClient.clear();
     setLocation("/login");
   };
@@ -70,12 +78,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-        <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-          <Wheat size={20} className="text-sidebar-primary-foreground" />
+        <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
+          {company?.logoUrl ? (
+            <img src={company.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+          ) : (
+            <Wheat size={20} className="text-sidebar-primary-foreground" />
+          )}
         </div>
-        <div>
-          <p className="font-serif font-bold text-sidebar-foreground text-sm leading-tight">New Model</p>
-          <p className="font-serif font-bold text-sidebar-primary text-sm leading-tight">Bread</p>
+        <div className="min-w-0">
+          <p className="font-serif font-bold text-sidebar-foreground text-sm leading-tight truncate">{company?.name ?? "New Model Bread"}</p>
+          <p className="text-sidebar-foreground/40 text-xs">Bakery System</p>
         </div>
       </div>
 
@@ -152,8 +164,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <Wheat size={18} className="text-primary" />
-            <span className="font-serif font-bold text-foreground">New Model Bread</span>
+            {company?.logoUrl ? (
+              <img src={company.logoUrl} alt="Logo" className="w-7 h-7 rounded object-contain" />
+            ) : (
+              <Wheat size={18} className="text-primary" />
+            )}
+            <span className="font-serif font-bold text-foreground">{company?.name ?? "New Model Bread"}</span>
           </div>
           <div className="w-9" />
         </header>

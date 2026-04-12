@@ -3,12 +3,14 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { branchesTable } from "./branches";
+import { companiesTable } from "./companies";
 
 export const paymentMethodEnum = ["cash", "transfer"] as const;
 export type PaymentMethod = typeof paymentMethodEnum[number];
 
 export const salesTable = pgTable("sales", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   receiptNumber: text("receipt_number").notNull().unique(),
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),

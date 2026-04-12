@@ -35,21 +35,31 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - **API Server** (`artifacts/api-server`): Express REST API on port 8080 (`/api/*`)
 - **Bakery Frontend** (`artifacts/bakery`): React+Vite SPA on port 23375, proxies `/api` to port 8080
 
-### Auth
-- Token stored as `nmb_token` in localStorage
-- User stored as `nmb_user` in localStorage
+### Multi-Tenant SaaS Architecture
+- Each company is fully isolated (all tables have `companyId` FK)
+- JWT carries `{ userId, role, branchId, companyId }` — `companyId` drives all queries
+- Registration creates: company + trial subscription + main branch + admin user
+- Subscription statuses: `trial` (7 days) | `active` | `expired` | `cancelled`
+- Price: ₦3,000/month (plan: "starter")
+- Theme colors: `amber` (default) | `orange` | `blue` | `green` | `slate` — stored on companies.themeColor, applied via CSS `[data-theme]` attribute
+
+### Auth & Local Storage
+- `nmb_token`: JWT
+- `nmb_user`: user object (includes companyId)
+- `nmb_company`: company object (name, phone, logoUrl, themeColor, address)
 - Helper functions in `artifacts/bakery/src/lib/auth.ts`
+- Theme utilities in `artifacts/bakery/src/lib/theme.ts`
 - `setAuthTokenGetter(() => getToken())` in main.tsx for auto-JWT injection
 
 ### Roles & Access
 | Role | Pages |
 |------|-------|
-| managing_director | All pages |
+| managing_director | All pages + Company + Subscription |
 | manager | Dashboard, Production, Inventory, Reports |
 | receptionist | Dashboard, Sales |
 | production_staff | Production only |
 
-### Seed Credentials
+### Seed Credentials (Demo Company: "New Model Bread")
 | Role | Username | Password |
 |------|----------|----------|
 | Managing Director | admin | admin123 |
@@ -57,30 +67,43 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 | Receptionist | receptionist1 | staff123 |
 | Production Staff | production1 | staff123 |
 
+Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
+
 ### Pages
-- `/login` — Login page
+- `/login` — Login page with "Register for free trial" link
+- `/register` — New company registration (creates company + 7-day trial)
 - `/dashboard` — Executive dashboard with KPIs and sales trend chart
-- `/sales` — Record sales, view receipts, print receipts
+- `/sales` — Record sales, view branded receipts (company logo + name on receipt)
 - `/production` — Record production batches with waste tracking
 - `/inventory` — Inventory management with low-stock alerts
 - `/reports` — Analytics charts (sales trend, production by type, efficiency pie chart)
 - `/users` — User management (MD only)
 - `/audit-logs` — Audit trail (MD only)
 - `/settings` — Branch management (MD only)
+- `/company-settings` — Company profile, logo upload (base64 ≤200KB), 5 theme colors (MD only)
+- `/subscription` — Subscription status + renewal (₦3,000/month) (MD only)
+
+### API Routes
+- `POST /api/auth/register` — Multi-tenant registration
+- `POST /api/auth/login` — Returns token + user + company + subscription
+- `GET /api/company` — Company profile
+- `PATCH /api/company` — Update name/phone/address/logo/theme
+- `GET /api/subscription` — Subscription status (auto-expires trial)
+- `POST /api/subscription/renew` — Renew for 1 month
 
 ### Database Tables
-- `branches` — Bakery locations
-- `users` — Staff accounts
-- `production_batches` — Production records with waste
-- `inventory_items` — Ingredient/material stock
-- `inventory_logs` — Stock adjustment history
-- `sales` — Sales transactions with receipts
-- `audit_logs` — System audit trail
+- `companies` — Tenant companies with theme/logo/branding
+- `subscriptions` — Per-company subscription (trial/active/expired)
+- `branches` — Bakery locations (scoped per company)
+- `users` — Staff accounts (scoped per company)
+- `production_batches` — Production records (scoped per company)
+- `inventory_items` — Ingredient/material stock (scoped per company)
+- `inventory_logs` — Stock adjustment history (scoped per company)
+- `sales` — Sales transactions with receipts (scoped per company)
+- `audit_logs` — System audit trail (scoped per company)
 
-### Seed Script
-Run seed (builds then runs):
-```bash
-cd artifacts/api-server
-node --input-type=module -e "import { build } from './node_modules/esbuild/lib/main.js'; build({ entryPoints: ['src/seed.ts'], platform: 'node', bundle: true, format: 'cjs', outfile: 'dist/seed.cjs', external: ['*.node'] }).then(() => console.log('built'))"
-node dist/seed.cjs
-```
+### Important Notes
+- Radix Select: never use `value=""` — use `"none"` and convert in submit handlers
+- DB numeric fields stored as strings in Postgres — always `parseFloat()` when reading
+- Logo upload: base64 data URL, max 200KB, stored in companies.logoUrl
+- Receipt branding: company logo + name + phone shown when company data exists in localStorage

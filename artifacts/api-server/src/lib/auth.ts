@@ -18,13 +18,13 @@ export function verifyPassword(password: string, stored: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(testHash, "hex"));
 }
 
-export function signToken(payload: { userId: number; role: string; branchId?: number | null }): string {
+export function signToken(payload: { userId: number; role: string; branchId?: number | null; companyId: number }): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
-export function verifyToken(token: string): { userId: number; role: string; branchId?: number | null } | null {
+export function verifyToken(token: string): { userId: number; role: string; branchId?: number | null; companyId: number } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; role: string; branchId?: number | null };
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; role: string; branchId?: number | null; companyId: number };
     return decoded;
   } catch (err) {
     logger.warn({ err }, "Invalid token");

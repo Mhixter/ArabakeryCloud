@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import DashboardPage from "@/pages/dashboard";
 import SalesPage from "@/pages/sales";
 import ProductionPage from "@/pages/production";
@@ -12,8 +13,11 @@ import ReportsPage from "@/pages/reports";
 import UsersPage from "@/pages/users";
 import AuditLogsPage from "@/pages/audit-logs";
 import SettingsPage from "@/pages/settings";
+import CompanySettingsPage from "@/pages/company-settings";
+import SubscriptionPage from "@/pages/subscription";
 import Layout from "@/components/layout";
 import { isAuthenticated } from "@/lib/auth";
+import { initTheme } from "@/lib/theme";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
@@ -38,72 +42,56 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ThemeInit() {
+  useEffect(() => { initTheme(); }, []);
+  return null;
+}
+
+function Protected({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <Layout>{children}</Layout>
+    </AuthGuard>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/">
-        <AuthGuard>
-          <Layout>
-            <DashboardPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><DashboardPage /></Protected>
       </Route>
       <Route path="/dashboard">
-        <AuthGuard>
-          <Layout>
-            <DashboardPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><DashboardPage /></Protected>
       </Route>
       <Route path="/sales">
-        <AuthGuard>
-          <Layout>
-            <SalesPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><SalesPage /></Protected>
       </Route>
       <Route path="/production">
-        <AuthGuard>
-          <Layout>
-            <ProductionPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><ProductionPage /></Protected>
       </Route>
       <Route path="/inventory">
-        <AuthGuard>
-          <Layout>
-            <InventoryPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><InventoryPage /></Protected>
       </Route>
       <Route path="/reports">
-        <AuthGuard>
-          <Layout>
-            <ReportsPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><ReportsPage /></Protected>
       </Route>
       <Route path="/users">
-        <AuthGuard>
-          <Layout>
-            <UsersPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><UsersPage /></Protected>
       </Route>
       <Route path="/audit-logs">
-        <AuthGuard>
-          <Layout>
-            <AuditLogsPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><AuditLogsPage /></Protected>
       </Route>
       <Route path="/settings">
-        <AuthGuard>
-          <Layout>
-            <SettingsPage />
-          </Layout>
-        </AuthGuard>
+        <Protected><SettingsPage /></Protected>
+      </Route>
+      <Route path="/company-settings">
+        <Protected><CompanySettingsPage /></Protected>
+      </Route>
+      <Route path="/subscription">
+        <Protected><SubscriptionPage /></Protected>
       </Route>
       <Route component={NotFound} />
     </Switch>
@@ -115,6 +103,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <ThemeInit />
           <Router />
         </WouterRouter>
         <Toaster />
