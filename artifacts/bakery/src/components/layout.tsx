@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
-  Users, ScrollText, Settings, LogOut, Wheat, Menu, AlertTriangle,
-  Building2, CreditCard, X,
+  Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
+  Building2, CreditCard, MoreHorizontal, X, ChevronRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -15,16 +15,16 @@ import { useGetLowStockItems } from "@workspace/api-client-react";
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard",        label: "Dashboard",   icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff"] },
-  { href: "/sales",            label: "Sales",        icon: ShoppingCart,    roles: ["managing_director","manager","receptionist"] },
-  { href: "/production",       label: "Production",   icon: Factory,         roles: ["managing_director","manager","production_staff"] },
-  { href: "/inventory",        label: "Inventory",    icon: Package,         roles: ["managing_director","manager"] },
-  { href: "/reports",          label: "Reports",      icon: BarChart3,       roles: ["managing_director","manager"] },
-  { href: "/users",            label: "Users",        icon: Users,           roles: ["managing_director"] },
-  { href: "/audit-logs",       label: "Audit Logs",   icon: ScrollText,      roles: ["managing_director"] },
-  { href: "/settings",         label: "Settings",     icon: Settings,        roles: ["managing_director"] },
-  { href: "/company-settings", label: "Company",      icon: Building2,       roles: ["managing_director"] },
-  { href: "/subscription",     label: "Subscription", icon: CreditCard,      roles: ["managing_director"] },
+  { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff"] },
+  { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist"] },
+  { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
+  { href: "/inventory",        label: "Inventory",     icon: Package,         roles: ["managing_director","manager"] },
+  { href: "/reports",          label: "Reports",       icon: BarChart3,       roles: ["managing_director","manager"] },
+  { href: "/users",            label: "Users",         icon: Users,           roles: ["managing_director"] },
+  { href: "/audit-logs",       label: "Audit Logs",    icon: ScrollText,      roles: ["managing_director"] },
+  { href: "/settings",         label: "Settings",      icon: Settings,        roles: ["managing_director"] },
+  { href: "/company-settings", label: "Company",       icon: Building2,       roles: ["managing_director"] },
+  { href: "/subscription",     label: "Subscription",  icon: CreditCard,      roles: ["managing_director"] },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -37,7 +37,7 @@ const ROLE_LABELS: Record<string, string> = {
 /* ─────────────────────── shared hook ─────────────────────── */
 function useLayoutState() {
   const [location, setLocation] = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const queryClient = useQueryClient();
   const user = getStoredUser();
   const company = getStoredCompany();
@@ -54,18 +54,161 @@ function useLayoutState() {
     queryClient.clear(); setLocation("/login");
   };
 
-  return { location, setLocation, mobileOpen, setMobileOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout };
+  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout };
+}
+
+/* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
+function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
+  const { location, visibleNav, lowStockCount, moreOpen, setMoreOpen, handleLogout, user, userRole } = ls;
+
+  const primaryTabs = visibleNav.slice(0, 4);
+  const secondaryItems = visibleNav.slice(4);
+  const hasMore = secondaryItems.length > 0;
+
+  return (
+    <>
+      {/* Bottom nav bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 safe-area-bottom"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="flex items-center justify-around h-16">
+          {primaryTabs.map(item => {
+            const Icon = item.icon;
+            const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
+            return (
+              <Link key={item.href} href={item.href}>
+                <button
+                  data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
+                  className="flex flex-col items-center justify-center gap-1 w-16 h-full relative touch-manipulation">
+                  <span className={cn(
+                    "flex items-center justify-center w-10 h-7 rounded-xl transition-colors",
+                    isActive ? "bg-amber-100" : ""
+                  )}>
+                    <Icon size={20} className={isActive ? "text-amber-600" : "text-slate-400"} />
+                  </span>
+                  {item.href === "/inventory" && lowStockCount > 0 && (
+                    <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                      {lowStockCount > 9 ? "9+" : lowStockCount}
+                    </span>
+                  )}
+                  <span className={cn("text-[10px] font-medium leading-none", isActive ? "text-amber-600" : "text-slate-400")}>
+                    {item.label}
+                  </span>
+                </button>
+              </Link>
+            );
+          })}
+
+          {/* More button — always shown for nav overflow + logout */}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 w-16 h-full touch-manipulation">
+            <span className={cn(
+              "flex items-center justify-center w-10 h-7 rounded-xl transition-colors",
+              moreOpen ? "bg-amber-100" : ""
+            )}>
+              <MoreHorizontal size={20} className={moreOpen ? "text-amber-600" : "text-slate-400"} />
+            </span>
+            <span className="text-[10px] font-medium leading-none text-slate-400">More</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More bottom sheet */}
+      {moreOpen && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMoreOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl overflow-hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+
+            {/* User info */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-amber-700 font-bold text-sm">{(user?.fullName ?? "U").charAt(0).toUpperCase()}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-800 text-sm truncate">{user?.fullName ?? "User"}</p>
+                <p className="text-slate-400 text-xs">{ROLE_LABELS[userRole] ?? userRole}</p>
+              </div>
+              <button onClick={() => setMoreOpen(false)} className="ml-auto p-2 text-slate-400">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Secondary nav items */}
+            {secondaryItems.length > 0 && (
+              <div className="px-3 py-2 border-b border-slate-100">
+                {secondaryItems.map(item => {
+                  const Icon = item.icon;
+                  const isActive = location === item.href;
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <button onClick={() => setMoreOpen(false)}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
+                          isActive ? "bg-amber-50 text-amber-700" : "text-slate-700 hover:bg-slate-50"
+                        )}>
+                        <Icon size={18} className={isActive ? "text-amber-600" : "text-slate-400"} />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        <ChevronRight size={15} className="text-slate-300" />
+                      </button>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* All primary items too if on More sheet */}
+            {secondaryItems.length === 0 && (
+              <div className="px-3 py-2 border-b border-slate-100">
+                {visibleNav.map(item => {
+                  const Icon = item.icon;
+                  const isActive = location === item.href;
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <button onClick={() => setMoreOpen(false)}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
+                          isActive ? "bg-amber-50 text-amber-700" : "text-slate-700 hover:bg-slate-50"
+                        )}>
+                        <Icon size={18} className={isActive ? "text-amber-600" : "text-slate-400"} />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        <ChevronRight size={15} className="text-slate-300" />
+                      </button>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Logout */}
+            <div className="px-3 py-3">
+              <button
+                data-testid="button-logout"
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
+                <LogOut size={18} className="text-red-400" />
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 /* ─────────────────────── BLUE: top-nav layout ─────────────── */
 function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, mobileOpen, setMobileOpen, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* ── Top navigation bar ── */}
+      {/* ── Top navigation bar (desktop) ── */}
       <header className="theme-topnav-bar flex items-center gap-0 h-14 px-4 bg-sidebar border-b border-sidebar-border flex-shrink-0 z-30">
-        {/* Logo */}
         <div className="flex items-center gap-2.5 mr-6 flex-shrink-0">
           <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center overflow-hidden flex-shrink-0">
             {company?.logoUrl
@@ -105,12 +248,13 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
 
         <div className="flex-1 lg:hidden" />
 
-        {/* Mobile hamburger */}
-        <button onClick={() => setMobileOpen(true)} className="lg:hidden p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground mr-2">
-          <Menu size={18} />
-        </button>
+        {/* Mobile — company name only */}
+        <div className="lg:hidden flex-1 flex justify-center">
+          <span className="font-semibold text-sidebar-foreground text-sm truncate max-w-[160px]">
+            {company?.name ?? "Ara Bakery Cloud"}
+          </span>
+        </div>
 
-        {/* User info + logout */}
         <div className="hidden lg:flex items-center gap-3 flex-shrink-0 border-l border-sidebar-border pl-4 ml-2">
           <div className="text-right">
             <p className="text-xs font-semibold text-sidebar-foreground leading-none">{user?.fullName ?? "User"}</p>
@@ -123,41 +267,7 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
         </div>
       </header>
 
-      {/* ── Mobile drawer ── */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="relative z-50 w-60 bg-sidebar flex flex-col border-r border-sidebar-border">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border">
-              <span className="font-semibold text-sidebar-foreground text-sm">{company?.name ?? "Menu"}</span>
-              <button onClick={() => setMobileOpen(false)} className="text-sidebar-foreground/60"><X size={18} /></button>
-            </div>
-            <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-              {visibleNav.map(item => {
-                const Icon = item.icon;
-                const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <button onClick={() => setMobileOpen(false)}
-                      className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                        isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
-                      )}>
-                      <Icon size={16} /><span>{item.label}</span>
-                    </button>
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="px-2 py-3 border-t border-sidebar-border">
-              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground/70 hover:bg-destructive/20 hover:text-destructive">
-                <LogOut size={16} /><span>Sign out</span>
-              </button>
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {/* ── Warning banner ── */}
+      {/* Low stock warning */}
       {lowStockCount > 0 && (userRole === "managing_director" || userRole === "manager") && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs">
           <AlertTriangle size={13} className="flex-shrink-0" />
@@ -166,46 +276,18 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
         </div>
       )}
 
-      {/* ── Main content ── */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">{children}</main>
+
+      {/* Mobile bottom tabs */}
+      <MobileBottomNav ls={ls} />
     </div>
   );
 }
 
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
 function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, setLocation: _sl, mobileOpen, setMobileOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout } = ls;
-
-  const NavItems = ({ onNavClick }: { onNavClick?: () => void }) => (
-    <>
-      {visibleNav.map(item => {
-        const Icon = item.icon;
-        const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
-        return (
-          <Link key={item.href} href={item.href}>
-            <button
-              data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
-              onClick={onNavClick}
-              className={cn(
-                "theme-nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors relative",
-                isActive
-                  ? cn("theme-nav-active bg-sidebar-primary text-sidebar-primary-foreground")
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}>
-              {/* Icon box — styled per theme via CSS class */}
-              <span className={cn("theme-nav-icon-box", isActive && "theme-nav-active-icon")}>
-                <Icon size={16} />
-              </span>
-              <span className="flex-1 text-left">{item.label}</span>
-              {item.href === "/inventory" && lowStockCount > 0 && (
-                <Badge variant="destructive" className="text-xs px-1.5 py-0.5 min-w-5 h-5">{lowStockCount}</Badge>
-              )}
-            </button>
-          </Link>
-        );
-      })}
-    </>
-  );
+  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout } = ls;
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -237,7 +319,30 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
         theme === "green" && "space-y-1",
         theme === "slate" && "space-y-px"
       )} data-testid="sidebar-nav">
-        <NavItems onNavClick={() => setMobileOpen(false)} />
+        {visibleNav.map(item => {
+          const Icon = item.icon;
+          const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
+          return (
+            <Link key={item.href} href={item.href}>
+              <button
+                data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
+                className={cn(
+                  "theme-nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors relative",
+                  isActive
+                    ? cn("theme-nav-active bg-sidebar-primary text-sidebar-primary-foreground")
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}>
+                <span className={cn("theme-nav-icon-box", isActive && "theme-nav-active-icon")}>
+                  <Icon size={16} />
+                </span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.href === "/inventory" && lowStockCount > 0 && (
+                  <Badge variant="destructive" className="text-xs px-1.5 py-0.5 min-w-5 h-5">{lowStockCount}</Badge>
+                )}
+              </button>
+            </Link>
+          );
+        })}
       </nav>
 
       {/* User */}
@@ -265,30 +370,22 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
         <SidebarContent />
       </aside>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <aside className="relative z-50 w-60 flex flex-col bg-sidebar border-r border-sidebar-border">
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
-
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
+        {/* Mobile header — logo + company name only */}
         <header className="lg:hidden flex items-center justify-between h-14 px-4 border-b border-border bg-card">
-          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-md hover:bg-accent" data-testid="button-mobile-menu">
-            <Menu size={20} />
-          </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {company?.logoUrl
               ? <img src={company.logoUrl} alt="Logo" className="w-7 h-7 rounded object-contain" />
               : <Wheat size={18} className="text-primary" />}
-            <span className={cn("font-bold text-foreground", theme === "amber" ? "font-serif" : "")}>{company?.name ?? "Ara Bakery Cloud"}</span>
+            <span className={cn("font-bold text-foreground text-sm", theme === "amber" ? "font-serif" : "")}>
+              {company?.name ?? "Ara Bakery Cloud"}
+            </span>
           </div>
-          <div className="w-9" />
+          {/* User initial avatar */}
+          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <span className="text-amber-700 font-bold text-xs">{(user?.fullName ?? "U").charAt(0).toUpperCase()}</span>
+          </div>
         </header>
 
         {/* Low stock banner */}
@@ -300,8 +397,11 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">{children}</main>
       </div>
+
+      {/* Mobile bottom tabs */}
+      <MobileBottomNav ls={ls} />
     </div>
   );
 }
