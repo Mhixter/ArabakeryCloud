@@ -83,13 +83,29 @@ Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
 - `/company-settings` — Company profile, logo upload (base64 ≤200KB), 5 theme colors (MD only)
 - `/subscription` — Subscription status + renewal (₦3,000/month) (MD only)
 
-### API Routes
+### API Routes (Bakery tenants)
 - `POST /api/auth/register` — Multi-tenant registration
 - `POST /api/auth/login` — Returns token + user + company + subscription
 - `GET /api/company` — Company profile
 - `PATCH /api/company` — Update name/phone/address/logo/theme
 - `GET /api/subscription` — Subscription status (auto-expires trial)
 - `POST /api/subscription/renew` — Renew for 1 month
+
+### API Routes (Super Admin — /api/admin/*)
+- `POST /api/admin/auth/login` — Super admin login (returns 8h JWT with role: "super_admin")
+- `GET /api/admin/companies` — List all companies with subscription info
+- `GET /api/admin/companies/:id` — Company details + user count
+- `PATCH /api/admin/companies/:id/subscription` — Update subscription (status + extend days)
+- `GET /api/admin/analytics` — Platform stats (total, active, trial, expired, MRR)
+
+### Super Admin Credentials
+| Username | Password |
+|----------|----------|
+| superadmin | superadmin123 |
+
+Access at: `/admin/login` → `/admin` (dashboard) → `/admin/companies` (company list)
+Super admin has its own dark blue UI (separate from bakery theme system).
+Re-seed with: `cd artifacts/api-server && pnpm exec tsx src/seed-admin.ts`
 
 ### Database Tables
 - `companies` — Tenant companies with theme/logo/branding

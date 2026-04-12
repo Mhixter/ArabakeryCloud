@@ -16,28 +16,20 @@ import SettingsPage from "@/pages/settings";
 import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
 import Layout from "@/components/layout";
+import AdminLoginPage from "@/pages/admin/login";
+import AdminDashboardPage from "@/pages/admin/dashboard";
+import AdminCompaniesPage from "@/pages/admin/companies";
 import { isAuthenticated } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30000,
-    },
-  },
+  defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      setLocation("/login");
-    }
-  }, [setLocation]);
-
+  useEffect(() => { if (!isAuthenticated()) setLocation("/login"); }, [setLocation]);
   if (!isAuthenticated()) return null;
   return <>{children}</>;
 }
@@ -48,51 +40,33 @@ function ThemeInit() {
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthGuard>
-      <Layout>{children}</Layout>
-    </AuthGuard>
-  );
+  return <AuthGuard><Layout>{children}</Layout></AuthGuard>;
 }
 
 function Router() {
   return (
     <Switch>
+      {/* Public */}
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
-      <Route path="/">
-        <Protected><DashboardPage /></Protected>
-      </Route>
-      <Route path="/dashboard">
-        <Protected><DashboardPage /></Protected>
-      </Route>
-      <Route path="/sales">
-        <Protected><SalesPage /></Protected>
-      </Route>
-      <Route path="/production">
-        <Protected><ProductionPage /></Protected>
-      </Route>
-      <Route path="/inventory">
-        <Protected><InventoryPage /></Protected>
-      </Route>
-      <Route path="/reports">
-        <Protected><ReportsPage /></Protected>
-      </Route>
-      <Route path="/users">
-        <Protected><UsersPage /></Protected>
-      </Route>
-      <Route path="/audit-logs">
-        <Protected><AuditLogsPage /></Protected>
-      </Route>
-      <Route path="/settings">
-        <Protected><SettingsPage /></Protected>
-      </Route>
-      <Route path="/company-settings">
-        <Protected><CompanySettingsPage /></Protected>
-      </Route>
-      <Route path="/subscription">
-        <Protected><SubscriptionPage /></Protected>
-      </Route>
+
+      {/* Super Admin */}
+      <Route path="/admin/login" component={AdminLoginPage} />
+      <Route path="/admin/companies" component={AdminCompaniesPage} />
+      <Route path="/admin"><AdminDashboardPage /></Route>
+
+      {/* Bakery app */}
+      <Route path="/"><Protected><DashboardPage /></Protected></Route>
+      <Route path="/dashboard"><Protected><DashboardPage /></Protected></Route>
+      <Route path="/sales"><Protected><SalesPage /></Protected></Route>
+      <Route path="/production"><Protected><ProductionPage /></Protected></Route>
+      <Route path="/inventory"><Protected><InventoryPage /></Protected></Route>
+      <Route path="/reports"><Protected><ReportsPage /></Protected></Route>
+      <Route path="/users"><Protected><UsersPage /></Protected></Route>
+      <Route path="/audit-logs"><Protected><AuditLogsPage /></Protected></Route>
+      <Route path="/settings"><Protected><SettingsPage /></Protected></Route>
+      <Route path="/company-settings"><Protected><CompanySettingsPage /></Protected></Route>
+      <Route path="/subscription"><Protected><SubscriptionPage /></Protected></Route>
       <Route component={NotFound} />
     </Switch>
   );

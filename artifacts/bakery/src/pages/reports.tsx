@@ -16,8 +16,8 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 
-function formatCurrency(n: number) {
-  return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+function formatCurrency(n: number | undefined | null) {
+  return `₦${(n ?? 0).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
