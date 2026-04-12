@@ -1,13 +1,14 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, Building2, LogOut, Shield, CreditCard, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/companies", label: "Companies", icon: Building2 },
+  { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/admin/companies",    label: "Companies",    icon: Building2 },
+  { href: "/admin/transactions", label: "Transactions", icon: Receipt },
+  { href: "/admin/settings",     label: "Gateway",      icon: CreditCard },
 ];
 
-function getAdminToken() { return localStorage.getItem("nmb_admin_token"); }
 function getAdminUser() {
   try { return JSON.parse(localStorage.getItem("nmb_admin_user") ?? "null"); } catch { return null; }
 }
@@ -21,6 +22,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     localStorage.removeItem("nmb_admin_user");
     setLocation("/admin/login");
   };
+
+  const pageLabel = ADMIN_NAV.slice().reverse().find(n =>
+    n.href === "/admin" ? location === "/admin" || location === "/admin/" : location.startsWith(n.href)
+  )?.label ?? "Admin";
 
   return (
     <div className="flex h-screen" style={{ colorScheme: "dark" }}>
@@ -80,9 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
         <header className="h-14 px-6 border-b border-slate-200 bg-white flex items-center">
-          <h1 className="text-slate-700 font-semibold text-sm">
-            {ADMIN_NAV.find(n => n.href === "/admin" ? location === "/admin" : location.startsWith(n.href))?.label ?? "Admin"}
-          </h1>
+          <h1 className="text-slate-700 font-semibold text-sm">{pageLabel}</h1>
         </header>
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>

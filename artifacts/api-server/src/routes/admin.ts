@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, superAdminsTable, companiesTable, subscriptionsTable, usersTable } from "@workspace/db";
+import { db, superAdminsTable, companiesTable, subscriptionsTable, usersTable, paymentGatewayConfigTable, transactionsTable } from "@workspace/db";
 import { eq, desc, count } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
 import jwt from "jsonwebtoken";
@@ -134,6 +134,69 @@ router.get("/admin/analytics", authenticateSuperAdmin, async (_req, res) => {
     monthlyRevenue: active * 3000,
     recentCompanies,
   });
+});
+
+/* ─ Payment gateway config ─ */
+router.get("/admin/gateway", authenticateSuperAdmin, async (_req, res) => {
+  const [config] = await db.select().from(paymentGatewayConfigTable).limit(1);
+  if (!config) {
+    return res.json({ provider: "paystack", publicKey: "", secretKey: "", webhookSecret: "", mode: "test", isActive: true });
+  }
+  res.json(config);
+});
+
+router.put("/admin/gateway", authenticateSuperAdmin, async (req: any, res) => {
+  const { provider, publicKey, secretKey, webhookSecret, mode, isActive } = req.body ?? {};
+  const [existing] = await db.select().from(paymentGatewayConfigTable).limit(1);
+
+  if (existing) {
+    const [updated] = await db.update(paymentGatewayConfigTable)
+      .set({ provider, publicKey, secretKey, webhookSecret, mode, isActive, updatedBy: req.superAdmin?.fullName })
+      .where(eq(paymentGatewayConfigTable.id, existing.id))
+      .returning();
+    return res.json(updated);
+  }
+
+  const [created] = await db.insert(paymentGatewayConfigTable)
+    .values({ provider: provider ?? "paystack", publicKey: publicKey ?? "", secretKey: secretKey ?? "", webhookSecret: webhookSecret ?? "", mode: mode ?? "test", isActive: isActive ?? true, updatedBy: req.superAdmin?.fullName })
+    .returning();
+  res.json(created);
+});
+
+/* ─ Transactions ─ */
+router.get("/admin/transactions", authenticateSuperAdmin, async (_req, res) => {
+  const txs = await db
+    .select({
+      id: transactionsTable.id,
+      companyId: transactionsTable.companyId,
+      companyName: companiesTable.name,
+      reference: transactionsTable.reference,
+      amount: transactionsTable.amount,
+      status: transactionsTable.status,
+      gateway: transactionsTable.gateway,
+      gatewayReference: transactionsTable.gatewayReference,
+      description: transactionsTable.description,
+      months: transactionsTable.months,
+      createdAt: transactionsTable.createdAt,
+    })
+    .from(transactionsTable)
+    .leftJoin(companiesTable, eq(companiesTable.id, transactionsTable.companyId))
+    .orderBy(desc(transactionsTable.createdAt));
+  res.json(txs);
+});
+
+router.patch("/admin/transactions/:id/status", authenticateSuperAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { status } = req.body ?? {};
+  const allowed = ["success", "failed", "pending", "refunded"];
+  if (!allowed.includes(status)) return res.status(400).json({ error: "Invalid status" });
+
+  const [updated] = await db.update(transactionsTable)
+    .set({ status })
+    .where(eq(transactionsTable.id, id))
+    .returning();
+  if (!updated) return res.status(404).json({ error: "Transaction not found" });
+  res.json(updated);
 });
 
 export default router;

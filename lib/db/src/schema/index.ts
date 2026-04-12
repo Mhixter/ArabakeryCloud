@@ -7,3 +7,5 @@ export * from "./inventory";
 export * from "./sales";
 export * from "./audit";
 export * from "./super-admins";
+export * from "./payment-gateway";
+export * from "./transactions";

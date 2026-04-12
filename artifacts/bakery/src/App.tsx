@@ -19,6 +19,8 @@ import Layout from "@/components/layout";
 import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminCompaniesPage from "@/pages/admin/companies";
+import AdminSettingsPage from "@/pages/admin/settings";
+import AdminTransactionsPage from "@/pages/admin/transactions";
 import { isAuthenticated } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import { useEffect } from "react";
@@ -53,6 +55,8 @@ function Router() {
       {/* Super Admin */}
       <Route path="/admin/login" component={AdminLoginPage} />
       <Route path="/admin/companies" component={AdminCompaniesPage} />
+      <Route path="/admin/transactions" component={AdminTransactionsPage} />
+      <Route path="/admin/settings" component={AdminSettingsPage} />
       <Route path="/admin"><AdminDashboardPage /></Route>
 
       {/* Bakery app */}

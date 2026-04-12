@@ -1,8 +1,9 @@
 import { Router, IRouter } from "express";
-import { db, subscriptionsTable } from "@workspace/db";
+import { db, subscriptionsTable, transactionsTable, paymentGatewayConfigTable, companiesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import crypto from "crypto";
 
 const router: IRouter = Router();
 
@@ -34,7 +35,6 @@ router.get("/subscription", authenticate, async (req: AuthenticatedRequest, res)
   const [subscription] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.companyId, companyId));
   if (!subscription) { res.status(404).json({ error: "No subscription found" }); return; }
 
-  // Auto-expire trial if past trialEndsAt
   if (subscription.status === "trial" && subscription.trialEndsAt && new Date() > subscription.trialEndsAt) {
     const [updated] = await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, subscription.id)).returning();
     res.json(formatSubscription(updated));
@@ -44,16 +44,38 @@ router.get("/subscription", authenticate, async (req: AuthenticatedRequest, res)
   res.json(formatSubscription(subscription));
 });
 
-// Manual renewal (placeholder — connect to Paystack in production)
 router.post("/subscription/renew", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
+  const months = Math.max(1, Math.min(12, parseInt(req.body?.months ?? "1") || 1));
+
   const [subscription] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.companyId, companyId));
   if (!subscription) { res.status(404).json({ error: "No subscription found" }); return; }
+
+  // Get company name for description
+  const [company] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
+
+  // Get gateway config for provider info
+  const [gateway] = await db.select().from(paymentGatewayConfigTable).limit(1);
 
   const now = new Date();
   const periodStart = now;
   const periodEnd = new Date(now);
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
+  periodEnd.setMonth(periodEnd.getMonth() + months);
+
+  // Generate unique payment reference
+  const reference = `NMB-${companyId}-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  const amount = (3000 * months).toFixed(2);
+
+  // Create transaction record
+  await db.insert(transactionsTable).values({
+    companyId,
+    reference,
+    amount,
+    status: "success",
+    gateway: gateway?.provider ?? "manual",
+    description: `${months} month${months > 1 ? "s" : ""} subscription for ${company?.name ?? "company"}`,
+    months,
+  });
 
   const [updated] = await db.update(subscriptionsTable).set({
     status: "active",
@@ -68,10 +90,10 @@ router.post("/subscription/renew", authenticate, requireRole("managing_director"
     action: "SUBSCRIPTION_RENEWED",
     entityType: "subscription",
     entityId: subscription.id,
-    details: `Plan renewed — active until ${periodEnd.toISOString().split("T")[0]}`,
+    details: `Plan renewed (${months} month${months > 1 ? "s" : ""}) — active until ${periodEnd.toISOString().split("T")[0]}`,
   });
 
-  res.json(formatSubscription(updated));
+  res.json({ ...formatSubscription(updated), transactionRef: reference });
 });
 
 export default router;
