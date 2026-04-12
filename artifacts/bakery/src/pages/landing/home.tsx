@@ -81,7 +81,7 @@ export default function LandingHome() {
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
             {/* Left — text */}
-            <div className="order-2 lg:order-1">
+            <div className="order-1 lg:order-1">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold mb-6"
                 style={{background:"#fef3c7",color:"#92400e",border:"1px solid #fde68a"}}>
                 🎉 7-day free trial — no credit card required
@@ -129,7 +129,7 @@ export default function LandingHome() {
             </div>
 
             {/* Right — real photo grid */}
-            <div className="order-1 lg:order-2 relative">
+            <div className="order-2 lg:order-2 relative">
               <div className="grid grid-cols-2 gap-3 sm:gap-4" style={{gridTemplateRows:"auto auto auto"}}>
                 {/* Main large photo */}
                 <div className="row-span-2 rounded-3xl overflow-hidden shadow-2xl border-4 border-white" style={{minHeight:260}}>
