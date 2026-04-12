@@ -175,7 +175,7 @@ export default function SettingsPage() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Application</dt>
-              <dd className="font-medium">New Model Bread v1.0</dd>
+              <dd className="font-medium">Ara Bakery Cloud v1.0</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Build</dt>

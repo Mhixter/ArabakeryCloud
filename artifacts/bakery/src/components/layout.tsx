@@ -73,7 +73,7 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
               : <Wheat size={18} className="text-sidebar-primary-foreground" />}
           </div>
           <span className="theme-sidebar-brand-name font-semibold text-sidebar-foreground text-sm hidden sm:block truncate max-w-[140px]">
-            {company?.name ?? "New Model Bread"}
+            {company?.name ?? "Ara Bakery Cloud"}
           </span>
         </div>
 
@@ -223,7 +223,7 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
           <p className={cn("theme-sidebar-brand-name font-bold text-sidebar-foreground text-sm leading-tight truncate",
             theme === "amber" && "font-serif"
           )}>
-            {company?.name ?? "New Model Bread"}
+            {company?.name ?? "Ara Bakery Cloud"}
           </p>
           <p className="text-sidebar-foreground/35 text-xs mt-0.5">
             {theme === "slate" ? "BAKERY SYS" : "Bakery System"}
@@ -286,7 +286,7 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
             {company?.logoUrl
               ? <img src={company.logoUrl} alt="Logo" className="w-7 h-7 rounded object-contain" />
               : <Wheat size={18} className="text-primary" />}
-            <span className={cn("font-bold text-foreground", theme === "amber" ? "font-serif" : "")}>{company?.name ?? "New Model Bread"}</span>
+            <span className={cn("font-bold text-foreground", theme === "amber" ? "font-serif" : "")}>{company?.name ?? "Ara Bakery Cloud"}</span>
           </div>
           <div className="w-9" />
         </header>

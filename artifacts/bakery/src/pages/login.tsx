@@ -53,7 +53,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4 shadow-lg">
             <Wheat size={32} className="text-primary-foreground" />
           </div>
-          <h1 className="font-serif text-3xl font-bold text-foreground">New Model Bread</h1>
+          <h1 className="font-serif text-3xl font-bold text-foreground">Ara Bakery Cloud</h1>
           <p className="text-muted-foreground text-sm mt-1">Bakery Management System</p>
         </div>
 
@@ -111,7 +111,7 @@ export default function LoginPage() {
           <button onClick={() => setLocation("/register")} className="text-primary font-medium hover:underline">Register for free trial</button>
         </p>
         <p className="text-center text-xs text-muted-foreground mt-3">
-          New Model Bread &copy; {new Date().getFullYear()}
+          Ara Bakery Cloud &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

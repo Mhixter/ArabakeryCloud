@@ -52,8 +52,9 @@ router.get("/admin/companies", authenticateSuperAdmin, async (_req, res) => {
       createdAt: companiesTable.createdAt,
       subStatus: subscriptionsTable.status,
       subPlan: subscriptionsTable.plan,
-      subStart: subscriptionsTable.startDate,
-      subEnd: subscriptionsTable.endDate,
+      subStart: subscriptionsTable.currentPeriodStart,
+      subEnd: subscriptionsTable.currentPeriodEnd,
+      trialEndsAt: subscriptionsTable.trialEndsAt,
     })
     .from(companiesTable)
     .leftJoin(subscriptionsTable, eq(subscriptionsTable.companyId, companiesTable.id))
@@ -74,8 +75,9 @@ router.get("/admin/companies/:id", authenticateSuperAdmin, async (req, res) => {
       createdAt: companiesTable.createdAt,
       subStatus: subscriptionsTable.status,
       subPlan: subscriptionsTable.plan,
-      subStart: subscriptionsTable.startDate,
-      subEnd: subscriptionsTable.endDate,
+      subStart: subscriptionsTable.currentPeriodStart,
+      subEnd: subscriptionsTable.currentPeriodEnd,
+      trialEndsAt: subscriptionsTable.trialEndsAt,
     })
     .from(companiesTable)
     .leftJoin(subscriptionsTable, eq(subscriptionsTable.companyId, companiesTable.id))

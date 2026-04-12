@@ -55,7 +55,7 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             {company?.logoUrl && (
               <img src={company.logoUrl} alt="Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
             )}
-            <p className="font-serif font-bold text-lg">{company?.name ?? "New Model Bread"}</p>
+            <p className="font-serif font-bold text-lg">{company?.name ?? "Ara Bakery Cloud"}</p>
             {company?.phone && <p className="text-muted-foreground text-xs">{company.phone}</p>}
             <p className="text-muted-foreground text-xs">{sale.branchName}</p>
           </div>

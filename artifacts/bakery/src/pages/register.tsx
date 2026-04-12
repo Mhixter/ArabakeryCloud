@@ -56,7 +56,7 @@ export default function RegisterPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4 shadow-lg">
             <Wheat size={32} className="text-primary-foreground" />
           </div>
-          <h1 className="font-serif text-3xl font-bold text-foreground">New Model Bread</h1>
+          <h1 className="font-serif text-3xl font-bold text-foreground">Ara Bakery Cloud</h1>
           <p className="text-muted-foreground text-sm mt-1">Register your bakery — free 7-day trial</p>
         </div>
 

@@ -21,6 +21,9 @@ import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminCompaniesPage from "@/pages/admin/companies";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminTransactionsPage from "@/pages/admin/transactions";
+import LandingHome from "@/pages/landing/home";
+import LandingFeatures from "@/pages/landing/features";
+import LandingPricing from "@/pages/landing/pricing";
 import { isAuthenticated } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import { useEffect } from "react";
@@ -48,6 +51,11 @@ function Protected({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      {/* Landing pages */}
+      <Route path="/" component={LandingHome} />
+      <Route path="/features" component={LandingFeatures} />
+      <Route path="/pricing" component={LandingPricing} />
+
       {/* Public */}
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
@@ -60,7 +68,6 @@ function Router() {
       <Route path="/admin"><AdminDashboardPage /></Route>
 
       {/* Bakery app */}
-      <Route path="/"><Protected><DashboardPage /></Protected></Route>
       <Route path="/dashboard"><Protected><DashboardPage /></Protected></Route>
       <Route path="/sales"><Protected><SalesPage /></Protected></Route>
       <Route path="/production"><Protected><ProductionPage /></Protected></Route>
