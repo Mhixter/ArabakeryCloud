@@ -6,6 +6,7 @@ import {
   Wheat, ArrowUpRight, MoreHorizontal, CheckCircle,
   Zap, Shield, Smartphone, Download, Share2, PlusSquare, Chrome,
 } from "lucide-react";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 
 /* ══════════════════════════════════════════════════════════
    PHONE FRAME + APP SCREENS
@@ -261,6 +262,8 @@ const PERKS = [
 ];
 
 export default function LandingHome() {
+  const { canInstall, install } = usePwaInstall();
+
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <LandingNav />
@@ -520,7 +523,21 @@ export default function LandingHome() {
             </div>
           </div>
 
-          <div className="mt-8 text-center">
+          {/* One-tap install button for Chrome / Edge / Android */}
+          {canInstall && (
+            <div className="mt-8 text-center">
+              <button
+                onClick={install}
+                className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-slate-950 text-white font-bold text-base hover:bg-slate-800 transition-colors"
+              >
+                <Download size={18} className="text-amber-400" />
+                Install App Now
+              </button>
+              <p className="text-xs text-slate-400 mt-2">Your browser is ready — one tap to install</p>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
             <div className="inline-flex items-center gap-2 text-sm text-slate-400">
               <PlusSquare size={14} />
               Works offline · Loads instantly · Always up to date

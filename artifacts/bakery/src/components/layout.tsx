@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
-  Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich,
+  Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich, Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { initTheme } from "@/lib/theme";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
@@ -61,6 +62,7 @@ function useLayoutState() {
 /* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
 function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
   const { location, visibleNav, lowStockCount, moreOpen, setMoreOpen, handleLogout, user, userRole } = ls;
+  const { canInstall, install } = usePwaInstall();
 
   const primaryTabs = visibleNav.slice(0, 4);
   const secondaryItems = visibleNav.slice(4);
@@ -199,8 +201,16 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
               </div>
             )}
 
-            {/* Logout */}
-            <div className="px-3 py-3">
+            {/* Install + Logout */}
+            <div className="px-3 py-3 space-y-1">
+              {canInstall && (
+                <button
+                  onClick={() => { install(); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                  <Download size={18} className="text-amber-500" />
+                  <span>Install App</span>
+                </button>
+              )}
               <button
                 data-testid="button-logout"
                 onClick={handleLogout}
@@ -303,6 +313,7 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
 function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
   const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { canInstall, install } = usePwaInstall();
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -364,6 +375,13 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
           <p className={cn("text-sidebar-foreground font-medium text-sm truncate", theme === "slate" && "text-xs uppercase tracking-wider")}>{user?.fullName ?? "User"}</p>
           <p className="text-sidebar-foreground/45 text-xs">{ROLE_LABELS[userRole] ?? userRole}</p>
         </div>
+        {canInstall && (
+          <button onClick={install}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors mb-0.5">
+            <Download size={15} />
+            <span>Install App</span>
+          </button>
+        )}
         <button data-testid="button-logout" onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:bg-destructive/15 hover:text-destructive transition-colors">
           <LogOut size={15} />

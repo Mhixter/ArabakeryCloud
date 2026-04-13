@@ -71,7 +71,7 @@ export default function LoginPage() {
                 disabled={login.isPending}
                 className="h-10"
               />
-              <p className="text-xs text-slate-400 mt-0.5">You can also use your <span className="font-medium">Company Login ID</span> to sign in as the Managing Director.</p>
+              <p className="text-xs text-slate-400 mt-0.5">Enter your <span className="font-medium">username</span>, <span className="font-medium">Agent ID</span> (e.g. ADA96857), or <span className="font-medium">Company Login ID</span> — then enter your password below.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-sm font-medium">Password</Label>
