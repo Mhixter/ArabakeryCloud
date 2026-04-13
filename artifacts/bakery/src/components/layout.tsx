@@ -63,31 +63,45 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
 
   const primaryTabs = visibleNav.slice(0, 4);
   const secondaryItems = visibleNav.slice(4);
-  const hasMore = secondaryItems.length > 0;
 
   return (
     <>
       {/* Bottom nav bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 safe-area-bottom"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="flex items-center justify-around h-16 rounded-tl-[30px] rounded-tr-[30px] rounded-br-[30px] rounded-bl-[30px]">
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-100"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-stretch h-[60px]">
           {primaryTabs.map(item => {
             const Icon = item.icon;
             const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} className="flex-1">
                 <button
                   data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
-                  className="flex flex-col items-center justify-center gap-1 w-16 h-full relative touch-manipulation">
-                  <span className="flex items-center justify-center w-10 h-7 rounded-xl transition-colors bg-amber-100 rounded-tl-[50px] rounded-tr-[50px] rounded-br-[50px] rounded-bl-[50px]">
-                    <Icon size={20} className={isActive ? "text-amber-600" : "text-slate-400"} />
-                  </span>
+                  className="relative flex flex-col items-center justify-center gap-1 w-full h-full touch-manipulation"
+                >
+                  {/* Active indicator — thin amber line at top */}
+                  {isActive && (
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-b-full bg-amber-400" />
+                  )}
+                  {/* Badge */}
                   {item.href === "/inventory" && lowStockCount > 0 && (
-                    <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                    <span className="absolute top-2 right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold z-10">
                       {lowStockCount > 9 ? "9+" : lowStockCount}
                     </span>
                   )}
-                  <span className={cn("text-[10px] font-medium leading-none", isActive ? "text-amber-600" : "text-slate-400")}>
+                  <Icon
+                    size={20}
+                    className={cn(
+                      "transition-colors",
+                      isActive ? "text-amber-500" : "text-slate-400"
+                    )}
+                  />
+                  <span className={cn(
+                    "text-[10px] font-semibold leading-none tracking-tight transition-colors",
+                    isActive ? "text-amber-500" : "text-slate-400"
+                  )}>
                     {item.label}
                   </span>
                 </button>
@@ -95,17 +109,21 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
             );
           })}
 
-          {/* More button — always shown for nav overflow + logout */}
+          {/* More button */}
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex flex-col items-center justify-center gap-1 w-16 h-full touch-manipulation">
+            className="flex-1 flex flex-col items-center justify-center gap-1 touch-manipulation"
+          >
+            <MoreHorizontal
+              size={20}
+              className={cn("transition-colors", moreOpen ? "text-amber-500" : "text-slate-400")}
+            />
             <span className={cn(
-              "flex items-center justify-center w-10 h-7 rounded-xl transition-colors",
-              moreOpen ? "bg-amber-100" : ""
+              "text-[10px] font-semibold leading-none tracking-tight",
+              moreOpen ? "text-amber-500" : "text-slate-400"
             )}>
-              <MoreHorizontal size={20} className={moreOpen ? "text-amber-600" : "text-slate-400"} />
+              More
             </span>
-            <span className="text-[10px] font-medium leading-none text-slate-400">More</span>
           </button>
         </div>
       </nav>
