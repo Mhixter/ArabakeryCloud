@@ -79,10 +79,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
                 <button
                   data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
                   className="flex flex-col items-center justify-center gap-1 w-16 h-full relative touch-manipulation">
-                  <span className={cn(
-                    "flex items-center justify-center w-10 h-7 rounded-xl transition-colors",
-                    isActive ? "bg-amber-100" : ""
-                  )}>
+                  <span className="flex items-center justify-center w-10 h-7 rounded-xl transition-colors bg-amber-100 rounded-tl-[60px] rounded-tr-[60px] rounded-br-[60px] rounded-bl-[60px]">
                     <Icon size={20} className={isActive ? "text-amber-600" : "text-slate-400"} />
                   </span>
                   {item.href === "/inventory" && lowStockCount > 0 && (
