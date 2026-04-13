@@ -26,6 +26,7 @@ import LandingFeatures from "@/pages/landing/features";
 import LandingPricing from "@/pages/landing/pricing";
 import { isAuthenticated } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
+import SubscriptionGuard from "@/components/subscription-guard";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
@@ -45,7 +46,13 @@ function ThemeInit() {
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
-  return <AuthGuard><Layout>{children}</Layout></AuthGuard>;
+  return (
+    <AuthGuard>
+      <SubscriptionGuard>
+        <Layout>{children}</Layout>
+      </SubscriptionGuard>
+    </AuthGuard>
+  );
 }
 
 function Router() {

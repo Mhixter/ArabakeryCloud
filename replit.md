@@ -99,13 +99,19 @@ Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
 - `GET /api/admin/analytics` — Platform stats (total, active, trial, expired, MRR)
 
 ### Super Admin Credentials
-| Username | Password |
-|----------|----------|
-| superadmin | superadmin123 |
+| Email | Password |
+|-------|----------|
+| saidumuhammed664@gmail.com | Mhixter@664 |
 
-Access at: `/admin/login` → `/admin` (dashboard) → `/admin/companies` (company list)
+Access at: `/admin/login` → `/admin` (dashboard) → `/admin/companies` → `/admin/settings` (payment gateway)
 Super admin has its own dark blue UI (separate from bakery theme system).
 Re-seed with: `cd artifacts/api-server && pnpm exec tsx src/seed-admin.ts`
+
+### Subscription Enforcement
+- API: Global `subscriptionGuard` middleware in `routes/index.ts` returns HTTP 402 for expired companies on all core routes (production, sales, inventory, reports, etc.)
+- Frontend: `SubscriptionGuard` component wraps all `Protected` routes — expired companies see a full-screen "Subscription Expired" wall with a Renew button; companies with ≤2 days remaining see an amber warning banner
+- Subscription/auth routes and admin routes are exempt from the guard
+- Trial auto-expires on API access (status updated to "expired" in DB)
 
 ### Database Tables
 - `companies` — Tenant companies with theme/logo/branding

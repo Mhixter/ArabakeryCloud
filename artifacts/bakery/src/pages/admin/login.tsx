@@ -48,10 +48,11 @@ export default function AdminLoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-slate-300 text-sm">Username</Label>
+              <Label className="text-slate-300 text-sm">Email</Label>
               <Input
+                type="email"
                 value={username} onChange={e => setUsername(e.target.value)}
-                placeholder="admin" required autoComplete="username"
+                placeholder="admin@example.com" required autoComplete="email"
                 className="bg-slate-700/60 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
               />
             </div>
