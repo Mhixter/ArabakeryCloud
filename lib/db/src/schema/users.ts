@@ -17,6 +17,7 @@ export const usersTable = pgTable("users", {
   role: text("role").$type<UserRole>().notNull(),
   branchId: integer("branch_id").references(() => branchesTable.id),
   isActive: boolean("is_active").notNull().default(true),
+  agentId: text("agent_id").unique(),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),

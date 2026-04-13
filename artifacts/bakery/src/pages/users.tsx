@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Users, Pencil, Trash2 } from "lucide-react";
+import { Plus, Users, Pencil, Trash2, KeyRound } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
+import { getToken } from "@/lib/auth";
 
 const ROLES = [
   { value: "managing_director", label: "Managing Director" },
@@ -35,6 +35,8 @@ const ROLE_COLORS: Record<string, string> = {
   production_staff: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
+type UserRow = { id: number; username: string; agentId?: string | null; fullName: string; role: string; branchId?: number | null; branchName?: string | null };
+
 export default function UsersPage() {
   const { isExpired } = useSubscription();
   const { toast } = useToast();
@@ -43,6 +45,9 @@ export default function UsersPage() {
   const [showNew, setShowNew] = useState(false);
   const [editUser, setEditUser] = useState<{ id: number; fullName: string; role: string; branchId: number | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [resetUser, setResetUser] = useState<UserRow | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const [form, setForm] = useState({
     username: "",
@@ -131,6 +136,29 @@ export default function UsersPage() {
     });
   };
 
+  const handleResetPassword = async () => {
+    if (!resetUser || !newPassword || newPassword.length < 4) {
+      toast({ title: "Password must be at least 4 characters", variant: "destructive" });
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/users/${resetUser.id}/reset-password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed"); }
+      toast({ title: "Password reset successfully" });
+      setResetUser(null);
+      setNewPassword("");
+    } catch (e) {
+      toast({ title: (e as Error).message, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="page-users">
       <div className="flex items-center justify-between gap-4">
@@ -164,6 +192,7 @@ export default function UsersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Full Name</TableHead>
+                    <TableHead>Agent ID</TableHead>
                     <TableHead>Username</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Branch</TableHead>
@@ -171,9 +200,14 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(users ?? []).map((user) => (
+                  {((users ?? []) as UserRow[]).map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">{user.fullName}</TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground tracking-wider">
+                          {user.agentId ?? "—"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-muted-foreground font-mono text-sm">{user.username}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[user.role] ?? ""}`}>
@@ -187,7 +221,18 @@ export default function UsersPage() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
+                            title="Reset Password"
+                            disabled={isExpired}
+                            onClick={() => { setResetUser(user); setNewPassword(""); }}
+                          >
+                            <KeyRound size={13} />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
                             data-testid={`button-edit-user-${user.id}`}
+                            disabled={isExpired}
                             onClick={() => {
                               setEditUser({ id: user.id, fullName: user.fullName, role: user.role, branchId: user.branchId ?? null });
                               setEditForm({ fullName: user.fullName, role: user.role, branchId: user.branchId?.toString() ?? "", password: "" });
@@ -200,6 +245,7 @@ export default function UsersPage() {
                             variant="ghost"
                             className="h-7 w-7 text-destructive hover:text-destructive"
                             data-testid={`button-delete-user-${user.id}`}
+                            disabled={isExpired}
                             onClick={() => setDeleteConfirm(user.id)}
                           >
                             <Trash2 size={13} />
@@ -292,16 +338,40 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2 space-y-1.5">
-                <Label>New Password (leave blank to keep current)</Label>
-                <Input type="password" placeholder="••••••••" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} />
-              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
             <Button onClick={handleEdit} disabled={updateUser.isPending}>
               {updateUser.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetUser} onOpenChange={() => { setResetUser(null); setNewPassword(""); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Reset Password — {resetUser?.fullName}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for <span className="font-medium text-foreground">{resetUser?.fullName}</span> (Agent ID: <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{resetUser?.agentId ?? "—"}</span>).
+            </p>
+            <div className="space-y-1.5">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                placeholder="Min. 4 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetUser(null); setNewPassword(""); }}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={resetting}>
+              {resetting ? "Saving..." : "Reset Password"}
             </Button>
           </DialogFooter>
         </DialogContent>

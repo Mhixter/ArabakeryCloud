@@ -43,10 +43,15 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - Price: ₦3,000/month (plan: "starter")
 - Theme colors: `amber` (default) | `orange` | `blue` | `green` | `slate` — stored on companies.themeColor, applied via CSS `[data-theme]` attribute
 
+### ID System
+- **Company Login ID** (`companies.loginId`): auto-generated on registration — first 3 letters of company name + 5 random digits (e.g. `NEW58759`). Shown in Company Settings. Can be used to log in as the Managing Director.
+- **Agent ID** (`users.agentId`): auto-generated on user creation — first 3 letters of full name + 5 random digits (e.g. `ADA96857`). Shown in Users table. Can be used at login.
+- Login accepts: `username` OR `agentId` OR `loginId` (loginId authenticates as MD of that company)
+
 ### Auth & Local Storage
 - `nmb_token`: JWT
-- `nmb_user`: user object (includes companyId)
-- `nmb_company`: company object (name, phone, logoUrl, themeColor, address)
+- `nmb_user`: user object (includes companyId, agentId)
+- `nmb_company`: company object (name, phone, logoUrl, themeColor, address, loginId)
 - Helper functions in `artifacts/bakery/src/lib/auth.ts`
 - Theme utilities in `artifacts/bakery/src/lib/theme.ts`
 - `setAuthTokenGetter(() => getToken())` in main.tsx for auto-JWT injection

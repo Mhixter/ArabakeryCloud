@@ -83,6 +83,17 @@ export default function CompanySettingsPage() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Building2 size={18} />Basic Information</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          {company?.loginId && (
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 border border-border px-4 py-3">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Company Login ID</p>
+                <p className="font-mono text-lg font-bold tracking-widest text-foreground mt-0.5">{company.loginId}</p>
+              </div>
+              <div className="text-xs text-muted-foreground text-right max-w-[180px]">
+                Share with staff to log in using your company account
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Company Name <span className="text-destructive">*</span></Label>
             <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Your bakery name" />

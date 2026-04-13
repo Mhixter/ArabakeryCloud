@@ -12,6 +12,7 @@ export const companiesTable = pgTable("companies", {
   logoUrl: text("logo_url"),
   themeColor: text("theme_color").$type<ThemeColor>().notNull().default("amber"),
   address: text("address"),
+  loginId: text("login_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

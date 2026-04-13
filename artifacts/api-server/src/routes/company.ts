@@ -13,6 +13,7 @@ const formatCompany = (c: typeof companiesTable.$inferSelect) => ({
   logoUrl: c.logoUrl,
   themeColor: c.themeColor,
   address: c.address,
+  loginId: c.loginId,
   createdAt: c.createdAt.toISOString(),
   updatedAt: c.updatedAt.toISOString(),
 });

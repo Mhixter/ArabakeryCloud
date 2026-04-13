@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   TrendingUp, TrendingDown, AlertTriangle, ChevronRight,
   Wheat, ArrowUpRight, MoreHorizontal, CheckCircle,
-  Zap, Shield, Smartphone,
+  Zap, Shield, Smartphone, Download, Share2, PlusSquare, Chrome,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════
@@ -443,6 +443,88 @@ export default function LandingHome() {
               Start your free trial
               <ChevronRight size={16} />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ PWA DOWNLOAD ═══════════════════════════════════════════════ */}
+      <section className="py-20 bg-white border-t border-slate-100">
+        <div className="max-w-4xl mx-auto px-5">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-950 mb-4">
+              <Download size={22} className="text-amber-400" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight mb-3">
+              Install on any device
+            </h2>
+            <p className="text-slate-400 text-base max-w-xl mx-auto leading-relaxed">
+              Ara Bakery Cloud works like a native app on your phone or computer — no app store needed.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {/* Android / Chrome */}
+            <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
+                  <Chrome size={18} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-950 text-sm">Android / Chrome</p>
+                  <p className="text-xs text-slate-400">Any Android phone or PC</p>
+                </div>
+              </div>
+              <ol className="space-y-2.5">
+                {[
+                  "Open the app in Chrome browser",
+                  'Tap the menu (⋮) at the top right',
+                  'Select "Add to Home screen"',
+                  "Tap Add — it opens like a real app",
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* iPhone / Safari */}
+            <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
+                  <Share2 size={18} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-950 text-sm">iPhone / Safari</p>
+                  <p className="text-xs text-slate-400">iOS 16.4 and above</p>
+                </div>
+              </div>
+              <ol className="space-y-2.5">
+                {[
+                  "Open the app in Safari browser",
+                  "Tap the Share button at the bottom",
+                  'Scroll down and tap "Add to Home Screen"',
+                  "Tap Add — launches from your home screen",
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <div className="inline-flex items-center gap-2 text-sm text-slate-400">
+              <PlusSquare size={14} />
+              Works offline · Loads instantly · Always up to date
+            </div>
           </div>
         </div>
       </section>

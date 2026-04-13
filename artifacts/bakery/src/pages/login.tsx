@@ -59,18 +59,19 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+              <Label htmlFor="username" className="text-sm font-medium">Username or Agent ID</Label>
               <Input
                 id="username"
                 data-testid="input-username"
                 type="text"
-                placeholder="Enter your username"
+                placeholder="Username or Agent ID (e.g. ADA96857)"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 disabled={login.isPending}
                 className="h-10"
               />
+              <p className="text-xs text-slate-400 mt-0.5">You can also use your <span className="font-medium">Company Login ID</span> to sign in as the Managing Director.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-sm font-medium">Password</Label>

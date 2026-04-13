@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff"] },
   { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist"] },
   { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
-  { href: "/products",         label: "Products",      icon: Sandwich,        roles: ["managing_director","manager"] },
+  { href: "/products",         label: "Products",      icon: Sandwich,        roles: ["managing_director","manager","receptionist"] },
   { href: "/inventory",        label: "Inventory",     icon: Package,         roles: ["managing_director","manager"] },
   { href: "/reports",          label: "Reports",       icon: BarChart3,       roles: ["managing_director","manager"] },
   { href: "/users",            label: "Users",         icon: Users,           roles: ["managing_director"] },
