@@ -70,7 +70,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
       {/* Bottom nav bar */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 safe-area-bottom"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="flex items-center justify-around h-16">
+        <div className="flex items-center justify-around h-16 rounded-tl-[5px] rounded-tr-[5px] rounded-br-[5px] rounded-bl-[5px]">
           {primaryTabs.map(item => {
             const Icon = item.icon;
             const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
@@ -112,7 +112,6 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
           </button>
         </div>
       </nav>
-
       {/* More bottom sheet */}
       {moreOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
