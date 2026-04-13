@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable } from "@workspace/db";
-import { eq, and, isNull, gte, lte, sql } from "drizzle-orm";
+import { db, salesTable, productionBatchesTable, productsTable } from "@workspace/db";
+import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -40,6 +40,84 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
       profit: weekSales.reduce((s, x) => s + parseFloat(x.profitAmount as unknown as string), 0),
       salesCount: weekSales.length,
     },
+  });
+});
+
+/* ── Product-focused dashboard (new) ── */
+router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const companyId = req.user!.companyId;
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
+
+  const activeProducts = await db
+    .select()
+    .from(productsTable)
+    .where(and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)));
+
+  const todaySales = await db
+    .select()
+    .from(salesTable)
+    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)));
+
+  const weekSales = await db
+    .select()
+    .from(salesTable)
+    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)));
+
+  const allProduction = await db
+    .select()
+    .from(productionBatchesTable)
+    .where(and(isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)));
+
+  const allSalesEver = await db
+    .select()
+    .from(salesTable)
+    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)));
+
+  function aggregateByProduct(sales: typeof salesTable.$inferSelect[]) {
+    const map = new Map<string, { quantity: number; amount: number }>();
+    for (const s of sales) {
+      const p = map.get(s.breadType) ?? { quantity: 0, amount: 0 };
+      map.set(s.breadType, { quantity: p.quantity + s.quantity, amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
+    }
+    return Array.from(map.entries())
+      .map(([name, d]) => ({ name, quantity: d.quantity, amount: d.amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }
+
+  const productionByType = new Map<string, number>();
+  for (const b of allProduction) {
+    productionByType.set(b.breadType, (productionByType.get(b.breadType) ?? 0) + b.quantityProduced - b.wasteQuantity);
+  }
+  const salesByType = new Map<string, number>();
+  for (const s of allSalesEver) {
+    salesByType.set(s.breadType, (salesByType.get(s.breadType) ?? 0) + s.quantity);
+  }
+
+  const remaining = activeProducts.map(p => ({
+    name: p.name,
+    produced: productionByType.get(p.name) ?? 0,
+    sold: salesByType.get(p.name) ?? 0,
+    remaining: Math.max(0, (productionByType.get(p.name) ?? 0) - (salesByType.get(p.name) ?? 0)),
+  }));
+
+  res.json({
+    activeProductCount: activeProducts.length,
+    today: {
+      totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
+      totalQuantity: todaySales.reduce((s, x) => s + x.quantity, 0),
+      salesCount: todaySales.length,
+      byProduct: aggregateByProduct(todaySales),
+    },
+    week: {
+      totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
+      totalQuantity: weekSales.reduce((s, x) => s + x.quantity, 0),
+      salesCount: weekSales.length,
+      byProduct: aggregateByProduct(weekSales),
+    },
+    remaining,
   });
 });
 

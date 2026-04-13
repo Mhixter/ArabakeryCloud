@@ -1,27 +1,20 @@
-import {
-  useGetDashboard, useGetSalesTrend, useListSales, useGetDailySalesSummary,
-} from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useGetDailySalesSummary, useListSales, useGetDashboard } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  TrendingUp, ShoppingCart, Factory, Package, AlertTriangle,
-  Percent, Plus, FileText, Clock, ArrowUpRight,
+  TrendingUp, ShoppingCart, Factory, Package,
+  Plus, FileText, Clock, ArrowUpRight, Layers,
 } from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
-
 function formatCurrency(n: number) {
   return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-/* ── Page header ── */
 function PageHeader({ title, subtitle, action }: {
   title: string; subtitle?: string; action?: React.ReactNode;
 }) {
@@ -36,7 +29,6 @@ function PageHeader({ title, subtitle, action }: {
   );
 }
 
-/* ── KPI card ── */
 function KpiCard({
   title, value, sub, icon: Icon, loading, accent = "default",
 }: {
@@ -77,7 +69,9 @@ function ReceptionistDashboard() {
   const today = new Date().toDateString();
   const todaySales = (sales ?? []).filter(s => new Date(s.saleDate).toDateString() === today);
   const totalUnits = todaySales.reduce((sum, s) => sum + s.quantity, 0);
-  const remaining = Math.max(0, (dash?.todayProduction ?? 0) - totalUnits);
+  const dashToday = (dash as { today?: { produced?: number } } | undefined)?.today;
+  const produced = dashToday?.produced ?? 0;
+  const remaining = Math.max(0, produced - totalUnits);
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -92,15 +86,13 @@ function ReceptionistDashboard() {
         }
       />
 
-      {/* 4 Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard title="Total Sales"        value={`${daily?.totalSales ?? 0}`}             sub="orders today"      icon={ShoppingCart} loading={dailyLoading} />
-        <KpiCard title="Total Amount"       value={formatCurrency(daily?.totalRevenue ?? 0)} sub="today's revenue"   icon={TrendingUp}   loading={dailyLoading} accent="green" />
-        <KpiCard title="Products Sold"      value={`${totalUnits}`}                          sub="units sold"        icon={Package}      loading={salesLoading} accent="amber" />
-        <KpiCard title="Remaining Stock"    value={dashLoading || salesLoading ? "—" : `${remaining}`} sub="units available" icon={Factory} loading={dashLoading || salesLoading} accent={remaining < 20 ? "red" : "default"} />
+        <KpiCard title="Total Sales"     value={`${daily?.totalSales ?? 0}`}             sub="orders today"    icon={ShoppingCart} loading={dailyLoading} />
+        <KpiCard title="Total Amount"    value={formatCurrency(daily?.totalRevenue ?? 0)} sub="today's revenue" icon={TrendingUp}   loading={dailyLoading} accent="green" />
+        <KpiCard title="Units Sold"      value={`${totalUnits}`}                          sub="units today"     icon={Package}      loading={salesLoading} accent="amber" />
+        <KpiCard title="Remaining Stock" value={dashLoading || salesLoading ? "—" : `${remaining}`} sub="units left" icon={Factory} loading={dashLoading || salesLoading} accent={remaining < 20 ? "red" : "default"} />
       </div>
 
-      {/* Daily Sales Track */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -148,7 +140,6 @@ function ReceptionistDashboard() {
         </CardContent>
       </Card>
 
-      {/* Saved receipts link */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -174,80 +165,224 @@ function ReceptionistDashboard() {
 /* ══════════════════════════════════════════════
    MANAGER / MD DASHBOARD
    ══════════════════════════════════════════════ */
-function ManagerDashboard() {
-  const { data: metrics, isLoading: metricsLoading } = useGetDashboard({});
-  const { data: trend, isLoading: trendLoading } = useGetSalesTrend({ days: 14 });
+interface ProductDashboard {
+  activeProductCount: number;
+  today: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
+  week: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
+  remaining: { name: string; produced: number; sold: number; remaining: number }[];
+}
 
-  const chartData = (trend ?? []).map((p) => ({
-    date: format(new Date(p.date), "MMM d"),
-    Revenue: p.revenue,
-    Profit: p.profit,
-  }));
+function ManagerDashboard() {
+  const [, setLocation] = useLocation();
+  const [period, setPeriod] = useState<"today" | "week">("today");
+  const [data, setData] = useState<ProductDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("nmb_token");
+    fetch(`/api/reports/product-dashboard`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const periodData = data ? data[period] : null;
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
-      <PageHeader title="Dashboard" subtitle="Today's overview and weekly performance" />
+      <PageHeader
+        title="Dashboard"
+        subtitle="Product sales and stock overview"
+        action={
+          <Button onClick={() => setLocation("/sales")} size="sm">
+            <Plus size={14} className="mr-1.5" />
+            New Sale
+          </Button>
+        }
+      />
 
-      {/* Section label */}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Today</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard title="Revenue"    value={formatCurrency(metrics?.todayRevenue ?? 0)}    sub="today"       icon={TrendingUp}   loading={metricsLoading} accent="green" />
-          <KpiCard title="Profit"     value={formatCurrency(metrics?.todayProfit ?? 0)}     sub="today"       icon={TrendingUp}   loading={metricsLoading} />
-          <KpiCard title="Sales"      value={`${metrics?.todaySalesCount ?? 0}`}            sub="orders"      icon={ShoppingCart} loading={metricsLoading} accent="amber" />
-          <KpiCard title="Production" value={`${metrics?.todayProduction ?? 0}`}            sub="units baked" icon={Factory}      loading={metricsLoading} />
-        </div>
+      {/* Period toggle */}
+      <div className="flex gap-2">
+        {(["today", "week"] as const).map(p => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              period === p
+                ? "bg-amber-400 text-slate-950"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {p === "today" ? "Today" : "This Week"}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">This Week</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard title="Weekly Revenue" value={formatCurrency(metrics?.weekRevenue ?? 0)} sub="last 7 days" icon={TrendingUp}    loading={metricsLoading} accent="green" />
-          <KpiCard title="Weekly Profit"  value={formatCurrency(metrics?.weekProfit ?? 0)}  sub="last 7 days" icon={TrendingUp}    loading={metricsLoading} />
-          <KpiCard title="Profit Margin"  value={`${(metrics?.profitMargin ?? 0).toFixed(1)}%`}  sub="this week" icon={Percent}    loading={metricsLoading} accent="amber" />
-          <KpiCard
-            title="Inventory Alerts"
-            value={`${metrics?.lowStockCount ?? 0}`}
-            sub={metrics?.lowStockCount ? "items low" : "all good"}
-            icon={AlertTriangle}
-            loading={metricsLoading}
-            accent={metrics?.lowStockCount ? "red" : "green"}
-          />
-        </div>
+      {/* Top KPIs */}
+      <div className="grid grid-cols-2 gap-3">
+        <KpiCard
+          title="Active Products"
+          value={loading ? "—" : `${data?.activeProductCount ?? 0}`}
+          sub="in your catalogue"
+          icon={Layers}
+          loading={loading}
+          accent="amber"
+        />
+        <KpiCard
+          title={period === "today" ? "Amount Today" : "Amount This Week"}
+          value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)}
+          sub={`${periodData?.salesCount ?? 0} orders`}
+          icon={TrendingUp}
+          loading={loading}
+          accent="green"
+        />
+        <KpiCard
+          title={period === "today" ? "Units Sold Today" : "Units Sold This Week"}
+          value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`}
+          sub="total units"
+          icon={ShoppingCart}
+          loading={loading}
+        />
+        <KpiCard
+          title="Total In Stock"
+          value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`}
+          sub="across all types"
+          icon={Package}
+          loading={loading}
+          accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"}
+        />
       </div>
 
-      {/* Sales Trend Chart */}
+      {/* Sales by product */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-              <TrendingUp size={15} className="text-amber-400" />
+              <ShoppingCart size={15} className="text-amber-400" />
             </div>
             <div>
-              <CardTitle className="text-sm font-bold tracking-tight">Revenue Trend — 14 Days</CardTitle>
-              <CardDescription className="text-xs">Revenue and profit over the last 2 weeks</CardDescription>
+              <CardTitle className="text-sm font-bold tracking-tight">
+                Sold by Product — {period === "today" ? "Today" : "This Week"}
+              </CardTitle>
+              <CardDescription className="text-xs">Units and revenue per bread type</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {trendLoading ? <Skeleton className="h-56 w-full" /> : (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₦${(v/1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                  formatter={(v: number, n: string) => [`₦${v.toLocaleString()}`, n]}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="Revenue" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="Profit"  stroke="#10b981" strokeWidth={2.5} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : !periodData?.byProduct?.length ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Package size={28} className="mx-auto mb-2 opacity-20" />
+              <p className="text-sm">No sales {period === "today" ? "today" : "this week"} yet.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {periodData.byProduct.map((item, idx) => (
+                <div key={item.name} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-muted-foreground">{idx + 1}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-foreground truncate">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.quantity} units sold</p>
+                  </div>
+                  <p className="font-bold text-sm flex-shrink-0">{formatCurrency(item.amount)}</p>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Remaining stock per bread type */}
+      <Card className="rounded-2xl border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+              <Factory size={15} className="text-amber-400" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
+              <CardDescription className="text-xs">Total produced minus total sold</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : !data?.remaining?.length ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Factory size={28} className="mx-auto mb-2 opacity-20" />
+              <p className="text-sm">No products found. Add products first.</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setLocation("/products")}>
+                Add Products
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {data.remaining.map(item => {
+                const pct = item.produced > 0 ? Math.round((item.sold / item.produced) * 100) : 0;
+                const low = item.remaining < 10;
+                return (
+                  <div key={item.name} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="font-semibold text-sm text-foreground">{item.name}</p>
+                      <Badge
+                        variant={low ? "destructive" : "secondary"}
+                        className="text-xs"
+                      >
+                        {item.remaining} left
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`}
+                          style={{ width: `${Math.min(100, pct)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground flex-shrink-0">
+                        {item.sold}/{item.produced} sold
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick links */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="rounded-2xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setLocation("/production")}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
+              <Factory size={16} className="text-amber-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Production</p>
+              <p className="text-xs text-muted-foreground">Log batches</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setLocation("/sales")}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0">
+              <FileText size={16} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Sales</p>
+              <p className="text-xs text-muted-foreground">View receipts</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

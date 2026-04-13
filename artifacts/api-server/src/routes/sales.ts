@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, usersTable, branchesTable } from "@workspace/db";
+import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -48,15 +48,82 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   const companyId = req.user!.companyId;
   const { breadType, quantity, pricePerUnit, paymentMethod, branchId, notes } = req.body;
   const user = req.user!;
-  if (!breadType || !quantity || !pricePerUnit || !paymentMethod || branchId == null) { res.status(400).json({ error: "breadType, quantity, pricePerUnit, paymentMethod, and branchId are required" }); return; }
+
+  if (!breadType || !quantity || !pricePerUnit || !paymentMethod || branchId == null) {
+    res.status(400).json({ error: "breadType, quantity, pricePerUnit, paymentMethod, and branchId are required" });
+    return;
+  }
+
   const qty = parseInt(quantity);
+
+  /* ── 1. Validate product exists and is active ── */
+  const [product] = await db
+    .select()
+    .from(productsTable)
+    .where(and(
+      eq(productsTable.companyId, companyId),
+      eq(productsTable.name, breadType),
+      eq(productsTable.isActive, true),
+    ));
+
+  if (!product) {
+    res.status(400).json({ error: `"${breadType}" is not an active product. Ask your admin to add it.` });
+    return;
+  }
+
+  /* ── 2. Calculate remaining stock (all-time produced minus all-time sold) ── */
+  const allProduction = await db
+    .select()
+    .from(productionBatchesTable)
+    .where(and(
+      eq(productionBatchesTable.companyId, companyId),
+      eq(productionBatchesTable.breadType, breadType),
+      isNull(productionBatchesTable.deletedAt),
+    ));
+
+  const allSales = await db
+    .select()
+    .from(salesTable)
+    .where(and(
+      eq(salesTable.companyId, companyId),
+      eq(salesTable.breadType, breadType),
+      isNull(salesTable.deletedAt),
+    ));
+
+  const totalProduced = allProduction.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
+  const totalSold = allSales.reduce((s, s2) => s + s2.quantity, 0);
+  const remaining = totalProduced - totalSold;
+
+  if (qty > remaining) {
+    res.status(400).json({
+      error: remaining <= 0
+        ? `No stock available for "${breadType}". Record production first.`
+        : `Only ${remaining} unit${remaining !== 1 ? "s" : ""} of "${breadType}" remaining in stock.`,
+    });
+    return;
+  }
+
   const price = parseFloat(pricePerUnit);
   const totalAmount = qty * price;
   const receiptNumber = generateReceiptNumber();
-  const [sale] = await db.insert(salesTable).values({ companyId, receiptNumber, breadType, quantity: qty, pricePerUnit: price.toString(), totalAmount: totalAmount.toString(), costAmount: "0", profitAmount: totalAmount.toString(), paymentMethod, cashierId: user.userId, branchId: parseInt(branchId), notes: notes ?? null, saleDate: new Date() }).returning();
+
+  const [sale] = await db.insert(salesTable).values({
+    companyId, receiptNumber, breadType, quantity: qty,
+    pricePerUnit: price.toString(), totalAmount: totalAmount.toString(),
+    costAmount: "0", profitAmount: totalAmount.toString(),
+    paymentMethod, cashierId: user.userId, branchId: parseInt(branchId),
+    notes: notes ?? null, saleDate: new Date(),
+  }).returning();
+
   const [cashier] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, sale.branchId));
-  await logAudit({ req, userId: user.userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
+
+  await logAudit({
+    req, userId: user.userId, companyId, action: "SALE_CREATED", entityType: "sale",
+    entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`,
+    branchId: sale.branchId,
+  });
+
   res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown"));
 });
 
