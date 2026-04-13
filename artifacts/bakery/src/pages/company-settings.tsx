@@ -76,7 +76,7 @@ export default function CompanySettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl" data-testid="page-company-settings">
       <div>
-        <h1 className="font-serif text-2xl font-bold text-foreground">Company Profile</h1>
+        <h1 className="text-2xl font-bold text-foreground">Company Profile</h1>
         <p className="text-muted-foreground text-sm mt-1">Customize your bakery's branding and information</p>
       </div>
 

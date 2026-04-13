@@ -133,7 +133,7 @@ export default function UsersPage() {
     <div className="space-y-6" data-testid="page-users">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-foreground">Users</h1>
+          <h1 className="text-2xl font-bold text-foreground">Users</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage staff accounts and permissions</p>
         </div>
         <Button onClick={() => setShowNew(true)} data-testid="button-new-user">

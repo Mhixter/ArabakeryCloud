@@ -365,7 +365,7 @@ export default function SalesPage() {
     <div className="space-y-6" data-testid="page-sales">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-foreground">Sales</h1>
+          <h1 className="text-2xl font-bold text-foreground">Sales</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Record and manage bread sales</p>
         </div>
         <Button onClick={() => setShowNewSale(true)} data-testid="button-new-sale">

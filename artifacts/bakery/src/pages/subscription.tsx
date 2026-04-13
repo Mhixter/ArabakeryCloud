@@ -59,7 +59,7 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-6 max-w-2xl" data-testid="page-subscription">
       <div>
-        <h1 className="font-serif text-2xl font-bold text-foreground">Subscription</h1>
+        <h1 className="text-2xl font-bold text-foreground">Subscription</h1>
         <p className="text-muted-foreground text-sm mt-1">Manage your plan and billing</p>
       </div>
 

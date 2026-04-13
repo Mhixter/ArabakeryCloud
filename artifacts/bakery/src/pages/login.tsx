@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Wheat, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -46,72 +45,67 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4" data-testid="page-login">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4" data-testid="page-login">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4 shadow-lg">
-            <Wheat size={32} className="text-primary-foreground" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-400 mb-5">
+            <Wheat size={26} className="text-slate-950" />
           </div>
-          <h1 className="font-serif text-3xl font-bold text-foreground">Ara Bakery Cloud</h1>
-          <p className="text-muted-foreground text-sm mt-1">Bakery Management System</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Ara Bakery Cloud</h1>
+          <p className="text-slate-400 text-sm mt-1">Sign in to your bakery dashboard</p>
         </div>
 
-        <Card className="shadow-lg border-card-border">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Sign In</CardTitle>
-            <CardDescription>Enter your credentials to access the system</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  data-testid="input-username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
-                  disabled={login.isPending}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  data-testid="input-password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  disabled={login.isPending}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+              <Input
+                id="username"
+                data-testid="input-username"
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
                 disabled={login.isPending}
-                data-testid="button-login"
-              >
-                {login.isPending ? (
-                  <><Loader2 size={16} className="mr-2 animate-spin" />Signing in...</>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Input
+                id="password"
+                data-testid="input-password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={login.isPending}
+                className="h-10"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full h-10 bg-slate-950 hover:bg-slate-800 text-white font-semibold"
+              disabled={login.isPending}
+              data-testid="button-login"
+            >
+              {login.isPending ? (
+                <><Loader2 size={16} className="mr-2 animate-spin" />Signing in…</>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+        </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-4">
+        <p className="text-center text-sm text-slate-400 mt-5">
           New bakery?{" "}
-          <button onClick={() => setLocation("/register")} className="text-primary font-medium hover:underline">Register for free trial</button>
-        </p>
-        <p className="text-center text-xs text-muted-foreground mt-3">
-          Ara Bakery Cloud &copy; {new Date().getFullYear()}
+          <button onClick={() => setLocation("/register")} className="text-amber-400 font-medium hover:text-amber-300">
+            Start your free trial
+          </button>
         </p>
       </div>
     </div>

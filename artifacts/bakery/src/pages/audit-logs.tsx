@@ -19,7 +19,7 @@ export default function AuditLogsPage() {
   return (
     <div className="space-y-6" data-testid="page-audit-logs">
       <div>
-        <h1 className="text-2xl font-serif font-bold text-foreground">Audit Logs</h1>
+        <h1 className="text-2xl font-bold text-foreground">Audit Logs</h1>
         <p className="text-muted-foreground text-sm mt-0.5">Complete record of all system actions and changes</p>
       </div>
 

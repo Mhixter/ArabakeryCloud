@@ -87,7 +87,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6" data-testid="page-settings">
       <div>
-        <h1 className="text-2xl font-serif font-bold text-foreground">Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground text-sm mt-0.5">Manage branches and system configuration</p>
       </div>
 

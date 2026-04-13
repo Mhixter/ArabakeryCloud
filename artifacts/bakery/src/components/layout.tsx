@@ -298,9 +298,7 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
             : <Wheat size={18} className="text-sidebar-primary-foreground" />}
         </div>
         <div className="min-w-0">
-          <p className={cn("theme-sidebar-brand-name font-bold text-sidebar-foreground text-sm leading-tight truncate",
-            theme === "amber" && "font-serif"
-          )}>
+          <p className="theme-sidebar-brand-name font-bold text-sidebar-foreground text-sm leading-tight tracking-tight truncate">
             {company?.name ?? "Ara Bakery Cloud"}
           </p>
           <p className="text-sidebar-foreground/35 text-xs mt-0.5">
@@ -374,7 +372,7 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
             {company?.logoUrl
               ? <img src={company.logoUrl} alt="Logo" className="w-7 h-7 rounded object-contain" />
               : <Wheat size={18} className="text-primary" />}
-            <span className={cn("font-bold text-foreground text-sm", theme === "amber" ? "font-serif" : "")}>
+            <span className="font-bold text-foreground text-sm tracking-tight">
               {company?.name ?? "Ara Bakery Cloud"}
             </span>
           </div>
