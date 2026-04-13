@@ -2,9 +2,9 @@ import { useState } from "react";
 import {
   useListProduction, useCreateProduction, useListBranches, getListProductionQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { getStoredUser } from "@/lib/auth";
+import { getStoredUser, getToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,11 +18,23 @@ import { Plus, Factory, TrendingDown } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
-const BREAD_TYPES = ["Standard White Loaf", "Whole Wheat Loaf", "Sweet Bread", "Agege Bread", "Coconut Bread", "Other"];
+function useProducts() {
+  const token = getToken();
+  return useQuery<{ id: number; name: string; isActive: boolean }[]>({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const res = await fetch("/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+}
 
 export default function ProductionPage() {
   const user = getStoredUser();
   const { isExpired } = useSubscription();
+  const { data: products } = useProducts();
+  const activeProducts = products?.filter(p => p.isActive) ?? [];
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
@@ -175,7 +187,12 @@ export default function ProductionPage() {
               <Label>Bread Type</Label>
               <Select value={form.breadType} onValueChange={(v) => setForm({ ...form, breadType: v })}>
                 <SelectTrigger data-testid="select-batch-bread-type"><SelectValue placeholder="Select bread type" /></SelectTrigger>
-                <SelectContent>{BREAD_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {activeProducts.length > 0
+                    ? activeProducts.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)
+                    : <SelectItem value="other" disabled>No products configured — add from Products page</SelectItem>
+                  }
+                </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -11,6 +11,7 @@ import salesRouter from "./sales";
 import reportsRouter from "./reports";
 import auditLogsRouter from "./auditLogs";
 import adminRouter from "./admin";
+import productsRouter from "./products";
 import { verifyToken } from "../lib/auth";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -103,6 +104,7 @@ router.use(inventoryRouter);
 router.use(salesRouter);
 router.use(reportsRouter);
 router.use(auditLogsRouter);
+router.use(productsRouter);
 router.use(adminRouter);
 
 export default router;

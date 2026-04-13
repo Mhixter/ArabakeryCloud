@@ -3,9 +3,9 @@ import {
   useListSales, useCreateSale, useGetDailySalesSummary, useListBranches,
   getListSalesQueryKey, getGetDailySalesSummaryQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { getStoredUser, getStoredCompany } from "@/lib/auth";
+import { getStoredUser, getStoredCompany, getToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,6 @@ import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText, T
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
-const BREAD_TYPES = ["Standard White Loaf", "Whole Wheat Loaf", "Sweet Bread", "Agege Bread", "Coconut Bread", "Other"];
 const SLIPS_KEY = "nmb_slips";
 
 function formatCurrency(n: number) {
@@ -281,11 +280,25 @@ function SavedSlipsSection() {
 /* ══════════════════════════════════════════════
    MAIN SALES PAGE
    ══════════════════════════════════════════════ */
+function useProducts() {
+  const token = getToken();
+  return useQuery<{ id: number; name: string; pricePerUnit: number; isActive: boolean }[]>({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const res = await fetch("/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+}
+
 export default function SalesPage() {
   const user = getStoredUser();
   const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: products } = useProducts();
+  const activeProducts = products?.filter(p => p.isActive) ?? [];
 
   const [showNewSale, setShowNewSale] = useState(false);
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
@@ -473,12 +486,25 @@ export default function SalesPage() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Bread Type</Label>
-              <Select value={form.breadType} onValueChange={(v) => setForm({ ...form, breadType: v })}>
+              <Select
+                value={form.breadType}
+                onValueChange={(v) => {
+                  const product = activeProducts.find(p => p.name === v);
+                  setForm({
+                    ...form,
+                    breadType: v,
+                    pricePerUnit: product?.pricePerUnit ? product.pricePerUnit.toString() : form.pricePerUnit,
+                  });
+                }}
+              >
                 <SelectTrigger data-testid="select-bread-type">
                   <SelectValue placeholder="Select bread type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {BREAD_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {activeProducts.length > 0
+                    ? activeProducts.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)
+                    : <SelectItem value="none" disabled>No products — add from Products page</SelectItem>
+                  }
                 </SelectContent>
               </Select>
             </div>

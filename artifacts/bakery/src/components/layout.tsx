@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
-  Building2, CreditCard, MoreHorizontal, X, ChevronRight,
+  Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff"] },
   { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist"] },
   { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
+  { href: "/products",         label: "Products",      icon: Sandwich,        roles: ["managing_director","manager"] },
   { href: "/inventory",        label: "Inventory",     icon: Package,         roles: ["managing_director","manager"] },
   { href: "/reports",          label: "Reports",       icon: BarChart3,       roles: ["managing_director","manager"] },
   { href: "/users",            label: "Users",         icon: Users,           roles: ["managing_director"] },
