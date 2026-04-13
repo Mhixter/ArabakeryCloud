@@ -15,12 +15,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Factory, TrendingDown } from "lucide-react";
+import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
 const BREAD_TYPES = ["Standard White Loaf", "Whole Wheat Loaf", "Sweet Bread", "Agege Bread", "Coconut Bread", "Other"];
 
 export default function ProductionPage() {
   const user = getStoredUser();
+  const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
@@ -81,7 +83,7 @@ export default function ProductionPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Production</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Record and track daily bread batches</p>
         </div>
-        <Button onClick={() => setShowNew(true)} size="sm" data-testid="button-new-batch">
+        <Button onClick={() => setShowNew(true)} size="sm" disabled={isExpired} data-testid="button-new-batch">
           <Plus size={14} className="mr-1.5" />
           Record Batch
         </Button>

@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Package, AlertTriangle, Pencil, Trash2, ArrowUpDown } from "lucide-react";
+import { useSubscription } from "@/components/subscription-guard";
 
 const CATEGORIES = ["Flour", "Yeast", "Sugar", "Salt", "Fat/Oil", "Eggs", "Flavoring", "Packaging", "Other"];
 const UNITS = ["kg", "g", "liters", "ml", "pcs", "bags", "boxes"];
@@ -38,6 +39,7 @@ function StatusBadge({ low }: { low: boolean }) {
 
 export default function InventoryPage() {
   const user = getStoredUser();
+  const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -125,7 +127,7 @@ export default function InventoryPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Inventory</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage raw materials and stock levels</p>
         </div>
-        <Button size="sm" onClick={() => setShowNew(true)} data-testid="button-add-item">
+        <Button size="sm" onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-add-item">
           <Plus size={14} className="mr-1.5" />
           Add Item
         </Button>

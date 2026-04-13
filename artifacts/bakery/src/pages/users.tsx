@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Users, Pencil, Trash2 } from "lucide-react";
+import { useSubscription } from "@/components/subscription-guard";
 
 const ROLES = [
   { value: "managing_director", label: "Managing Director" },
@@ -35,6 +36,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function UsersPage() {
+  const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -136,7 +138,7 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-foreground">Users</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage staff accounts and permissions</p>
         </div>
-        <Button onClick={() => setShowNew(true)} data-testid="button-new-user">
+        <Button onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-new-user">
           <Plus size={16} className="mr-2" />
           Add User
         </Button>

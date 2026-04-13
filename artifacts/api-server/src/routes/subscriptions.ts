@@ -54,8 +54,16 @@ router.post("/subscription/renew", authenticate, requireRole("managing_director"
   // Get company name for description
   const [company] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
 
-  // Get gateway config for provider info
+  // Get gateway config — must be configured with a secret key before renewal is allowed
   const [gateway] = await db.select().from(paymentGatewayConfigTable).limit(1);
+
+  if (!gateway || !gateway.secretKey || gateway.secretKey.trim() === "") {
+    res.status(400).json({
+      error: "Payment gateway not configured. Please contact the platform administrator to set up payments before renewing.",
+      code: "GATEWAY_NOT_CONFIGURED",
+    });
+    return;
+  }
 
   const now = new Date();
   const periodStart = now;

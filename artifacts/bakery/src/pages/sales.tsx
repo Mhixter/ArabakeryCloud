@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText, Trash2 } from "lucide-react";
+import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
 const BREAD_TYPES = ["Standard White Loaf", "Whole Wheat Loaf", "Sweet Bread", "Agege Bread", "Coconut Bread", "Other"];
@@ -282,6 +283,7 @@ function SavedSlipsSection() {
    ══════════════════════════════════════════════ */
 export default function SalesPage() {
   const user = getStoredUser();
+  const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -368,7 +370,7 @@ export default function SalesPage() {
           <h1 className="text-2xl font-bold text-foreground">Sales</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Record and manage bread sales</p>
         </div>
-        <Button onClick={() => setShowNewSale(true)} data-testid="button-new-sale">
+        <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
           <Plus size={16} className="mr-2" />
           New Sale
         </Button>

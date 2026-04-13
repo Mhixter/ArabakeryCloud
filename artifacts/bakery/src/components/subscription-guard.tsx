@@ -1,14 +1,29 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, createContext, useContext } from "react";
 import { useLocation } from "wouter";
 import { getToken } from "@/lib/auth";
-import { AlertTriangle, CreditCard, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, Clock, Lock } from "lucide-react";
 
 interface SubStatus {
   status: string;
   daysRemaining: number;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
+}
+
+interface SubscriptionContextValue {
+  status: string | null;
+  isExpired: boolean;
+  isLoading: boolean;
+}
+
+const SubscriptionContext = createContext<SubscriptionContextValue>({
+  status: null,
+  isExpired: false,
+  isLoading: true,
+});
+
+export function useSubscription() {
+  return useContext(SubscriptionContext);
 }
 
 // Module-level cache — avoids re-fetching on every route change
@@ -36,7 +51,6 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
     const token = getToken();
     if (!token) { setChecked(true); return; }
 
-    // Use cache if fresh
     if (cachedSub && Date.now() - cacheTime < CACHE_TTL) {
       setSub(cachedSub);
       setChecked(true);
@@ -62,72 +76,51 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
       });
   }, [isExempt]);
 
-  // Always render children if exempt or still checking (no blocking spinner for fast UX)
-  if (isExempt || !checked) return <>{children}</>;
+  const isExpired = !isExempt && checked && sub?.status === "expired";
+  const ctxValue: SubscriptionContextValue = {
+    status: sub?.status ?? null,
+    isExpired,
+    isLoading: !checked,
+  };
 
-  if (sub?.status === "expired") {
-    return <SubscriptionExpiredWall onGoToSubscription={() => setLocation("/subscription")} />;
-  }
+  const showTrialWarning =
+    !isExempt &&
+    checked &&
+    sub &&
+    (sub.status === "trial" || sub.status === "active") &&
+    sub.daysRemaining <= 2;
 
-  if (sub && (sub.status === "trial" || sub.status === "active") && sub.daysRemaining <= 2) {
-    return (
-      <>
+  return (
+    <SubscriptionContext.Provider value={ctxValue}>
+      {isExpired && (
+        <ExpiredBanner onGoToSubscription={() => setLocation("/subscription")} />
+      )}
+      {showTrialWarning && !isExpired && (
         <TrialWarningBanner
-          daysRemaining={sub.daysRemaining}
-          isTrial={sub.status === "trial"}
+          daysRemaining={sub!.daysRemaining}
+          isTrial={sub!.status === "trial"}
           onRenew={() => setLocation("/subscription")}
         />
-        {children}
-      </>
-    );
-  }
-
-  return <>{children}</>;
+      )}
+      {children}
+    </SubscriptionContext.Provider>
+  );
 }
 
-/* ──── Expired wall ──── */
-function SubscriptionExpiredWall({ onGoToSubscription }: { onGoToSubscription: () => void }) {
+/* ──── Expired view-only banner ──── */
+function ExpiredBanner({ onGoToSubscription }: { onGoToSubscription: () => void }) {
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm text-center">
-        <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle size={32} className="text-red-400" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
-          Subscription Expired
-        </h1>
-        <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-          Your subscription has expired. Renew now to restore full access to your bakery dashboard — sales, production, inventory, and reports.
-        </p>
-
-        <div className="bg-white rounded-2xl p-5 mb-5 text-left space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center flex-shrink-0">
-              <CreditCard size={16} className="text-slate-950" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-900">Starter Plan</p>
-              <p className="text-xs text-slate-500">₦3,000 / month · All features included</p>
-            </div>
-          </div>
-          {["Unlimited sales & production records", "Full inventory management", "Reports & analytics", "Multi-user access with roles"].map(f => (
-            <div key={f} className="flex items-center gap-2 text-sm text-slate-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-              {f}
-            </div>
-          ))}
-        </div>
-
-        <Button
-          onClick={onGoToSubscription}
-          className="w-full h-12 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-base"
-        >
-          Renew Subscription — ₦3,000
-        </Button>
-        <p className="text-slate-500 text-xs mt-4">
-          Contact support if you need help processing payment.
-        </p>
-      </div>
+    <div className="bg-red-600 text-white px-4 py-2.5 flex items-center gap-3 sticky top-0 z-50">
+      <Lock size={15} className="flex-shrink-0" />
+      <p className="text-sm font-semibold flex-1">
+        Subscription expired — <span className="font-normal">view only mode. You can browse your data but cannot make changes.</span>
+      </p>
+      <button
+        onClick={onGoToSubscription}
+        className="text-xs font-bold underline underline-offset-2 whitespace-nowrap bg-white/20 hover:bg-white/30 px-2 py-1 rounded"
+      >
+        Renew Now
+      </button>
     </div>
   );
 }

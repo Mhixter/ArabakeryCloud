@@ -45,12 +45,15 @@ export default function SubscriptionPage() {
       const token = getToken();
       const res = await fetch("/api/subscription/renew", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
-        setSub(await res.json());
-        toast({ title: "Subscription renewed for 1 month!" });
+        const data = await res.json();
+        setSub(data);
+        toast({ title: "Subscription renewed!", description: "Your plan is now active for 1 month." });
       } else {
-        toast({ title: "Renewal failed", variant: "destructive" });
+        const data = await res.json().catch(() => ({}));
+        const msg = data?.error ?? "Renewal failed. Please try again.";
+        toast({ title: "Cannot renew", description: msg, variant: "destructive" });
       }
-    } catch { toast({ title: "Renewal failed", variant: "destructive" }); }
+    } catch { toast({ title: "Renewal failed", description: "Network error. Please try again.", variant: "destructive" }); }
     finally { setRenewing(false); }
   };
 

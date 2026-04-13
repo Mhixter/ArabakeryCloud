@@ -18,26 +18,33 @@ import { eq } from "drizzle-orm";
 const router: IRouter = Router();
 
 /* ─────────────────────── Subscription enforcement ─────────────────────── */
-// Routes exempt from subscription checking
+// Routes exempt from subscription checking entirely
 const EXEMPT_PREFIXES = [
   "/auth/", "/login", "/register",
   "/subscription",
   "/admin",
   "/health",
-  "/company",       // company settings (they need to update even on expired sub)
-  "/branches",      // read-only needed for login flow
+  "/company",
+  "/branches",
 ];
 
+// Write methods that are blocked for expired subscriptions
+const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
 async function subscriptionGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
-  // Only guard GET/POST/PUT/DELETE on core data routes
   const path = req.path;
 
-  // Skip exempt paths
+  // Skip exempt paths entirely
   if (EXEMPT_PREFIXES.some(p => path.startsWith(p))) {
     next(); return;
   }
 
-  // Extract + verify token
+  // GET requests: always allow — expired users can view their data (read-only mode)
+  if (!WRITE_METHODS.includes(req.method)) {
+    next(); return;
+  }
+
+  // From here: only checking write operations
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) { next(); return; }
   const token = authHeader.substring(7);
@@ -60,7 +67,7 @@ async function subscriptionGuard(req: Request, res: Response, next: NextFunction
     // Auto-expire trial
     if (sub.status === "trial" && sub.trialEndsAt && now > sub.trialEndsAt) {
       await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, sub.id));
-      res.status(402).json({ error: "Your trial has expired. Please renew your subscription.", code: "TRIAL_EXPIRED" });
+      res.status(402).json({ error: "Your trial has expired. Please renew your subscription.", code: "SUBSCRIPTION_EXPIRED" });
       return;
     }
 
@@ -72,7 +79,7 @@ async function subscriptionGuard(req: Request, res: Response, next: NextFunction
     }
 
     if (sub.status === "expired") {
-      res.status(402).json({ error: "Subscription expired. Please renew to continue.", code: "SUBSCRIPTION_EXPIRED" });
+      res.status(402).json({ error: "Subscription expired. Renew to make changes.", code: "SUBSCRIPTION_EXPIRED" });
       return;
     }
 
