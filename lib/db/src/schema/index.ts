@@ -10,3 +10,4 @@ export * from "./super-admins";
 export * from "./payment-gateway";
 export * from "./transactions";
 export * from "./products";
+export * from "./allocations";

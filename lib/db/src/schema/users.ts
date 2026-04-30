@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { branchesTable } from "./branches";
 import { companiesTable } from "./companies";
 
-export const userRoleEnum = ["managing_director", "manager", "receptionist", "production_staff"] as const;
+export const userRoleEnum = ["managing_director", "manager", "receptionist", "production_staff", "seller"] as const;
 export type UserRole = typeof userRoleEnum[number];
 
 export const usersTable = pgTable("users", {

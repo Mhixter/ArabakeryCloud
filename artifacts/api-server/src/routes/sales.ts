@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable } from "@workspace/db";
+import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -34,20 +34,39 @@ function generateReceiptNumber(): string {
 }
 
 router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { branchId, startDate, endDate } = req.query as { branchId?: string; startDate?: string; endDate?: string };
+
   const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
-  if (branchId && !isNaN(parseInt(branchId))) conditions.push(eq(salesTable.branchId, parseInt(branchId)));
+
+  if (role === "seller") {
+    /* Sellers only see their own sales */
+    conditions.push(eq(salesTable.cashierId, userId));
+  } else {
+    /* Others filtered by branch query param or their own branch (non-MD) */
+    const branchFilter = branchId && !isNaN(parseInt(branchId))
+      ? parseInt(branchId)
+      : (role !== "managing_director" ? userBranchId : null);
+    if (branchFilter) conditions.push(eq(salesTable.branchId, branchFilter));
+  }
+
   if (startDate) conditions.push(gte(salesTable.saleDate, new Date(startDate)));
   if (endDate) conditions.push(lte(salesTable.saleDate, new Date(endDate)));
-  const sales = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id)).where(and(...conditions)).orderBy(salesTable.saleDate);
+
+  const sales = await db
+    .select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name })
+    .from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
+    .where(and(...conditions))
+    .orderBy(salesTable.saleDate);
+
   res.json(sales.map(({ sale, cashierName, branchName }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown")));
 });
 
 router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { breadType, quantity, pricePerUnit, paymentMethod, branchId, notes } = req.body;
-  const user = req.user!;
 
   if (!breadType || !quantity || !pricePerUnit || !paymentMethod || branchId == null) {
     res.status(400).json({ error: "breadType, quantity, pricePerUnit, paymentMethod, and branchId are required" });
@@ -56,85 +75,96 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
 
   const qty = parseInt(quantity);
 
-  /* ── 1. Validate product exists and is active ── */
+  /* 1. Validate product exists and is active */
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(and(
-      eq(productsTable.companyId, companyId),
-      eq(productsTable.name, breadType),
-      eq(productsTable.isActive, true),
-    ));
+    .where(and(eq(productsTable.companyId, companyId), eq(productsTable.name, breadType), eq(productsTable.isActive, true)));
 
   if (!product) {
     res.status(400).json({ error: `"${breadType}" is not an active product. Ask your admin to add it.` });
     return;
   }
 
-  /* ── 2. Calculate remaining stock (all-time produced minus all-time sold) ── */
-  const allProduction = await db
-    .select()
-    .from(productionBatchesTable)
-    .where(and(
-      eq(productionBatchesTable.companyId, companyId),
-      eq(productionBatchesTable.breadType, breadType),
-      isNull(productionBatchesTable.deletedAt),
-    ));
+  /* 2. Stock check — logic differs for sellers vs. others */
+  if (role === "seller") {
+    /* Seller can only sell what they've been allocated minus what they've sold */
+    const [allocations, myPastSales] = await Promise.all([
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.sellerId, userId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(salesTable).where(and(eq(salesTable.cashierId, userId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
+    ]);
 
-  const allSales = await db
-    .select()
-    .from(salesTable)
-    .where(and(
-      eq(salesTable.companyId, companyId),
-      eq(salesTable.breadType, breadType),
-      isNull(salesTable.deletedAt),
-    ));
+    const totalAllocated = allocations.reduce((s, a) => s + a.quantity, 0);
+    const totalSold = myPastSales.reduce((s, s2) => s + s2.quantity, 0);
+    const canSell = totalAllocated - totalSold;
 
-  const totalProduced = allProduction.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
-  const totalSold = allSales.reduce((s, s2) => s + s2.quantity, 0);
-  const remaining = totalProduced - totalSold;
+    if (qty > canSell) {
+      res.status(400).json({
+        error: canSell <= 0
+          ? `You have no "${breadType}" allocated to you. Ask the receptionist to allocate some.`
+          : `You only have ${canSell} unit${canSell !== 1 ? "s" : ""} of "${breadType}" available to sell.`,
+      });
+      return;
+    }
+  } else {
+    /* Receptionists/managers: check overall stock (produced - allocated - direct sales) */
+    const [allProduction, allSales, allAllocations] = await Promise.all([
+      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.breadType, breadType), isNull(productionBatchesTable.deletedAt))),
+      db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
+    ]);
 
-  if (qty > remaining) {
-    res.status(400).json({
-      error: remaining <= 0
-        ? `No stock available for "${breadType}". Record production first.`
-        : `Only ${remaining} unit${remaining !== 1 ? "s" : ""} of "${breadType}" remaining in stock.`,
-    });
-    return;
+    const totalProduced = allProduction.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
+    const totalSold = allSales.reduce((s, s2) => s + s2.quantity, 0);
+    const totalAllocated = allAllocations.reduce((s, a) => s + a.quantity, 0);
+    const remaining = totalProduced - totalSold - totalAllocated;
+
+    if (qty > remaining) {
+      res.status(400).json({
+        error: remaining <= 0
+          ? `No direct stock available for "${breadType}". (Check if bread is allocated to sellers.)`
+          : `Only ${remaining} unit${remaining !== 1 ? "s" : ""} of "${breadType}" available for direct sale.`,
+      });
+      return;
+    }
   }
 
   const price = parseFloat(pricePerUnit);
   const totalAmount = qty * price;
   const receiptNumber = generateReceiptNumber();
+  const effectiveBranchId = parseInt(branchId) || userBranchId || 1;
 
   const [sale] = await db.insert(salesTable).values({
     companyId, receiptNumber, breadType, quantity: qty,
     pricePerUnit: price.toString(), totalAmount: totalAmount.toString(),
     costAmount: "0", profitAmount: totalAmount.toString(),
-    paymentMethod, cashierId: user.userId, branchId: parseInt(branchId),
+    paymentMethod, cashierId: userId, branchId: effectiveBranchId,
     notes: notes ?? null, saleDate: new Date(),
   }).returning();
 
-  const [cashier] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
-  const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, sale.branchId));
+  const [[cashier], [branch]] = await Promise.all([
+    db.select().from(usersTable).where(eq(usersTable.id, userId)),
+    db.select().from(branchesTable).where(eq(branchesTable.id, sale.branchId)),
+  ]);
 
-  await logAudit({
-    req, userId: user.userId, companyId, action: "SALE_CREATED", entityType: "sale",
-    entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`,
-    branchId: sale.branchId,
-  });
-
+  await logAudit({ req, userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
   res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown"));
 });
 
 router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { date, branchId } = req.query as { date?: string; branchId?: string };
   const targetDate = date ? new Date(date) : new Date();
   const startOfDay = new Date(targetDate); startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(targetDate); endOfDay.setHours(23, 59, 59, 999);
   const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
-  if (branchId && !isNaN(parseInt(branchId))) conditions.push(eq(salesTable.branchId, parseInt(branchId)));
+  if (role === "seller") {
+    conditions.push(eq(salesTable.cashierId, userId));
+  } else if (branchId && !isNaN(parseInt(branchId))) {
+    conditions.push(eq(salesTable.branchId, parseInt(branchId)));
+  } else if (role !== "managing_director" && userBranchId) {
+    conditions.push(eq(salesTable.branchId, userBranchId));
+  }
   const sales = await db.select().from(salesTable).where(and(...conditions));
   const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.totalAmount as unknown as string), 0);
   const totalProfit = sales.reduce((sum, s) => sum + parseFloat(s.profitAmount as unknown as string), 0);
@@ -149,11 +179,19 @@ router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedReques
 });
 
 router.get("/sales/:id", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { userId, role, companyId } = req.user!;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id)).where(and(eq(salesTable.id, id), eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt)));
+  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name })
+    .from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
+    .where(and(eq(salesTable.id, id), eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt)));
   if (!result) { res.status(404).json({ error: "Sale not found" }); return; }
+  /* Sellers can only view their own sales */
+  if (role === "seller" && result.sale.cashierId !== userId) {
+    res.status(403).json({ error: "Access denied" }); return;
+  }
   res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown"));
 });
 

@@ -16,6 +16,7 @@ import SettingsPage from "@/pages/settings";
 import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
 import ProductsPage from "@/pages/products";
+import AllocationsPage from "@/pages/allocations";
 import Layout from "@/components/layout";
 import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboardPage from "@/pages/admin/dashboard";
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/users"><Protected><UsersPage /></Protected></Route>
       <Route path="/audit-logs"><Protected><AuditLogsPage /></Protected></Route>
       <Route path="/products"><Protected><ProductsPage /></Protected></Route>
+      <Route path="/allocations"><Protected><AllocationsPage /></Protected></Route>
       <Route path="/settings"><Protected><SettingsPage /></Protected></Route>
       <Route path="/company-settings"><Protected><CompanySettingsPage /></Protected></Route>
       <Route path="/subscription"><Protected><SubscriptionPage /></Protected></Route>

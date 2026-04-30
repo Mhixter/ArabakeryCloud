@@ -45,7 +45,11 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
 
 /* ── Product-focused dashboard (new) ── */
 router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { companyId, role, branchId: userBranchId } = req.user!;
+  const { branchId: queryBranchId } = req.query as { branchId?: string };
+  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
+    ? parseInt(queryBranchId)
+    : role !== "managing_director" ? userBranchId : null;
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
@@ -56,25 +60,21 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     .from(productsTable)
     .where(and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)));
 
-  const todaySales = await db
-    .select()
-    .from(salesTable)
-    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)));
+  const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
+  if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
+  const todaySales = await db.select().from(salesTable).where(and(...todayConds));
 
-  const weekSales = await db
-    .select()
-    .from(salesTable)
-    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)));
+  const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
+  if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
+  const weekSales = await db.select().from(salesTable).where(and(...weekConds));
 
-  const allProduction = await db
-    .select()
-    .from(productionBatchesTable)
-    .where(and(isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)));
+  const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
+  if (branchFilter) prodConds.push(eq(productionBatchesTable.branchId, branchFilter));
+  const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
-  const allSalesEver = await db
-    .select()
-    .from(salesTable)
-    .where(and(isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)));
+  const allSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  if (branchFilter) allSalesConds.push(eq(salesTable.branchId, branchFilter));
+  const allSalesEver = await db.select().from(salesTable).where(and(...allSalesConds));
 
   function aggregateByProduct(sales: typeof salesTable.$inferSelect[]) {
     const map = new Map<string, { quantity: number; amount: number }>();

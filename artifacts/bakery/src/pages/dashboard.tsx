@@ -1,16 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGetDailySalesSummary, useListSales, useGetDashboard } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  TrendingUp, ShoppingCart, Factory, Package,
-  Plus, FileText, Clock, ArrowUpRight, Layers,
+  TrendingUp, ShoppingCart, Factory, Package, PackageCheck,
+  Plus, FileText, Clock, ArrowUpRight, Layers, ChevronDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
+
 function formatCurrency(n: number) {
   return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
@@ -54,6 +55,186 @@ function KpiCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SELLER DASHBOARD
+   ══════════════════════════════════════════════ */
+interface Allocation {
+  id: number;
+  breadType: string;
+  quantity: number;
+  issuedByName: string;
+  allocationDate: string;
+}
+
+interface Sale {
+  id: number;
+  breadType: string;
+  quantity: number;
+  totalAmount: number;
+  paymentMethod: string;
+  saleDate: string;
+  receiptNumber: string;
+}
+
+function SellerDashboard() {
+  const [, setLocation] = useLocation();
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("nmb_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    Promise.all([
+      fetch("/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch("/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([a, s]) => {
+      setAllocations(a);
+      setSales(s);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  /* Compute remaining per bread type */
+  const breadTypes = [...new Set([...allocations.map(a => a.breadType), ...sales.map(s => s.breadType)])];
+  const remaining = breadTypes.map(bt => {
+    const allocated = allocations.filter(a => a.breadType === bt).reduce((s, a) => s + a.quantity, 0);
+    const sold = sales.filter(s => s.breadType === bt).reduce((s2, s) => s2 + s.quantity, 0);
+    return { breadType: bt, allocated, sold, remaining: Math.max(0, allocated - sold) };
+  });
+
+  const totalAllocated = allocations.reduce((s, a) => s + a.quantity, 0);
+  const totalSold = sales.reduce((s, s2) => s + s2.quantity, 0);
+  const totalRevenue = sales.reduce((s, s2) => s + s2.totalAmount, 0);
+  const todaySales = sales.filter(s => new Date(s.saleDate).toDateString() === new Date().toDateString());
+
+  return (
+    <div className="space-y-6" data-testid="page-dashboard">
+      <PageHeader
+        title={format(new Date(), "EEEE, d MMMM")}
+        subtitle="Your bread allocation and sales"
+        action={
+          <Button onClick={() => setLocation("/sales")} size="sm">
+            <Plus size={14} className="mr-1.5" />
+            Record Sale
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <KpiCard title="Total Allocated" value={`${totalAllocated}`} sub="bread units received" icon={PackageCheck} loading={loading} accent="amber" />
+        <KpiCard title="In Hand"         value={`${Math.max(0, totalAllocated - totalSold)}`} sub="unsold units" icon={Package} loading={loading} accent={(totalAllocated - totalSold) <= 5 ? "red" : "default"} />
+        <KpiCard title="Total Sold"      value={`${totalSold}`} sub="units sold" icon={ShoppingCart} loading={loading} />
+        <KpiCard title="Total Revenue"   value={formatCurrency(totalRevenue)} sub="all time" icon={TrendingUp} loading={loading} accent="green" />
+      </div>
+
+      {/* Remaining by bread type */}
+      <Card className="rounded-2xl border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+              <PackageCheck size={15} className="text-amber-400" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-bold tracking-tight">My Bread Stock</CardTitle>
+              <CardDescription className="text-xs">Allocated minus sold per type</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : remaining.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <PackageCheck size={28} className="mx-auto mb-2 opacity-20" />
+              <p className="text-sm">No bread allocated to you yet.</p>
+              <p className="text-xs mt-1">Ask your receptionist to allocate bread.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {remaining.map(r => {
+                const pct = r.allocated > 0 ? Math.round((r.sold / r.allocated) * 100) : 0;
+                const low = r.remaining <= 5;
+                return (
+                  <div key={r.breadType} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="font-semibold text-sm text-foreground">{r.breadType}</p>
+                      <Badge variant={low ? "destructive" : "secondary"} className="text-xs">
+                        {r.remaining} left
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`}
+                          style={{ width: `${Math.min(100, pct)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground flex-shrink-0">
+                        {r.sold}/{r.allocated} sold
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Today's sales */}
+      <Card className="rounded-2xl border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+                <Clock size={15} className="text-amber-400" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold tracking-tight">Today's Sales</CardTitle>
+                <CardDescription className="text-xs">Your transactions today</CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary" className="text-xs">{todaySales.length} txns</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : todaySales.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <ShoppingCart size={28} className="mx-auto mb-2 opacity-20" />
+              <p className="text-sm">No sales today.</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setLocation("/sales")}>
+                Record a Sale
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {[...todaySales].reverse().map((sale, idx) => (
+                <div key={sale.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-muted-foreground">{idx + 1}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-foreground truncate">{sale.breadType}</p>
+                    <p className="text-xs text-muted-foreground">{sale.quantity} units · {format(new Date(sale.saleDate), "HH:mm")}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-sm">{formatCurrency(sale.totalAmount)}</p>
+                    <Badge variant={sale.paymentMethod === "cash" ? "secondary" : "outline"} className="text-[10px] capitalize mt-0.5">
+                      {sale.paymentMethod}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -172,23 +353,46 @@ interface ProductDashboard {
   remaining: { name: string; produced: number; sold: number; remaining: number }[];
 }
 
+interface Branch { id: number; name: string }
+
 function ManagerDashboard() {
   const [, setLocation] = useLocation();
+  const user = getStoredUser();
+  const isDirector = user?.role === "managing_director";
+
   const [period, setPeriod] = useState<"today" | "week">("today");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchDashboard = useCallback((branchId: number | null) => {
     const token = localStorage.getItem("nmb_token");
-    fetch(`/api/reports/product-dashboard`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: "include",
-    })
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const url = `/api/reports/product-dashboard${branchId ? `?branchId=${branchId}` : ""}`;
+    setLoading(true);
+    fetch(url, { headers, credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setData(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("nmb_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    if (isDirector) {
+      fetch("/api/branches", { headers, credentials: "include" })
+        .then(r => r.ok ? r.json() : [])
+        .then((bs: Branch[]) => setBranches(bs))
+        .catch(() => {});
+    }
+    fetchDashboard(null);
+  }, [isDirector, fetchDashboard]);
+
+  useEffect(() => {
+    fetchDashboard(selectedBranchId);
+  }, [selectedBranchId, fetchDashboard]);
 
   const periodData = data ? data[period] : null;
 
@@ -204,6 +408,26 @@ function ManagerDashboard() {
           </Button>
         }
       />
+
+      {/* Branch selector for MD */}
+      {isDirector && branches.length > 1 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground font-medium">Branch:</span>
+          <div className="relative">
+            <select
+              value={selectedBranchId ?? ""}
+              onChange={e => setSelectedBranchId(e.target.value ? parseInt(e.target.value) : null)}
+              className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-xl bg-muted border-0 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option value="">All Branches</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
+      )}
 
       {/* Period toggle */}
       <div className="flex gap-2">
@@ -332,10 +556,7 @@ function ManagerDashboard() {
                   <div key={item.name} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                      <Badge
-                        variant={low ? "destructive" : "secondary"}
-                        className="text-xs"
-                      >
+                      <Badge variant={low ? "destructive" : "secondary"} className="text-xs">
                         {item.remaining} left
                       </Badge>
                     </div>
@@ -371,14 +592,14 @@ function ManagerDashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setLocation("/sales")}>
+        <Card className="rounded-2xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setLocation("/allocations")}>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0">
-              <FileText size={16} className="text-white" />
+              <PackageCheck size={16} className="text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-sm">Sales</p>
-              <p className="text-xs text-muted-foreground">View receipts</p>
+              <p className="font-semibold text-sm">Allocations</p>
+              <p className="text-xs text-muted-foreground">Assign to sellers</p>
             </div>
           </CardContent>
         </Card>
@@ -389,6 +610,7 @@ function ManagerDashboard() {
 
 export default function DashboardPage() {
   const user = getStoredUser();
+  if (user?.role === "seller") return <SellerDashboard />;
   if (user?.role === "receptionist") return <ReceptionistDashboard />;
   return <ManagerDashboard />;
 }
