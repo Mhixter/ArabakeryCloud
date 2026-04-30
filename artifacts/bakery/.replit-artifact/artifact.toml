@@ -18,13 +18,23 @@ localPort = 23375
 run = "pnpm --filter @workspace/bakery run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/bakery", "run", "build" ]
-publicDir = "artifacts/bakery/dist/public"
-serve = "static"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.build]
+args = [ "pnpm", "--filter", "@workspace/bakery", "run", "build" ]
+
+[services.production.build.env]
+PORT = "23375"
+BASE_PATH = "/"
+NODE_ENV = "production"
+
+[services.production.run]
+args = [ "node", "artifacts/bakery/serve.mjs" ]
+
+[services.production.run.env]
+PORT = "23375"
+
+[services.production.health.startup]
+path = "/"
 
 [services.env]
 PORT = "23375"
