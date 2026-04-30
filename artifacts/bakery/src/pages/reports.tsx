@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import {
   useGetSalesTrend, useGetProductionSummary, useGetDashboard, useListBranches,
 } from "@workspace/api-client-react";
@@ -31,8 +32,13 @@ function StatCard({ label, value, loading }: { label: string; value: string; loa
 }
 
 export default function ReportsPage() {
-  const [branchId, setBranchId] = useState<string>("all");
+  const { activeBranch } = useActiveBranch();
+  const [branchId, setBranchId] = useState<string>(activeBranch ? activeBranch.id.toString() : "all");
   const [days, setDays] = useState("14");
+
+  useEffect(() => {
+    setBranchId(activeBranch ? activeBranch.id.toString() : "all");
+  }, [activeBranch]);
 
   const { data: branches } = useListBranches();
   const branchParam = branchId !== "all" ? parseInt(branchId) : null;

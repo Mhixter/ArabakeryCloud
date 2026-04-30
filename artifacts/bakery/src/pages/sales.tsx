@@ -3,6 +3,7 @@ import {
   useListSales, useCreateSale, useGetDailySalesSummary, useListBranches,
   getListSalesQueryKey, getGetDailySalesSummaryQueryKey,
 } from "@workspace/api-client-react";
+import { useActiveBranch } from "@/lib/branch-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { getStoredUser, getStoredCompany, getToken } from "@/lib/auth";
@@ -313,8 +314,17 @@ export default function SalesPage() {
     notes: "",
   });
 
-  const { data: sales, isLoading } = useListSales({});
-  const { data: dailySummary } = useGetDailySalesSummary({});
+  const { activeBranch } = useActiveBranch();
+  const branchParam = activeBranch?.id ?? null;
+
+  useEffect(() => {
+    if (activeBranch) {
+      setForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
+    }
+  }, [activeBranch]);
+
+  const { data: sales, isLoading } = useListSales({ branchId: branchParam });
+  const { data: dailySummary } = useGetDailySalesSummary({ branchId: branchParam });
   const { data: branches } = useListBranches();
   const createSale = useCreateSale();
 

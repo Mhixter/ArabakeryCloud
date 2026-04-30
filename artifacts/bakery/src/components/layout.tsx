@@ -237,7 +237,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
 
 /* ─────────────────────── BLUE: top-nav layout ─────────────── */
 function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout, activeBranch } = ls;
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -300,6 +300,14 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
           </button>
         </div>
       </header>
+
+      {/* Active branch banner */}
+      {activeBranch && (
+        <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
+          <Building2 size={12} className="flex-shrink-0 text-amber-600" />
+          <span>Viewing <strong>{activeBranch.name}</strong> — all data is filtered for this branch.</span>
+        </div>
+      )}
 
       {/* Low stock warning */}
       {lowStockCount > 0 && (userRole === "managing_director" || userRole === "manager") && (
@@ -427,6 +435,14 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
             <span className="text-amber-700 font-bold text-xs">{(user?.fullName ?? "U").charAt(0).toUpperCase()}</span>
           </div>
         </header>
+
+        {/* Active branch banner */}
+        {activeBranch && (
+          <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
+            <Building2 size={12} className="flex-shrink-0 text-amber-600" />
+            <span>Viewing <strong>{activeBranch.name}</strong> — all data is filtered for this branch.</span>
+          </div>
+        )}
 
         {/* Low stock banner */}
         {lowStockCount > 0 && (userRole === "managing_director" || userRole === "manager") && (

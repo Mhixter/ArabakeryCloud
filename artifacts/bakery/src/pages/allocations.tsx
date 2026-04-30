@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,18 +42,22 @@ function AllocationForm({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const { activeBranch } = useActiveBranch();
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h = token ? { Authorization: `Bearer ${token}` } : {};
+    const sellersUrl = activeBranch
+      ? `/api/allocations/sellers?branchId=${activeBranch.id}`
+      : "/api/allocations/sellers";
     Promise.all([
-      fetch("/api/allocations/sellers", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([s, p]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
     }).catch(() => {});
-  }, []);
+  }, [activeBranch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,6 +185,7 @@ export default function AllocationsPage() {
   const role = user?.role ?? "";
   const isSeller = role === "seller";
   const canCreate = ["managing_director", "manager", "receptionist"].includes(role);
+  const { activeBranch } = useActiveBranch();
 
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +195,10 @@ export default function AllocationsPage() {
   const load = useCallback(() => {
     const token = localStorage.getItem("nmb_token");
     setLoading(true);
-    fetch("/api/allocations", {
+    const url = activeBranch
+      ? `/api/allocations?branchId=${activeBranch.id}`
+      : "/api/allocations";
+    fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
     })
@@ -197,7 +206,7 @@ export default function AllocationsPage() {
       .then(setAllocations)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeBranch]);
 
   useEffect(() => { load(); }, [load]);
 

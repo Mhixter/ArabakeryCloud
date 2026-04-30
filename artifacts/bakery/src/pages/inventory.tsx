@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListInventory, useCreateInventoryItem, useUpdateInventoryItem,
   useDeleteInventoryItem, useAdjustInventory, useListBranches,
@@ -42,6 +43,8 @@ export default function InventoryPage() {
   const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeBranch } = useActiveBranch();
+  const branchParam = activeBranch?.id ?? null;
 
   const [showNew, setShowNew] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -49,10 +52,15 @@ export default function InventoryPage() {
   const [adjustmentValue, setAdjustmentValue] = useState("");
   const [adjustmentReason, setAdjustmentReason] = useState("");
 
-  const defaultBranchId = user?.branchId?.toString() ?? "";
+  const defaultBranchId = activeBranch?.id.toString() ?? user?.branchId?.toString() ?? "";
   const [form, setForm] = useState({ name: "", category: "", unit: "", currentQuantity: "", minimumQuantity: "", costPerUnit: "", branchId: defaultBranchId });
 
-  const { data: items, isLoading } = useListInventory({});
+  useEffect(() => {
+    const id = activeBranch?.id.toString() ?? user?.branchId?.toString() ?? "";
+    setForm(f => ({ ...f, branchId: id }));
+  }, [activeBranch, user?.branchId]);
+
+  const { data: items, isLoading } = useListInventory({ branchId: branchParam });
   const { data: branches } = useListBranches();
   const createItem   = useCreateInventoryItem();
   const updateItem   = useUpdateInventoryItem();

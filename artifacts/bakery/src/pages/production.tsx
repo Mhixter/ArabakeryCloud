@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListProduction, useCreateProduction, useListBranches, getListProductionQueryKey,
 } from "@workspace/api-client-react";
@@ -37,6 +38,8 @@ export default function ProductionPage() {
   const activeProducts = products?.filter(p => p.isActive) ?? [];
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeBranch } = useActiveBranch();
+  const branchParam = activeBranch?.id ?? null;
   const [showNew, setShowNew] = useState(false);
 
   const [form, setForm] = useState({
@@ -47,7 +50,13 @@ export default function ProductionPage() {
     notes: "",
   });
 
-  const { data: batches, isLoading } = useListProduction({});
+  useEffect(() => {
+    if (activeBranch) {
+      setForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
+    }
+  }, [activeBranch]);
+
+  const { data: batches, isLoading } = useListProduction({ branchId: branchParam });
   const { data: branches } = useListBranches();
   const createProduction = useCreateProduction();
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListUsers,
   useCreateUser,
@@ -41,6 +42,7 @@ export default function UsersPage() {
   const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeBranch } = useActiveBranch();
 
   const [showNew, setShowNew] = useState(false);
   const [editUser, setEditUser] = useState<{ id: number; fullName: string; role: string; branchId: number | null } | null>(null);
@@ -64,8 +66,18 @@ export default function UsersPage() {
     password: "",
   });
 
+  useEffect(() => {
+    if (activeBranch) {
+      setForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
+    }
+  }, [activeBranch]);
+
   const { data: users, isLoading } = useListUsers();
   const { data: branches } = useListBranches();
+
+  const filteredUsers = activeBranch
+    ? (users as UserRow[] | undefined)?.filter(u => u.branchId === activeBranch.id)
+    : (users as UserRow[] | undefined);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
@@ -181,10 +193,10 @@ export default function UsersPage() {
             <div className="p-4 space-y-3">
               {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
-          ) : !(users?.length) ? (
+          ) : !(filteredUsers?.length) ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users size={36} className="mx-auto mb-2 opacity-40" />
-              <p>No users found.</p>
+              <p>{activeBranch ? `No users in ${activeBranch.name}.` : "No users found."}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -200,7 +212,7 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {((users ?? []) as UserRow[]).map((user) => (
+                  {(filteredUsers ?? []).map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">{user.fullName}</TableCell>
                       <TableCell>
@@ -289,14 +301,21 @@ export default function UsersPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Branch (optional)</Label>
-                <Select value={form.branchId || "none"} onValueChange={(v) => setForm({...form, branchId: v === "none" ? "" : v})}>
-                  <SelectTrigger><SelectValue placeholder="Any branch" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No branch</SelectItem>
-                    {(branches ?? []).map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Branch {activeBranch ? "" : "(optional)"}</Label>
+                {activeBranch ? (
+                  <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted text-sm text-foreground">
+                    <span className="font-medium">{activeBranch.name}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">(active branch)</span>
+                  </div>
+                ) : (
+                  <Select value={form.branchId || "none"} onValueChange={(v) => setForm({...form, branchId: v === "none" ? "" : v})}>
+                    <SelectTrigger><SelectValue placeholder="Any branch" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No branch</SelectItem>
+                      {(branches ?? []).map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
           </div>
