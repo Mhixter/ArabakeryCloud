@@ -29,6 +29,7 @@ import LandingPricing from "@/pages/landing/pricing";
 import { isAuthenticated } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import SubscriptionGuard from "@/components/subscription-guard";
+import { BranchProvider } from "@/lib/branch-context";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
@@ -98,11 +99,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <ThemeInit />
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <BranchProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <ThemeInit />
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </BranchProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

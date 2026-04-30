@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { clearToken, clearStoredUser, getStoredUser, clearStoredCompany, getStoredCompany } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
+import { useActiveBranch } from "@/lib/branch-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
@@ -51,6 +52,7 @@ function useLayoutState() {
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
   const visibleNav = NAV_ITEMS.filter(i => i.roles.includes(userRole));
+  const { activeBranch } = useActiveBranch();
 
   useEffect(() => { initTheme(); }, []);
 
@@ -59,7 +61,11 @@ function useLayoutState() {
     queryClient.clear(); setLocation("/login");
   };
 
-  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout };
+  const serviceLabel = activeBranch
+    ? activeBranch.name.toUpperCase()
+    : theme === "slate" ? "BAKERY SYS" : "Bakery System";
+
+  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, activeBranch, serviceLabel };
 }
 
 /* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
@@ -315,7 +321,7 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
 
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
 function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, serviceLabel } = ls;
   const { canInstall, install } = usePwaInstall();
 
   const SidebarContent = () => (
@@ -334,8 +340,8 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
           <p className="theme-sidebar-brand-name font-bold text-sidebar-foreground text-sm leading-tight tracking-tight truncate">
             {company?.name ?? "Ara Bakery Cloud"}
           </p>
-          <p className="text-sidebar-foreground/35 text-xs mt-0.5">
-            {theme === "slate" ? "BAKERY SYS" : "Bakery System"}
+          <p className="text-sidebar-foreground/35 text-xs mt-0.5 truncate max-w-[140px]">
+            {serviceLabel}
           </p>
         </div>
       </div>

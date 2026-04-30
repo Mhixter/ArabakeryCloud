@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useActiveBranch } from "@/lib/branch-context";
 import { useGetDailySalesSummary, useListSales, useGetDashboard } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -359,6 +360,7 @@ function ManagerDashboard() {
   const [, setLocation] = useLocation();
   const user = getStoredUser();
   const isDirector = user?.role === "managing_director";
+  const { setActiveBranch } = useActiveBranch();
 
   const [period, setPeriod] = useState<"today" | "week">("today");
   const [data, setData] = useState<ProductDashboard | null>(null);
@@ -416,7 +418,12 @@ function ManagerDashboard() {
           <div className="relative">
             <select
               value={selectedBranchId ?? ""}
-              onChange={e => setSelectedBranchId(e.target.value ? parseInt(e.target.value) : null)}
+              onChange={e => {
+                const id = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedBranchId(id);
+                const branch = id ? branches.find(b => b.id === id) ?? null : null;
+                setActiveBranch(branch);
+              }}
               className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-xl bg-muted border-0 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
               <option value="">All Branches</option>
