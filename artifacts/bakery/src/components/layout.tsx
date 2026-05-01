@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { clearToken, clearStoredUser, getStoredUser, clearStoredCompany, getStoredCompany } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
-import { useActiveBranch } from "@/lib/branch-context";
+import { useActiveBranch, clearPersistedBranch } from "@/lib/branch-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
@@ -57,7 +57,7 @@ function useLayoutState() {
   useEffect(() => { initTheme(); }, []);
 
   const handleLogout = () => {
-    clearToken(); clearStoredUser(); clearStoredCompany();
+    clearToken(); clearStoredUser(); clearStoredCompany(); clearPersistedBranch();
     queryClient.clear(); setLocation("/login");
   };
 
@@ -236,8 +236,8 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
 }
 
 /* ─────────────────────── BLUE: top-nav layout ─────────────── */
-function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout, activeBranch } = ls;
+function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
+  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -301,13 +301,8 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
         </div>
       </header>
 
-      {/* Active branch banner */}
-      {activeBranch && (
-        <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
-          <Building2 size={12} className="flex-shrink-0 text-amber-600" />
-          <span>Your branch: <strong>{activeBranch.name}</strong> — data filtered to this branch.</span>
-        </div>
-      )}
+      {/* Branch banner — injected from root Layout */}
+      {banner}
 
       {/* Low stock warning */}
       {lowStockCount > 0 && (userRole === "managing_director" || userRole === "manager") && (
@@ -328,8 +323,8 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
 }
 
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
-function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState> }) {
-  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, serviceLabel, activeBranch } = ls;
+function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
+  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, serviceLabel } = ls;
   const { canInstall, install } = usePwaInstall();
 
   const SidebarContent = () => (
@@ -436,13 +431,8 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
           </div>
         </header>
 
-        {/* Active branch banner */}
-        {activeBranch && (
-          <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
-            <Building2 size={12} className="flex-shrink-0 text-amber-600" />
-            <span>Your branch: <strong>{activeBranch.name}</strong> — data filtered to this branch.</span>
-          </div>
-        )}
+        {/* Branch banner — injected from root Layout */}
+        {banner}
 
         {/* Low stock banner */}
         {lowStockCount > 0 && (userRole === "managing_director" || userRole === "manager") && (
@@ -462,9 +452,26 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
   );
 }
 
+/* ── Shared branch banner — rendered ONCE here, not inside sub-layouts ── */
+function BranchBanner({ activeBranch }: { activeBranch: { id: number; name: string } | null }) {
+  if (!activeBranch) return null;
+  return (
+    <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium flex-shrink-0">
+      <Building2 size={12} className="flex-shrink-0 text-amber-600" />
+      <span>Your branch: <strong>{activeBranch.name}</strong> — data filtered to this branch.</span>
+    </div>
+  );
+}
+
 /* ─────────────────────── Root Layout ──────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
   const ls = useLayoutState();
-  if (ls.theme === "blue") return <TopNavLayout ls={ls}>{children}</TopNavLayout>;
-  return <SidebarLayout ls={ls}>{children}</SidebarLayout>;
+  const banner = <BranchBanner activeBranch={ls.activeBranch} />;
+
+  if (ls.theme === "blue") {
+    return (
+      <TopNavLayout ls={ls} banner={banner}>{children}</TopNavLayout>
+    );
+  }
+  return <SidebarLayout ls={ls} banner={banner}>{children}</SidebarLayout>;
 }
