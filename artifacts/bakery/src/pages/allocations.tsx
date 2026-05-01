@@ -211,16 +211,16 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Seller *</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Supplier *</label>
             <div className="relative">
               <select value={sellerId} onChange={e => setSellerId(e.target.value)}
                 className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required>
-                <option value="">Select seller…</option>
+                <option value="">Select supplier…</option>
                 {sellers.map(s => <option key={s.id} value={s.id}>{s.fullName} ({s.agentId})</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
-            {sellers.length === 0 && <p className="text-xs text-amber-600 mt-1">No sellers found. Create a user with the Seller role first.</p>}
+            {sellers.length === 0 && <p className="text-xs text-amber-600 mt-1">No suppliers found. Create a user with the Supplier role first.</p>}
           </div>
 
           <div>
@@ -276,7 +276,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
 export default function AllocationsPage() {
   const user = getStoredUser();
   const role = user?.role ?? "";
-  const isSeller = role === "seller";
+  const isSeller = role === "supplier";
   const canCreate = ["managing_director", "manager", "receptionist"].includes(role);
   const canDelete = ["managing_director", "manager"].includes(role);
   const { activeBranch } = useActiveBranch();
@@ -335,7 +335,7 @@ export default function AllocationsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">Allocations</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {isSeller ? "Bread allocated to you — return unsold stock here" : "Bread issued to field sellers"}
+            {isSeller ? "Bread allocated to you — return unsold stock here" : "Bread issued to field suppliers"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -400,7 +400,7 @@ export default function AllocationsPage() {
                   {isSeller ? "My Allocations" : "All Allocations"}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {isSeller ? "Bread given to you from the store" : "Bread distributed to sellers"}
+                  {isSeller ? "Bread given to you from the store" : "Bread distributed to suppliers"}
                 </CardDescription>
               </div>
             </div>
@@ -412,7 +412,7 @@ export default function AllocationsPage() {
               <div className="text-center py-14 text-muted-foreground">
                 <PackageCheck size={32} className="mx-auto mb-3 opacity-20" />
                 <p className="text-sm font-medium">No allocations yet</p>
-                <p className="text-xs mt-1">{isSeller ? "Ask your receptionist to allocate bread." : "Create an allocation to assign bread to a seller."}</p>
+                <p className="text-xs mt-1">{isSeller ? "Ask your receptionist to allocate bread." : "Create an allocation to assign bread to a supplier."}</p>
                 {canCreate && (
                   <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowForm(true)}>
                     <Plus size={13} className="mr-1.5" />New Allocation
@@ -482,7 +482,7 @@ export default function AllocationsPage() {
                 <div>
                   <CardTitle className="text-sm font-bold tracking-tight">Product Returns</CardTitle>
                   <CardDescription className="text-xs">
-                    {isSeller ? "Bread returned to the receptionist" : "Returns submitted by sellers"}
+                    {isSeller ? "Bread returned to the receptionist" : "Returns submitted by suppliers"}
                   </CardDescription>
                 </div>
               </div>

@@ -27,7 +27,7 @@ const ROLES = [
   { value: "manager", label: "Manager" },
   { value: "receptionist", label: "Receptionist" },
   { value: "production_staff", label: "Production Staff" },
-  { value: "seller", label: "Seller" },
+  { value: "supplier", label: "Supplier" },
 ];
 
 const ROLE_COLORS: Record<string, string> = {
@@ -35,7 +35,7 @@ const ROLE_COLORS: Record<string, string> = {
   manager: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
   receptionist: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   production_staff: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  seller: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  supplier: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };
 
 type UserRow = { id: number; username: string; agentId?: string | null; fullName: string; role: string; branchId?: number | null; branchName?: string | null };

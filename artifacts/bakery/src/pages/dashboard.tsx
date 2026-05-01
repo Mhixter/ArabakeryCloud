@@ -304,7 +304,7 @@ function ReceptionistDashboard() {
         <KpiCard title="Sales Today" value={`${dailySummary?.totalSales ?? 0}`} sub="orders" icon={ShoppingCart} loading={dailyLoading} />
         <KpiCard title="Units Sold" value={`${todayUnits}`} sub="today" icon={Package} loading={dailyLoading} accent="amber" />
         <KpiCard title="Cash Collected" value={formatCurrency(dailySummary?.cashSales ?? 0)} sub="cash today" icon={TrendingUp} loading={dailyLoading} accent="green" />
-        <KpiCard title="Pending Returns" value={`${todayPendingReturns.length}`} sub="from sellers today" icon={RotateCcw} loading={stockLoading} accent={todayPendingReturns.length > 0 ? "red" : "default"} />
+        <KpiCard title="Pending Returns" value={`${todayPendingReturns.length}`} sub="from suppliers today" icon={RotateCcw} loading={stockLoading} accent={todayPendingReturns.length > 0 ? "red" : "default"} />
       </div>
 
       {/* Remaining stock by bread type */}
@@ -577,13 +577,16 @@ function ManagerDashboard() {
   const [, setLocation] = useLocation();
   const user = getStoredUser();
   const isDirector = user?.role === "managing_director";
-  const { setActiveBranch } = useActiveBranch();
+  const { setActiveBranch, isBranchLocked } = useActiveBranch();
+
+  /* If the user has a fixed branch, pre-select it */
+  const userFixedBranchId = user?.branchId ?? null;
 
   const [period, setPeriod] = useState<"today" | "week">("today");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(userFixedBranchId);
 
   const fetchDashboard = useCallback((branchId: number | null) => {
     const token = localStorage.getItem("nmb_token");
@@ -606,8 +609,8 @@ function ManagerDashboard() {
         .then((bs: Branch[]) => setBranches(bs))
         .catch(() => {});
     }
-    fetchDashboard(null);
-  }, [isDirector, fetchDashboard]);
+    fetchDashboard(userFixedBranchId);
+  }, [isDirector, fetchDashboard, userFixedBranchId]);
 
   useEffect(() => { fetchDashboard(selectedBranchId); }, [selectedBranchId, fetchDashboard]);
 
@@ -626,7 +629,7 @@ function ManagerDashboard() {
         }
       />
 
-      {isDirector && branches.length > 1 && (
+      {isDirector && !isBranchLocked && branches.length > 1 && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground font-medium">Branch:</span>
           <div className="relative">
@@ -771,7 +774,7 @@ function ManagerDashboard() {
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm">Allocations</p>
-              <p className="text-xs text-muted-foreground">Assign to sellers</p>
+              <p className="text-xs text-muted-foreground">Assign to suppliers</p>
             </div>
           </CardContent>
         </Card>
@@ -782,7 +785,7 @@ function ManagerDashboard() {
 
 export default function DashboardPage() {
   const user = getStoredUser();
-  if (user?.role === "seller") return <SellerDashboard />;
+  if (user?.role === "supplier") return <SellerDashboard />;
   if (user?.role === "receptionist") return <ReceptionistDashboard />;
   if (user?.role === "production_staff") return <ProductionDashboard />;
   return <ManagerDashboard />;

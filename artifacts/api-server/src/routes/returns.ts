@@ -46,7 +46,7 @@ router.get("/returns", authenticate, async (req: AuthenticatedRequest, res): Pro
     eq(productReturnsTable.companyId, companyId),
   ];
 
-  if (role === "seller") {
+  if (role === "supplier") {
     conditions.push(eq(productReturnsTable.sellerId, userId));
   } else {
     const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))

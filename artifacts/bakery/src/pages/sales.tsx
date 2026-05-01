@@ -23,7 +23,7 @@ import { format } from "date-fns";
 const SLIPS_KEY = "nmb_slips";
 
 const ROLE_LABELS: Record<string, string> = {
-  seller: "Seller",
+  supplier: "Supplier",
   receptionist: "Receptionist",
   manager: "Manager",
   managing_director: "Director",
@@ -297,7 +297,7 @@ function todayStr() {
 export default function SalesPage() {
   const user = getStoredUser();
   const role = user?.role ?? "";
-  const isLimitedRole = role === "seller" || role === "receptionist";
+  const isLimitedRole = role === "supplier" || role === "receptionist";
 
   const { isExpired } = useSubscription();
   const { toast } = useToast();
@@ -309,7 +309,7 @@ export default function SalesPage() {
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
 
-  /* Date filter — seller/receptionist default to today, others default to "all" */
+  /* Date filter — supplier/receptionist default to today, others default to "all" */
   const [filterDate, setFilterDate] = useState(isLimitedRole ? todayStr() : "");
 
   const [form, setForm] = useState({
@@ -330,7 +330,7 @@ export default function SalesPage() {
     }
   }, [activeBranch]);
 
-  /* Build API params — use date filter for seller/receptionist or when filter is set */
+  /* Build API params — use date filter for supplier/receptionist or when filter is set */
   const listParams: Record<string, string | number | null> = { branchId: branchParam };
   if (filterDate) {
     listParams.startDate = `${filterDate}T00:00:00`;
@@ -455,7 +455,7 @@ export default function SalesPage() {
         <Badge variant="secondary" className="text-xs">{dateLabel}</Badge>
       </div>
 
-      {/* Daily Summary — seller/receptionist see only today's daily numbers */}
+      {/* Daily Summary — supplier/receptionist see only today's daily numbers */}
       {dailySummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[

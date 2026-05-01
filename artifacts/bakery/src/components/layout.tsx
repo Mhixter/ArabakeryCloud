@@ -18,9 +18,9 @@ import { usePwaInstall } from "@/hooks/use-pwa-install";
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff","seller"] },
-  { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist","seller"] },
-  { href: "/allocations",      label: "Allocations",   icon: PackageCheck,    roles: ["managing_director","manager","receptionist","seller"] },
+  { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff","supplier"] },
+  { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist","supplier"] },
+  { href: "/allocations",      label: "Allocations",   icon: PackageCheck,    roles: ["managing_director","manager","receptionist","supplier"] },
   { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
   { href: "/products",         label: "Products",      icon: Sandwich,        roles: ["managing_director","manager","receptionist"] },
   { href: "/inventory",        label: "Inventory",     icon: Package,         roles: ["managing_director","manager"] },
@@ -37,7 +37,7 @@ const ROLE_LABELS: Record<string, string> = {
   manager: "Manager",
   receptionist: "Receptionist",
   production_staff: "Production Staff",
-  seller: "Seller",
+  supplier: "Supplier",
 };
 
 /* ─────────────────────── shared hook ─────────────────────── */
@@ -52,7 +52,7 @@ function useLayoutState() {
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
   const visibleNav = NAV_ITEMS.filter(i => i.roles.includes(userRole));
-  const { activeBranch } = useActiveBranch();
+  const { activeBranch, isBranchLocked } = useActiveBranch();
 
   useEffect(() => { initTheme(); }, []);
 
@@ -65,7 +65,7 @@ function useLayoutState() {
     ? activeBranch.name.toUpperCase()
     : theme === "slate" ? "BAKERY SYS" : "Bakery System";
 
-  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, activeBranch, serviceLabel };
+  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, activeBranch, serviceLabel, isBranchLocked };
 }
 
 /* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
@@ -305,7 +305,7 @@ function TopNavLayout({ children, ls }: { children: React.ReactNode; ls: ReturnT
       {activeBranch && (
         <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
           <Building2 size={12} className="flex-shrink-0 text-amber-600" />
-          <span>Viewing <strong>{activeBranch.name}</strong> — all data is filtered for this branch.</span>
+          <span>Your branch: <strong>{activeBranch.name}</strong> — data filtered to this branch.</span>
         </div>
       )}
 
@@ -440,7 +440,7 @@ function SidebarLayout({ children, ls }: { children: React.ReactNode; ls: Return
         {activeBranch && (
           <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium">
             <Building2 size={12} className="flex-shrink-0 text-amber-600" />
-            <span>Viewing <strong>{activeBranch.name}</strong> — all data is filtered for this branch.</span>
+            <span>Your branch: <strong>{activeBranch.name}</strong> — data filtered to this branch.</span>
           </div>
         )}
 

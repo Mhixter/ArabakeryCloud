@@ -7,7 +7,7 @@ export const getStoredUser = () => {
   const raw = localStorage.getItem("nmb_user");
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { id: number; username: string; fullName: string; role: string; branchId: number | null; companyId: number };
+    return JSON.parse(raw) as { id: number; username: string; fullName: string; role: string; branchId: number | null; branchName?: string; companyId: number };
   } catch {
     return null;
   }

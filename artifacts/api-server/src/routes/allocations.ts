@@ -40,7 +40,7 @@ router.get("/allocations/sellers", authenticate, requireRole("managing_director"
 
   const conditions = [
     eq(usersTable.companyId, companyId),
-    eq(usersTable.role, "seller" as const),
+    eq(usersTable.role, "supplier" as const),
     isNull(usersTable.deletedAt),
     eq(usersTable.isActive, true),
   ] as Parameters<typeof and>[0][];
@@ -63,7 +63,7 @@ router.get("/allocations", authenticate, async (req: AuthenticatedRequest, res):
     eq(sellerAllocationsTable.companyId, companyId),
   ] as Parameters<typeof and>[0][];
 
-  if (role === "seller") {
+  if (role === "supplier") {
     conditions.push(eq(sellerAllocationsTable.sellerId, userId));
   } else {
     const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
@@ -119,8 +119,8 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     .from(usersTable)
     .where(and(eq(usersTable.id, parseInt(sellerId)), eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)));
 
-  if (!seller) { res.status(404).json({ error: "Seller not found" }); return; }
-  if (seller.role !== "seller") { res.status(400).json({ error: "Selected user is not a seller" }); return; }
+  if (!seller) { res.status(404).json({ error: "Supplier not found" }); return; }
+  if (seller.role !== "supplier") { res.status(400).json({ error: "Selected user is not a supplier" }); return; }
 
   /* Stock check: produced - sold - already allocated */
   const [production, sales, existingAllocations] = await Promise.all([

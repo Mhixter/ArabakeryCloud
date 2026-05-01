@@ -40,7 +40,7 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
 
   const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
 
-  if (role === "seller") {
+  if (role === "supplier") {
     /* Sellers only see their own sales */
     conditions.push(eq(salesTable.cashierId, userId));
   } else {
@@ -88,7 +88,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   }
 
   /* 2. Stock check — logic differs for sellers vs. others */
-  if (role === "seller") {
+  if (role === "supplier") {
     /* Seller can only sell what they've been allocated minus what they've sold */
     const [allocations, myPastSales] = await Promise.all([
       db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.sellerId, userId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
@@ -159,7 +159,7 @@ router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedReques
   const startOfDay = new Date(targetDate); startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(targetDate); endOfDay.setHours(23, 59, 59, 999);
   const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
-  if (role === "seller") {
+  if (role === "supplier") {
     conditions.push(eq(salesTable.cashierId, userId));
   } else if (branchId && !isNaN(parseInt(branchId))) {
     conditions.push(eq(salesTable.branchId, parseInt(branchId)));
@@ -190,7 +190,7 @@ router.get("/sales/:id", authenticate, async (req: AuthenticatedRequest, res): P
     .where(and(eq(salesTable.id, id), eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt)));
   if (!result) { res.status(404).json({ error: "Sale not found" }); return; }
   /* Sellers can only view their own sales */
-  if (role === "seller" && result.sale.cashierId !== userId) {
+  if (role === "supplier" && result.sale.cashierId !== userId) {
     res.status(403).json({ error: "Access denied" }); return;
   }
   res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown"));
