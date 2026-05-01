@@ -13,6 +13,7 @@ import auditLogsRouter from "./auditLogs";
 import adminRouter from "./admin";
 import productsRouter from "./products";
 import allocationsRouter from "./allocations";
+import returnsRouter from "./returns";
 import { verifyToken } from "../lib/auth";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -107,6 +108,7 @@ router.use(reportsRouter);
 router.use(auditLogsRouter);
 router.use(productsRouter);
 router.use(allocationsRouter);
+router.use(returnsRouter);
 router.use(adminRouter);
 
 export default router;

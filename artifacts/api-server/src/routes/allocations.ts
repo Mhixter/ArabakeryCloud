@@ -158,8 +158,8 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
   res.status(201).json(formatAllocation(allocation, sellerRow?.fullName ?? "Unknown", issuerRow?.fullName ?? "Unknown", branchRow?.name ?? "Unknown"));
 });
 
-/* DELETE /allocations/:id */
-router.delete("/allocations/:id", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
+/* DELETE /allocations/:id — receptionists cannot cancel allocations */
+router.delete("/allocations/:id", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, companyId, role } = req.user!;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }

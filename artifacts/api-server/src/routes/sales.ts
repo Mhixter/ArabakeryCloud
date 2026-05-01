@@ -7,7 +7,7 @@ import crypto from "crypto";
 
 const router: IRouter = Router();
 
-const formatSale = (s: typeof salesTable.$inferSelect, cashierName: string, branchName: string) => ({
+const formatSale = (s: typeof salesTable.$inferSelect, cashierName: string, branchName: string, cashierRole?: string) => ({
   id: s.id,
   receiptNumber: s.receiptNumber,
   breadType: s.breadType,
@@ -19,6 +19,7 @@ const formatSale = (s: typeof salesTable.$inferSelect, cashierName: string, bran
   paymentMethod: s.paymentMethod,
   cashierId: s.cashierId,
   cashierName,
+  cashierRole: cashierRole ?? null,
   branchId: s.branchId,
   branchName,
   notes: s.notes,
@@ -54,14 +55,14 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   if (endDate) conditions.push(lte(salesTable.saleDate, new Date(endDate)));
 
   const sales = await db
-    .select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name })
+    .select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
     .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
     .where(and(...conditions))
     .orderBy(salesTable.saleDate);
 
-  res.json(sales.map(({ sale, cashierName, branchName }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown")));
+  res.json(sales.map(({ sale, cashierName, cashierRole, branchName }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown", cashierRole ?? undefined)));
 });
 
 router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {

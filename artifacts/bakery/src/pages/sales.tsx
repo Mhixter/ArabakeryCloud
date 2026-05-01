@@ -16,11 +16,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText, Trash2 } from "lucide-react";
+import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
 const SLIPS_KEY = "nmb_slips";
+
+const ROLE_LABELS: Record<string, string> = {
+  seller: "Seller",
+  receptionist: "Receptionist",
+  manager: "Manager",
+  managing_director: "Director",
+  production_staff: "Production",
+};
 
 function formatCurrency(n: number) {
   return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -35,6 +43,7 @@ export interface ReceiptData {
   totalAmount: number;
   paymentMethod: string;
   cashierName: string;
+  cashierRole?: string | null;
   branchName: string;
   saleDate: string;
   savedAt?: string;
@@ -57,13 +66,9 @@ function saveSlip(receipt: ReceiptData) {
   }
 }
 
-function deleteSlip(receiptNumber: string) {
-  const slips = loadSlips().filter(s => s.receiptNumber !== receiptNumber);
-  localStorage.setItem(SLIPS_KEY, JSON.stringify(slips));
-}
-
 /* ── Generate printable HTML for download ── */
 function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhone?: string) {
+  const roleLabel = sale.cashierRole ? ROLE_LABELS[sale.cashierRole] ?? sale.cashierRole : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,7 +94,7 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
   <hr class="divider"/>
   <div class="row"><span class="label">Receipt No.</span><span class="bold">${sale.receiptNumber}</span></div>
   <div class="row"><span class="label">Date</span><span>${format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span></div>
-  <div class="row"><span class="label">Cashier</span><span>${sale.cashierName}</span></div>
+  <div class="row"><span class="label">${roleLabel || "Served by"}</span><span>${sale.cashierName}</span></div>
   <hr class="divider"/>
   <div class="row"><span class="label">Item</span><span>${sale.breadType}</span></div>
   <div class="row"><span class="label">Qty × Price</span><span>${sale.quantity} × ${formatCurrency(sale.pricePerUnit)}</span></div>
@@ -120,6 +125,7 @@ function downloadReceipt(sale: ReceiptData, companyName: string, companyPhone?: 
 function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => void }) {
   const company = getStoredCompany();
   const companyName = company?.name ?? "Ara Bakery Cloud";
+  const roleLabel = sale.cashierRole ? ROLE_LABELS[sale.cashierRole] ?? sale.cashierRole : null;
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -151,8 +157,8 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
               <span>{format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cashier</span>
-              <span>{sale.cashierName}</span>
+              <span className="text-muted-foreground">{roleLabel ?? "Served by"}</span>
+              <span className="font-medium">{sale.cashierName}</span>
             </div>
           </div>
 
@@ -186,7 +192,7 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             <Printer size={14} className="mr-2" />
             Print
           </Button>
-          <Button onClick={() => downloadReceipt(sale, companyName, company?.phone)} className="flex-1" data-testid="button-download-receipt">
+          <Button onClick={() => downloadReceipt(sale, companyName, company?.phone ?? undefined)} className="flex-1" data-testid="button-download-receipt">
             <Download size={14} className="mr-2" />
             Download
           </Button>
@@ -203,11 +209,6 @@ function SavedSlipsSection() {
   const company = getStoredCompany();
 
   useEffect(() => { setSlips(loadSlips()); }, []);
-
-  const handleDelete = (receiptNumber: string) => {
-    deleteSlip(receiptNumber);
-    setSlips(loadSlips());
-  };
 
   if (slips.length === 0) {
     return (
@@ -261,12 +262,8 @@ function SavedSlipsSection() {
                   <Receipt size={13} />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7"
-                  onClick={() => downloadReceipt(slip, company?.name ?? "Ara Bakery Cloud", company?.phone)}>
+                  onClick={() => downloadReceipt(slip, company?.name ?? "Ara Bakery Cloud", company?.phone ?? undefined)}>
                   <Download size={13} />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={() => handleDelete(slip.receiptNumber)}>
-                  <Trash2 size={13} />
                 </Button>
               </div>
             </div>
@@ -293,8 +290,15 @@ function useProducts() {
   });
 }
 
+function todayStr() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 export default function SalesPage() {
   const user = getStoredUser();
+  const role = user?.role ?? "";
+  const isLimitedRole = role === "seller" || role === "receptionist";
+
   const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -304,6 +308,9 @@ export default function SalesPage() {
   const [showNewSale, setShowNewSale] = useState(false);
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
+
+  /* Date filter — seller/receptionist default to today, others default to "all" */
+  const [filterDate, setFilterDate] = useState(isLimitedRole ? todayStr() : "");
 
   const [form, setForm] = useState({
     breadType: "",
@@ -323,7 +330,14 @@ export default function SalesPage() {
     }
   }, [activeBranch]);
 
-  const { data: sales, isLoading } = useListSales({ branchId: branchParam });
+  /* Build API params — use date filter for seller/receptionist or when filter is set */
+  const listParams: Record<string, string | number | null> = { branchId: branchParam };
+  if (filterDate) {
+    listParams.startDate = `${filterDate}T00:00:00`;
+    listParams.endDate = `${filterDate}T23:59:59`;
+  }
+
+  const { data: sales, isLoading } = useListSales(listParams as any);
   const { data: dailySummary } = useGetDailySalesSummary({ branchId: branchParam });
   const { data: branches } = useListBranches();
   const createSale = useCreateSale();
@@ -358,6 +372,7 @@ export default function SalesPage() {
             totalAmount:   sale.totalAmount,
             paymentMethod: sale.paymentMethod,
             cashierName:   sale.cashierName,
+            cashierRole:   (sale as any).cashierRole ?? null,
             branchName:    sale.branchName,
             saleDate:      sale.saleDate,
           };
@@ -373,7 +388,6 @@ export default function SalesPage() {
     );
   };
 
-  /* Build receipt data from a sale list item */
   const toReceipt = (sale: NonNullable<typeof sales>[0]): ReceiptData => ({
     receiptNumber: sale.receiptNumber,
     breadType:     sale.breadType,
@@ -382,16 +396,24 @@ export default function SalesPage() {
     totalAmount:   sale.totalAmount,
     paymentMethod: sale.paymentMethod,
     cashierName:   sale.cashierName,
+    cashierRole:   (sale as any).cashierRole ?? null,
     branchName:    sale.branchName,
     saleDate:      sale.saleDate,
   });
+
+  const isToday = filterDate === todayStr();
+  const dateLabel = filterDate
+    ? isToday ? "Today" : format(new Date(filterDate + "T12:00:00"), "dd MMM yyyy")
+    : "All Time";
 
   return (
     <div className="space-y-6" data-testid="page-sales">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Sales</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Record and manage bread sales</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {isLimitedRole ? "Your daily sales" : "Record and manage bread sales"}
+          </p>
         </div>
         <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
           <Plus size={16} className="mr-2" />
@@ -399,15 +421,49 @@ export default function SalesPage() {
         </Button>
       </div>
 
-      {/* Daily Summary */}
+      {/* Date filter */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date:</Label>
+          <Input
+            type="date"
+            value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            className="w-40 h-8 text-sm"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={isToday && filterDate ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setFilterDate(todayStr())}
+          >
+            Today
+          </Button>
+          {!isLimitedRole && (
+            <Button
+              variant={!filterDate ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setFilterDate("")}
+            >
+              All Time
+            </Button>
+          )}
+        </div>
+        <Badge variant="secondary" className="text-xs">{dateLabel}</Badge>
+      </div>
+
+      {/* Daily Summary — seller/receptionist see only today's daily numbers */}
       {dailySummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { label: "Today's Sales",    value: `${dailySummary.totalSales} orders`,        icon: ShoppingCart },
-            { label: "Total Revenue",    value: formatCurrency(dailySummary.totalRevenue),   icon: TrendingUp },
-            { label: "Cash",             value: formatCurrency(dailySummary.cashSales),      icon: TrendingUp },
-            { label: "Transfer",         value: formatCurrency(dailySummary.transferSales),  icon: TrendingUp },
-          ].map(item => (
+            { label: "Today's Sales",    value: `${dailySummary.totalSales} orders`,        icon: ShoppingCart, show: true },
+            { label: "Today's Revenue",  value: formatCurrency(dailySummary.totalRevenue),   icon: TrendingUp,   show: !isLimitedRole },
+            { label: "Cash",             value: formatCurrency(dailySummary.cashSales),      icon: TrendingUp,   show: true },
+            { label: "Transfer",         value: formatCurrency(dailySummary.transferSales),  icon: TrendingUp,   show: true },
+          ].filter(i => i.show).map(item => (
             <Card key={item.label}>
               <CardContent className="pt-4 pb-4">
                 <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -418,10 +474,15 @@ export default function SalesPage() {
         </div>
       )}
 
-      {/* Recent Sales Table */}
+      {/* Sales Table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Recent Sales</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">
+              {filterDate ? `Sales — ${dateLabel}` : "All Sales"}
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">{sales?.length ?? 0} records</Badge>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -431,7 +492,7 @@ export default function SalesPage() {
           ) : !sales?.length ? (
             <div className="text-center py-12 text-muted-foreground">
               <ShoppingCart size={36} className="mx-auto mb-2 opacity-40" />
-              <p>No sales recorded yet. Start by recording your first sale.</p>
+              <p>{filterDate ? `No sales on ${dateLabel}.` : "No sales recorded yet."}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -444,39 +505,50 @@ export default function SalesPage() {
                     <TableHead>Price</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Payment</TableHead>
-                    <TableHead>Cashier</TableHead>
+                    <TableHead>Served By</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...(sales ?? [])].reverse().map((sale) => (
-                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
-                      <TableCell className="font-mono text-xs">{sale.receiptNumber}</TableCell>
-                      <TableCell>{sale.breadType}</TableCell>
-                      <TableCell>{sale.quantity}</TableCell>
-                      <TableCell>{formatCurrency(sale.pricePerUnit)}</TableCell>
-                      <TableCell className="font-semibold">{formatCurrency(sale.totalAmount)}</TableCell>
-                      <TableCell>
-                        <Badge variant={sale.paymentMethod === "cash" ? "secondary" : "outline"} className="capitalize">
-                          {sale.paymentMethod}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{sale.cashierName}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{format(new Date(sale.saleDate), "dd/MM/yy HH:mm")}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="View Receipt"
-                          onClick={() => setViewingReceipt(toReceipt(sale))}
-                          data-testid={`button-receipt-${sale.id}`}>
-                          <Receipt size={13} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {[...(sales ?? [])].reverse().map((sale) => {
+                    const cashierRole = (sale as any).cashierRole as string | null;
+                    const roleLabel = cashierRole ? ROLE_LABELS[cashierRole] ?? cashierRole : null;
+                    return (
+                      <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
+                        <TableCell className="font-mono text-xs">{sale.receiptNumber}</TableCell>
+                        <TableCell>{sale.breadType}</TableCell>
+                        <TableCell>{sale.quantity}</TableCell>
+                        <TableCell>{formatCurrency(sale.pricePerUnit)}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(sale.totalAmount)}</TableCell>
+                        <TableCell>
+                          <Badge variant={sale.paymentMethod === "cash" ? "secondary" : "outline"} className="capitalize">
+                            {sale.paymentMethod}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div>
+                            <p className="font-medium text-foreground">{sale.cashierName}</p>
+                            {roleLabel && (
+                              <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{format(new Date(sale.saleDate), "dd/MM/yy HH:mm")}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="View Receipt"
+                            onClick={() => setViewingReceipt(toReceipt(sale))}
+                            data-testid={`button-receipt-${sale.id}`}>
+                            <Receipt size={13} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
