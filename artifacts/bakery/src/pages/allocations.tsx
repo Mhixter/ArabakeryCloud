@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
-  PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle,
+  PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
@@ -16,6 +16,23 @@ import { useToast } from "@/hooks/use-toast";
 
 function formatDate(iso: string) {
   return format(new Date(iso), "dd MMM yyyy, HH:mm");
+}
+
+function downloadCSV(rows: Record<string, string | number>[], filename: string) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => {
+      const v = String(r[h] ?? "").replace(/"/g, '""');
+      return v.includes(",") || v.includes('"') || v.includes("\n") ? `"${v}"` : v;
+    }).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 interface Allocation {
@@ -53,9 +70,10 @@ const RETURN_REASONS = [
   { value: "other", label: "Other" },
 ];
 
-/* ── Return Product Form (for sellers) ── */
+/* ── Return Product Form (for suppliers) ── */
 function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r: Return) => void }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [myAllocations, setMyAllocations] = useState<Allocation[]>([]);
+  const [loadingAlloc, setLoadingAlloc] = useState(true);
   const [breadType, setBreadType] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("not_sold");
@@ -65,11 +83,23 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
-    fetch("/api/products", { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: "include" })
+    const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch("/api/allocations", { headers: h, credentials: "include" })
       .then(r => r.ok ? r.json() : [])
-      .then((p: Product[]) => setProducts(p.filter(pr => pr.isActive)))
-      .catch(() => {});
+      .then((allocs: Allocation[]) => setMyAllocations(allocs))
+      .catch(() => {})
+      .finally(() => setLoadingAlloc(false));
   }, []);
+
+  /* Group by breadType so each type appears once */
+  const availableTypes = Array.from(
+    myAllocations.reduce((m, a) => {
+      m.set(a.breadType, (m.get(a.breadType) ?? 0) + a.quantity);
+      return m;
+    }, new Map<string, number>()).entries()
+  ).map(([name, qty]) => ({ name, qty }));
+
+  const maxQty = availableTypes.find(t => t.name === breadType)?.qty ?? undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,44 +132,60 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
           <h2 className="font-bold text-base tracking-tight">Return Products</h2>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted transition-colors"><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Bread Type *</label>
-            <div className="relative">
-              <select value={breadType} onChange={e => setBreadType(e.target.value)}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required>
-                <option value="">Select bread type…</option>
-                {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+
+        {loadingAlloc ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">Loading your allocations…</div>
+        ) : availableTypes.length === 0 ? (
+          <div className="p-8 text-center">
+            <PackageCheck size={32} className="mx-auto mb-3 text-muted-foreground/30" />
+            <p className="font-semibold text-foreground text-sm">No products to return</p>
+            <p className="text-muted-foreground text-xs mt-1">You don't have any product held with you to return.</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={onClose}>Close</Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Bread Type *</label>
+              <div className="relative">
+                <select value={breadType} onChange={e => setBreadType(e.target.value)}
+                  className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required>
+                  <option value="">Select bread type…</option>
+                  {availableTypes.map(t => (
+                    <option key={t.name} value={t.name}>{t.name} — {t.qty} units allocated</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Quantity *</label>
-            <input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)}
-              placeholder="e.g. 5"
-              className="w-full pl-3 pr-3 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Reason *</label>
-            <div className="relative">
-              <select value={reason} onChange={e => setReason(e.target.value)}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400">
-                {RETURN_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Quantity * {maxQty !== undefined && <span className="font-normal normal-case">(max {maxQty})</span>}
+              </label>
+              <input type="number" min="1" max={maxQty} value={quantity} onChange={e => setQuantity(e.target.value)}
+                placeholder="e.g. 5"
+                className="w-full pl-3 pr-3 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required />
             </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Notes (optional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              placeholder="Any additional details…"
-              className="w-full pl-3 pr-3 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
-          </div>
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Submitting…" : "Submit Return"}
-          </Button>
-        </form>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Reason *</label>
+              <div className="relative">
+                <select value={reason} onChange={e => setReason(e.target.value)}
+                  className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400">
+                  {RETURN_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Notes (optional)</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                placeholder="Any additional details…"
+                className="w-full pl-3 pr-3 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Submitting…" : "Submit Return"}
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -391,18 +437,34 @@ export default function AllocationsPage() {
       {tab === "allocations" && (
         <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-                <PackageCheck size={15} className="text-amber-400" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+                  <PackageCheck size={15} className="text-amber-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold tracking-tight">
+                    {isSeller ? "My Allocations" : "All Allocations"}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {isSeller ? "Bread given to you from the store" : "Bread distributed to suppliers"}
+                  </CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-sm font-bold tracking-tight">
-                  {isSeller ? "My Allocations" : "All Allocations"}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {isSeller ? "Bread given to you from the store" : "Bread distributed to suppliers"}
-                </CardDescription>
-              </div>
+              {allocations.length > 0 && (
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs flex-shrink-0"
+                  onClick={() => downloadCSV([...allocations].reverse().map(a => ({
+                    Date: formatDate(a.allocationDate),
+                    "Bread Type": a.breadType,
+                    Quantity: a.quantity,
+                    Supplier: a.sellerName,
+                    "Issued By": a.issuedByName,
+                    Branch: a.branchName,
+                    Notes: a.notes ?? "",
+                  })), `allocations-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
+                  <Download size={12} /> Download CSV
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -474,7 +536,7 @@ export default function AllocationsPage() {
       {tab === "returns" && (
         <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
                   <RotateCcw size={15} className="text-amber-400" />
@@ -486,11 +548,26 @@ export default function AllocationsPage() {
                   </CardDescription>
                 </div>
               </div>
-              {isSeller && (
-                <Button size="sm" variant="outline" onClick={() => setShowReturnForm(true)}>
-                  <RotateCcw size={13} className="mr-1.5" />Return
-                </Button>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {returns.length > 0 && (
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+                    onClick={() => downloadCSV([...returns].reverse().map(r => ({
+                      Date: formatDate(r.returnDate),
+                      "Bread Type": r.breadType,
+                      Quantity: r.quantity,
+                      Reason: r.reasonLabel,
+                      "Received By": r.receptionistName ?? "",
+                      Notes: r.notes ?? "",
+                    })), `returns-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
+                    <Download size={12} /> Download CSV
+                  </Button>
+                )}
+                {isSeller && (
+                  <Button size="sm" variant="outline" onClick={() => setShowReturnForm(true)}>
+                    <RotateCcw size={13} className="mr-1.5" />Return
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">

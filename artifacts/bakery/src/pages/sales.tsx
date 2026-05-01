@@ -477,11 +477,41 @@ export default function SalesPage() {
       {/* Sales Table */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">
               {filterDate ? `Sales — ${dateLabel}` : "All Sales"}
             </CardTitle>
-            <Badge variant="secondary" className="text-xs">{sales?.length ?? 0} records</Badge>
+            <div className="flex items-center gap-2">
+              {sales && sales.length > 0 && (
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+                  onClick={() => {
+                    const rows = [...sales].reverse().map(s => ({
+                      Receipt: s.receiptNumber ?? "",
+                      Date: format(new Date(s.saleDate), "dd/MM/yyyy HH:mm"),
+                      "Bread Type": s.breadType,
+                      Quantity: s.quantity,
+                      "Price/Unit (₦)": s.pricePerUnit,
+                      "Total (₦)": s.totalAmount,
+                      Payment: s.paymentMethod,
+                      Branch: s.branchName ?? "",
+                      "Served By": s.cashierName ?? "",
+                    }));
+                    const blob = new Blob([
+                      [Object.keys(rows[0]).join(","), ...rows.map(r => Object.values(r).map(v => {
+                        const sv = String(v ?? "").replace(/"/g, '""');
+                        return sv.includes(",") || sv.includes('"') ? `"${sv}"` : sv;
+                      }).join(","))].join("\n")
+                    ], { type: "text/csv;charset=utf-8;" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url;
+                    a.download = `sales-${filterDate ?? format(new Date(), "yyyy-MM-dd")}.csv`;
+                    a.click(); URL.revokeObjectURL(url);
+                  }}>
+                  <Download size={12} /> Download CSV
+                </Button>
+              )}
+              <Badge variant="secondary" className="text-xs">{sales?.length ?? 0} records</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -630,7 +660,7 @@ export default function SalesPage() {
                 </SelectContent>
               </Select>
             </div>
-            {branches && branches.length > 1 && (
+            {branches && branches.length > 1 && !isLimitedRole && (
               <div className="space-y-1.5">
                 <Label>Branch</Label>
                 <Select value={form.branchId} onValueChange={(v) => setForm({ ...form, branchId: v })}>

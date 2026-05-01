@@ -15,9 +15,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Factory, TrendingDown } from "lucide-react";
+import { Plus, Factory, TrendingDown, Download } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
+
+function downloadCSV(rows: Record<string, string | number>[], filename: string) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => {
+      const v = String(r[h] ?? "").replace(/"/g, '""');
+      return v.includes(",") || v.includes('"') || v.includes("\n") ? `"${v}"` : v;
+    }).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 function useProducts() {
   const token = getToken();
@@ -135,11 +152,29 @@ export default function ProductionPage() {
       {/* Batches list */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-              <Factory size={15} className="text-amber-400" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+                <Factory size={15} className="text-amber-400" />
+              </div>
+              <CardTitle className="text-sm font-bold tracking-tight">Production Batches</CardTitle>
             </div>
-            <CardTitle className="text-sm font-bold tracking-tight">Production Batches</CardTitle>
+            {sorted.length > 0 && (
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+                onClick={() => downloadCSV(sorted.map(b => ({
+                  Date: format(new Date(b.productionDate), "dd/MM/yyyy HH:mm"),
+                  "Bread Type": b.breadType,
+                  Produced: b.quantityProduced,
+                  Waste: b.wasteQuantity,
+                  Net: b.netQuantity,
+                  "Efficiency (%)": b.quantityProduced > 0 ? ((b.netQuantity / b.quantityProduced) * 100).toFixed(1) : "100",
+                  Staff: b.staffName,
+                  Branch: b.branchName,
+                  Notes: b.notes ?? "",
+                })), `production-batches-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
+                <Download size={12} /> Download CSV
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -222,7 +257,7 @@ export default function ProductionPage() {
                 <span className="font-bold">{Math.max(0, parseInt(form.quantityProduced || "0") - parseInt(form.wasteQuantity || "0"))} units</span>
               </div>
             )}
-            {branches && branches.length > 1 && (
+            {branches && branches.length > 1 && !user?.branchId && (
               <div className="space-y-1.5">
                 <Label>Branch</Label>
                 <Select value={form.branchId} onValueChange={(v) => setForm({ ...form, branchId: v })}>

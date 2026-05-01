@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, ShoppingCart, Factory, Package, PackageCheck,
-  Plus, FileText, Clock, ArrowUpRight, Layers, ChevronDown, RotateCcw,
+  Plus, FileText, Clock, ArrowUpRight, Layers, ChevronDown, RotateCcw, Download,
+  CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
@@ -425,86 +426,201 @@ function ReceptionistDashboard() {
 /* ══════════════════════════════════════════════
    PRODUCTION STAFF DASHBOARD
    ══════════════════════════════════════════════ */
+interface ProdBatch {
+  id?: number;
+  breadType: string;
+  quantityProduced: number;
+  wasteQuantity: number;
+  netQuantity?: number;
+  productionDate: string;
+  staffName?: string;
+  branchName?: string;
+  notes?: string | null;
+}
+
+function downloadCSV(rows: Record<string, string | number>[], filename: string) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => {
+      const v = String(r[h] ?? "").replace(/"/g, '""');
+      return v.includes(",") || v.includes('"') || v.includes("\n") ? `"${v}"` : v;
+    }).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function ProductionDashboard() {
   const [, setLocation] = useLocation();
   const [stockData, setStockData] = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
-  const [todayProduction, setTodayProduction] = useState<{ breadType: string; quantityProduced: number; wasteQuantity: number; productionDate: string }[]>([]);
+  const [todayBatches, setTodayBatches] = useState<ProdBatch[]>([]);
+  const [weekBatches, setWeekBatches] = useState<ProdBatch[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const today = format(new Date(), "yyyy-MM-dd");
+    // Week: last 7 days
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 6);
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
     Promise.all([
       fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`/api/production?startDate=${today}T00:00:00&endDate=${today}T23:59:59`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-    ]).then(([dash, prod]) => {
+      fetch(`/api/production?startDate=${weekStartStr}T00:00:00&endDate=${today}T23:59:59`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([dash, today_prod, week_prod]) => {
       if (dash?.remaining) setStockData(dash.remaining);
-      setTodayProduction(prod);
+      setTodayBatches(today_prod);
+      setWeekBatches(week_prod);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const todayUnits = todayProduction.reduce((s, p) => s + p.quantityProduced, 0);
-  const todayWaste = todayProduction.reduce((s, p) => s + p.wasteQuantity, 0);
+  /* Today stats */
+  const todayProduced = todayBatches.reduce((s, p) => s + p.quantityProduced, 0);
+  const todayWaste   = todayBatches.reduce((s, p) => s + p.wasteQuantity, 0);
+  const todayNet     = todayProduced - todayWaste;
+  const todayEff     = todayProduced > 0 ? Math.round((todayNet / todayProduced) * 100) : 100;
+
+  /* Week stats */
+  const weekProduced = weekBatches.reduce((s, p) => s + p.quantityProduced, 0);
+  const weekWaste    = weekBatches.reduce((s, p) => s + p.wasteQuantity, 0);
+  const weekNet      = weekProduced - weekWaste;
+
+  /* Stock */
   const totalStock = stockData.reduce((s, r) => s + r.remaining, 0);
+  const lowStockTypes = stockData.filter(s => s.remaining < 20).length;
+
+  const effBadge = (eff: number) => {
+    if (eff >= 95) return { label: "Excellent", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+    if (eff >= 85) return { label: "Good", cls: "bg-blue-100 text-blue-700 border-blue-200" };
+    if (eff >= 70) return { label: "Fair", cls: "bg-amber-100 text-amber-700 border-amber-200" };
+    return { label: "Poor", cls: "bg-red-100 text-red-700 border-red-200" };
+  };
 
   return (
-    <div className="space-y-6" data-testid="page-dashboard">
-      <PageHeader
-        title={format(new Date(), "EEEE, d MMMM")}
-        subtitle="Today's production overview"
-        action={
-          <Button onClick={() => setLocation("/production")} size="sm">
-            <Plus size={14} className="mr-1.5" />
-            Log Production
-          </Button>
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3">
-        <KpiCard title="Produced Today" value={`${todayUnits}`} sub="units baked" icon={Factory} loading={loading} accent="amber" />
-        <KpiCard title="Waste Today" value={`${todayWaste}`} sub="units wasted" icon={Package} loading={loading} accent={todayWaste > 0 ? "red" : "default"} />
-        <KpiCard title="Batches Today" value={`${todayProduction.length}`} sub="production runs" icon={Layers} loading={loading} />
-        <KpiCard title="Total In Stock" value={`${totalStock}`} sub="across all types" icon={PackageCheck} loading={loading} accent={totalStock < 20 ? "red" : "green"} />
+    <div className="space-y-5" data-testid="page-dashboard">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{format(new Date(), "EEEE, d MMMM")}</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Production overview — your shift today</p>
+        </div>
+        <Button onClick={() => setLocation("/production")} size="sm">
+          <Plus size={14} className="mr-1.5" />
+          Log Batch
+        </Button>
       </div>
 
-      {/* Stock remaining by bread type */}
+      {/* KPI row */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center mb-3">
+              <Factory size={15} className="text-amber-400" />
+            </div>
+            {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <p className="text-2xl font-bold tracking-tight leading-none">{todayProduced}</p>}
+            <p className="text-xs text-muted-foreground mt-1">Produced Today</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center mb-3">
+              <CheckCircle2 size={15} className="text-white" />
+            </div>
+            {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <p className="text-2xl font-bold tracking-tight leading-none">{todayNet}</p>}
+            <p className="text-xs text-muted-foreground mt-1">Net Today</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className={`w-8 h-8 rounded-lg ${todayWaste > 0 ? "bg-red-500" : "bg-slate-400"} flex items-center justify-center mb-3`}>
+              <AlertTriangle size={15} className="text-white" />
+            </div>
+            {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <p className="text-2xl font-bold tracking-tight leading-none">{todayWaste}</p>}
+            <p className="text-xs text-muted-foreground mt-1">Waste Today</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className={`w-8 h-8 rounded-lg ${todayEff >= 90 ? "bg-emerald-600" : todayEff >= 75 ? "bg-amber-500" : "bg-red-500"} flex items-center justify-center mb-3`}>
+              <TrendingUp size={15} className="text-white" />
+            </div>
+            {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <p className="text-2xl font-bold tracking-tight leading-none">{todayEff}%</p>}
+            <p className="text-xs text-muted-foreground mt-1">Efficiency Today</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Today's batch list */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-              <Package size={15} className="text-amber-400" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
+                <Clock size={15} className="text-amber-400" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold tracking-tight">Today's Batches</CardTitle>
+                <CardDescription className="text-xs">{todayBatches.length} production run{todayBatches.length !== 1 ? "s" : ""} logged</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
-              <CardDescription className="text-xs">Total produced minus sold</CardDescription>
+            <div className="flex items-center gap-2">
+              {todayBatches.length > 0 && (
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+                  onClick={() => downloadCSV(todayBatches.map((b, i) => ({
+                    "#": i + 1,
+                    Time: format(new Date(b.productionDate), "HH:mm"),
+                    "Bread Type": b.breadType,
+                    Produced: b.quantityProduced,
+                    Waste: b.wasteQuantity,
+                    Net: b.quantityProduced - b.wasteQuantity,
+                    "Efficiency (%)": b.quantityProduced > 0 ? Math.round(((b.quantityProduced - b.wasteQuantity) / b.quantityProduced) * 100) : 100,
+                    Notes: b.notes ?? "",
+                  })), `batches-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
+                  <Download size={12} /> CSV
+                </Button>
+              )}
+              <Badge variant="secondary" className="text-xs">{todayBatches.length}</Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : stockData.length === 0 ? (
+            <div className="p-4 space-y-2">{[1,2].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          ) : todayBatches.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <Factory size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No stock data yet.</p>
+              <p className="text-sm font-medium">No batches logged today</p>
+              <p className="text-xs mt-1 mb-3">Tap the button above to record your first batch.</p>
+              <Button variant="outline" size="sm" onClick={() => setLocation("/production")}>
+                <Plus size={13} className="mr-1.5" />Log Batch
+              </Button>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {stockData.map(item => {
-                const pct = item.produced > 0 ? Math.round((item.sold / item.produced) * 100) : 0;
-                const low = item.remaining < 10;
+              {todayBatches.map((batch, idx) => {
+                const net = batch.quantityProduced - batch.wasteQuantity;
+                const eff = batch.quantityProduced > 0 ? Math.round((net / batch.quantityProduced) * 100) : 100;
+                const eb = effBadge(eff);
                 return (
-                  <div key={item.name} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                      <Badge variant={low ? "destructive" : "secondary"} className="text-xs">{item.remaining} left</Badge>
+                  <div key={idx} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors">
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-slate-500">{idx + 1}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-                        <div className={`h-full rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                      </div>
-                      <p className="text-xs text-muted-foreground flex-shrink-0">{item.sold}/{item.produced} sold</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-foreground truncate">{batch.breadType}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(batch.productionDate), "HH:mm")} · {batch.quantityProduced} baked · {batch.wasteQuantity} waste
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-sm text-foreground">{net}<span className="text-xs font-normal text-muted-foreground ml-1">net</span></p>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${eb.cls}`}>{eff}% · {eb.label}</span>
                     </div>
                   </div>
                 );
@@ -514,45 +630,81 @@ function ProductionDashboard() {
         </CardContent>
       </Card>
 
-      {/* Today's batches */}
+      {/* Week summary bar */}
+      <Card className="rounded-2xl border-0 shadow-sm">
+        <CardContent className="p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Last 7 Days</p>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              {loading ? <Skeleton className="h-6 w-12 mx-auto mb-1" /> : <p className="text-lg font-bold tracking-tight">{weekProduced}</p>}
+              <p className="text-xs text-muted-foreground">Produced</p>
+            </div>
+            <div>
+              {loading ? <Skeleton className="h-6 w-12 mx-auto mb-1" /> : <p className="text-lg font-bold tracking-tight text-emerald-600">{weekNet}</p>}
+              <p className="text-xs text-muted-foreground">Net</p>
+            </div>
+            <div>
+              {loading ? <Skeleton className="h-6 w-12 mx-auto mb-1" /> : <p className="text-lg font-bold tracking-tight text-red-500">{weekWaste}</p>}
+              <p className="text-xs text-muted-foreground">Waste</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stock remaining by bread type */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-                <Clock size={15} className="text-amber-400" />
+                <Package size={15} className="text-amber-400" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold tracking-tight">Today's Production Batches</CardTitle>
-                <CardDescription className="text-xs">What was baked today</CardDescription>
+                <CardTitle className="text-sm font-bold tracking-tight">Stock by Bread Type</CardTitle>
+                <CardDescription className="text-xs">{totalStock} units in stock · {lowStockTypes > 0 ? `${lowStockTypes} type${lowStockTypes > 1 ? "s" : ""} running low` : "all levels ok"}</CardDescription>
               </div>
             </div>
-            <Badge variant="secondary" className="text-xs">{todayProduction.length} batches</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-4 space-y-2">{[1,2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : todayProduction.length === 0 ? (
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : stockData.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <Factory size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No batches logged today.</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setLocation("/production")}>Log Batch</Button>
+              <Package size={28} className="mx-auto mb-2 opacity-20" />
+              <p className="text-sm">No stock data yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {todayProduction.map((batch, idx) => (
-                <div key={idx} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-muted-foreground">{idx + 1}</span>
+              {stockData.map(item => {
+                const soldPct = item.produced > 0 ? Math.min(100, Math.round((item.sold / item.produced) * 100)) : 0;
+                const remainingPct = 100 - soldPct;
+                const isLow = item.remaining < 20;
+                return (
+                  <div key={item.name} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-foreground">{item.name}</p>
+                        {isLow && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Low</Badge>}
+                      </div>
+                      <p className="text-sm font-bold text-foreground">{item.remaining}<span className="text-xs font-normal text-muted-foreground ml-1">left</span></p>
+                    </div>
+                    {/* Stacked bar: remaining (amber) vs sold (slate) */}
+                    <div className="flex h-2 rounded-full overflow-hidden bg-muted gap-0.5">
+                      {remainingPct > 0 && (
+                        <div className={`h-full rounded-l-full ${isLow ? "bg-red-400" : "bg-amber-400"}`} style={{ width: `${remainingPct}%` }} />
+                      )}
+                      {soldPct > 0 && (
+                        <div className="h-full rounded-r-full bg-slate-300" style={{ width: `${soldPct}%` }} />
+                      )}
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <p className="text-[11px] text-muted-foreground">{item.remaining} remaining</p>
+                      <p className="text-[11px] text-muted-foreground">{item.sold} sold of {item.produced}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{batch.breadType}</p>
-                    <p className="text-xs text-muted-foreground">{batch.quantityProduced} produced · {batch.wasteQuantity} waste</p>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">{batch.quantityProduced - batch.wasteQuantity} net</Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

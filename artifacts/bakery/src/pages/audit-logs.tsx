@@ -2,8 +2,26 @@ import { useListAuditLogs } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollText, Download } from "lucide-react";
 import { format } from "date-fns";
+
+function downloadCSV(rows: Record<string, string | number>[], filename: string) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => {
+      const v = String(r[h] ?? "").replace(/"/g, '""');
+      return v.includes(",") || v.includes('"') || v.includes("\n") ? `"${v}"` : v;
+    }).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
@@ -25,7 +43,25 @@ export default function AuditLogsPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Activity History</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Activity History</CardTitle>
+            {Array.isArray(logs) && logs.length > 0 && (
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+                onClick={() => downloadCSV(
+                  [...(logs as unknown as { id: number; action: string; entityType: string; entityId?: number | null; details?: string | null; performedByName: string; createdAt: string }[])].reverse().map(l => ({
+                    Date: format(new Date(l.createdAt), "dd/MM/yyyy HH:mm"),
+                    Action: l.action,
+                    Type: l.entityType,
+                    ID: l.entityId ?? "",
+                    Details: l.details ?? "",
+                    "Performed By": l.performedByName,
+                  })),
+                  `audit-logs-${format(new Date(), "yyyy-MM-dd")}.csv`
+                )}>
+                <Download size={12} /> Download CSV
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
