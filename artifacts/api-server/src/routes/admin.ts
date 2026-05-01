@@ -101,8 +101,11 @@ router.patch("/admin/companies/:id/subscription", authenticateSuperAdmin, async 
   const updates: any = { updatedAt: now };
   if (status) updates.status = status;
   if (days && typeof days === "number" && days > 0) {
-    updates.startDate = now;
-    updates.endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    updates.currentPeriodStart = now;
+    updates.currentPeriodEnd = endDate;
+    updates.trialEndsAt = null;
+    if (!status) updates.status = "active";
   }
 
   await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.companyId, companyId));

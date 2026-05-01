@@ -18,7 +18,9 @@ const formatBranch = (b: typeof branchesTable.$inferSelect) => ({
 
 router.get("/branches", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
-  const branches = await db.select().from(branchesTable).where(eq(branchesTable.companyId, companyId)).orderBy(branchesTable.name);
+  const branches = await db.select().from(branchesTable)
+    .where(and(eq(branchesTable.companyId, companyId), eq(branchesTable.isActive, true)))
+    .orderBy(branchesTable.name);
   res.json(branches.map(formatBranch));
 });
 
@@ -49,9 +51,13 @@ router.delete("/branches/:id", authenticate, requireRole("managing_director"), a
   const companyId = req.user!.companyId;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-  const [branch] = await db.delete(branchesTable).where(and(eq(branchesTable.id, id), eq(branchesTable.companyId, companyId))).returning();
+  const [branch] = await db
+    .update(branchesTable)
+    .set({ isActive: false })
+    .where(and(eq(branchesTable.id, id), eq(branchesTable.companyId, companyId), eq(branchesTable.isActive, true)))
+    .returning();
   if (!branch) { res.status(404).json({ error: "Branch not found" }); return; }
-  await logAudit({ req, userId: req.user!.userId, companyId, action: "BRANCH_DELETED", entityType: "branch", entityId: id, details: `Deleted branch ${branch.name}` });
+  await logAudit({ req, userId: req.user!.userId, companyId, action: "BRANCH_DELETED", entityType: "branch", entityId: id, details: `Removed branch ${branch.name}` });
   res.json({ success: true });
 });
 
