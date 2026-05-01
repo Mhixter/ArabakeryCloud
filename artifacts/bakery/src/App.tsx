@@ -26,7 +26,7 @@ import AdminTransactionsPage from "@/pages/admin/transactions";
 import LandingHome from "@/pages/landing/home";
 import LandingFeatures from "@/pages/landing/features";
 import LandingPricing from "@/pages/landing/pricing";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import SubscriptionGuard from "@/components/subscription-guard";
 import { BranchProvider } from "@/lib/branch-context";
@@ -48,6 +48,18 @@ function ThemeInit() {
   return null;
 }
 
+/** Redirect to /dashboard if the logged-in user's role isn't in the allowed list */
+function RequireRole({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const user = getStoredUser();
+  const role = user?.role ?? "";
+  useEffect(() => {
+    if (!roles.includes(role)) setLocation("/dashboard");
+  }, [role, roles, setLocation]);
+  if (!roles.includes(role)) return null;
+  return <>{children}</>;
+}
+
 function Protected({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
@@ -55,6 +67,14 @@ function Protected({ children }: { children: React.ReactNode }) {
         <Layout>{children}</Layout>
       </SubscriptionGuard>
     </AuthGuard>
+  );
+}
+
+function ProtectedRole({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  return (
+    <Protected>
+      <RequireRole roles={roles}>{children}</RequireRole>
+    </Protected>
   );
 }
 
@@ -77,19 +97,19 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettingsPage} />
       <Route path="/admin"><AdminDashboardPage /></Route>
 
-      {/* Bakery app */}
+      {/* Bakery app — each route enforces the roles that match the nav definition */}
       <Route path="/dashboard"><Protected><DashboardPage /></Protected></Route>
-      <Route path="/sales"><Protected><SalesPage /></Protected></Route>
-      <Route path="/production"><Protected><ProductionPage /></Protected></Route>
-      <Route path="/inventory"><Protected><InventoryPage /></Protected></Route>
-      <Route path="/reports"><Protected><ReportsPage /></Protected></Route>
-      <Route path="/users"><Protected><UsersPage /></Protected></Route>
-      <Route path="/audit-logs"><Protected><AuditLogsPage /></Protected></Route>
-      <Route path="/products"><Protected><ProductsPage /></Protected></Route>
-      <Route path="/allocations"><Protected><AllocationsPage /></Protected></Route>
-      <Route path="/settings"><Protected><SettingsPage /></Protected></Route>
-      <Route path="/company-settings"><Protected><CompanySettingsPage /></Protected></Route>
-      <Route path="/subscription"><Protected><SubscriptionPage /></Protected></Route>
+      <Route path="/sales"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><SalesPage /></ProtectedRole></Route>
+      <Route path="/production"><ProtectedRole roles={["managing_director","manager","production_staff"]}><ProductionPage /></ProtectedRole></Route>
+      <Route path="/inventory"><ProtectedRole roles={["managing_director","manager"]}><InventoryPage /></ProtectedRole></Route>
+      <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><ReportsPage /></ProtectedRole></Route>
+      <Route path="/users"><ProtectedRole roles={["managing_director"]}><UsersPage /></ProtectedRole></Route>
+      <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
+      <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
+      <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><AllocationsPage /></ProtectedRole></Route>
+      <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>
+      <Route path="/company-settings"><ProtectedRole roles={["managing_director"]}><CompanySettingsPage /></ProtectedRole></Route>
+      <Route path="/subscription"><ProtectedRole roles={["managing_director"]}><SubscriptionPage /></ProtectedRole></Route>
       <Route component={NotFound} />
     </Switch>
   );

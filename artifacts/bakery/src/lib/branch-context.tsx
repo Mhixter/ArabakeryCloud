@@ -12,24 +12,37 @@ interface BranchContextValue {
   isBranchLocked: boolean;
 }
 
-const STORAGE_KEY = "nmb_active_branch";
+/** Per-user storage key so each user's branch preference is independent */
+function getBranchKey(): string {
+  const user = getStoredUser();
+  return user ? `nmb_active_branch_${user.id}` : "nmb_active_branch";
+}
 
 function readPersistedBranch(): ActiveBranch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getBranchKey());
     return raw ? (JSON.parse(raw) as ActiveBranch) : null;
   } catch {
     return null;
   }
 }
 
+function savePersistedBranch(branch: ActiveBranch | null) {
+  const key = getBranchKey();
+  if (branch) {
+    localStorage.setItem(key, JSON.stringify(branch));
+  } else {
+    localStorage.removeItem(key);
+  }
+}
+
 function initBranch(): ActiveBranch | null {
   const user = getStoredUser();
-  // Branch-locked users always use their own branch
+  // Branch-locked users (non-MD staff with assigned branch) always use their own branch
   if (user?.branchId && user?.branchName) {
     return { id: user.branchId, name: user.branchName };
   }
-  // MD/managers without a fixed branch: restore their last-selected branch
+  // MD/managers without a fixed branch: restore their last-selected branch from storage
   return readPersistedBranch();
 }
 
@@ -48,12 +61,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const setActiveBranch = (branch: ActiveBranch | null) => {
     if (isBranchLocked) return;
     setActiveBranchState(branch);
-    // Persist the MD's choice so it survives page refresh
-    if (branch) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(branch));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    // Persist per user — survives page refresh AND logout/re-login as the same user
+    savePersistedBranch(branch);
   };
 
   return (
@@ -63,9 +72,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Call on logout to clear the persisted branch selection */
+/**
+ * No longer clears branch on logout — the branch preference is now keyed by
+ * user ID so it persists across logout/re-login as the same account.
+ * Kept for backward-compat call sites.
+ */
 export function clearPersistedBranch() {
-  localStorage.removeItem(STORAGE_KEY);
+  // intentionally a no-op — branch survives logout so the user returns to
+  // the same branch next time they sign back in
 }
 
 export function useActiveBranch() {

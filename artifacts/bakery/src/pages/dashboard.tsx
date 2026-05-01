@@ -729,16 +729,17 @@ function ManagerDashboard() {
   const [, setLocation] = useLocation();
   const user = getStoredUser();
   const isDirector = user?.role === "managing_director";
-  const { setActiveBranch, isBranchLocked } = useActiveBranch();
+  const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
 
-  /* If the user has a fixed branch, pre-select it */
+  /* Initialise to persisted activeBranch (survives reload/re-login) or fixed branch for non-MD */
   const userFixedBranchId = user?.branchId ?? null;
+  const initBranchId = userFixedBranchId ?? activeBranch?.id ?? null;
 
   const [period, setPeriod] = useState<"today" | "week">("today");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(userFixedBranchId);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initBranchId);
 
   const fetchDashboard = useCallback((branchId: number | null) => {
     const token = localStorage.getItem("nmb_token");
@@ -761,8 +762,9 @@ function ManagerDashboard() {
         .then((bs: Branch[]) => setBranches(bs))
         .catch(() => {});
     }
-    fetchDashboard(userFixedBranchId);
-  }, [isDirector, fetchDashboard, userFixedBranchId]);
+    fetchDashboard(initBranchId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirector, fetchDashboard]);
 
   useEffect(() => { fetchDashboard(selectedBranchId); }, [selectedBranchId, fetchDashboard]);
 

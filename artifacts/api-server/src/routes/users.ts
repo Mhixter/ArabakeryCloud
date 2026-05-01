@@ -53,8 +53,10 @@ router.post("/users", authenticate, requireRole("managing_director"), async (req
   if (!username || !password || !fullName || !role) {
     res.status(400).json({ error: "username, password, fullName, and role are required" }); return;
   }
-  const existing = await db.select().from(usersTable).where(eq(usersTable.username, username));
-  if (existing.length > 0) { res.status(400).json({ error: "Username already exists" }); return; }
+  const existing = await db.select().from(usersTable).where(
+    and(eq(usersTable.username, username), eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt))
+  );
+  if (existing.length > 0) { res.status(400).json({ error: "Username already taken within this company" }); return; }
 
   const agentId = await uniqueAgentId(fullName);
   const passwordHash = hashPassword(password);
