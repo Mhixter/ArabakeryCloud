@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable } from "@workspace/db";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
@@ -83,6 +83,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
 
+  /* Fetch active allocations — bread held by suppliers, not yet sold or returned */
+  const allocConds = [eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt)];
+  if (branchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, branchFilter));
+  const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
+
   function aggregateByProduct(sales: typeof salesTable.$inferSelect[]) {
     const map = new Map<string, { quantity: number; amount: number }>();
     for (const s of sales) {
@@ -112,15 +117,21 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       damagedByType.set(r.breadType, (damagedByType.get(r.breadType) ?? 0) + r.quantity);
     }
   }
+  /* bread currently in suppliers' hands (allocated but not yet sold or returned) */
+  const allocatedByType = new Map<string, number>();
+  for (const a of activeAllocations) {
+    allocatedByType.set(a.breadType, (allocatedByType.get(a.breadType) ?? 0) + a.quantity);
+  }
 
   const remaining = activeProducts.map(p => {
     const produced   = productionByType.get(p.name) ?? 0;
     const sold       = salesByType.get(p.name) ?? 0;
     const restored   = restorableByType.get(p.name) ?? 0;
     const damaged    = damagedByType.get(p.name) ?? 0;
-    /* remaining = net_produced + restorable_returns - sold - damaged_returns */
-    const rem = Math.max(0, produced + restored - sold - damaged);
-    return { name: p.name, produced, sold, restored, damaged, remaining: rem };
+    const allocated  = allocatedByType.get(p.name) ?? 0;
+    /* remaining = net_produced + restorable_returns - sold - damaged_returns - currently_allocated */
+    const rem = Math.max(0, produced + restored - sold - damaged - allocated);
+    return { name: p.name, produced, sold, restored, damaged, allocated, remaining: rem };
   });
 
   res.json({

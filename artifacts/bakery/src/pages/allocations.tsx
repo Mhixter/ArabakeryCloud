@@ -208,10 +208,11 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const sellersUrl = activeBranch ? `/api/allocations/sellers?branchId=${activeBranch.id}` : "/api/allocations/sellers";
+    const dashUrl = activeBranch ? `/api/reports/product-dashboard?branchId=${activeBranch.id}` : "/api/reports/product-dashboard";
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(dashUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
