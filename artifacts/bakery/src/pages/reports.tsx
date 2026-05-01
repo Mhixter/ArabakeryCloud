@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useActiveBranch } from "@/lib/branch-context";
 import {
-  useGetSalesTrend, useGetProductionSummary, useGetDashboard, useListBranches,
+  useGetSalesTrend, useGetProductionSummary, useListBranches,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +45,6 @@ export default function ReportsPage() {
 
   const { data: trend, isLoading: trendLoading } = useGetSalesTrend({ branchId: branchParam, days: parseInt(days) });
   const { data: prod,  isLoading: prodLoading  } = useGetProductionSummary({ branchId: branchParam });
-  const { data: dash,  isLoading: dashLoading  } = useGetDashboard({ branchId: branchParam });
 
   const trendData = (trend ?? []).map((p) => ({
     date: format(new Date(p.date), "MMM d"),
@@ -106,17 +105,6 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Sales KPIs */}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Sales Summary</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Week Revenue"  value={formatCurrency(dash?.weekRevenue)}             loading={dashLoading} />
-          <StatCard label="Week Profit"   value={formatCurrency(dash?.weekProfit)}              loading={dashLoading} />
-          <StatCard label="Profit Margin" value={`${(dash?.profitMargin ?? 0).toFixed(1)}%`}   loading={dashLoading} />
-          <StatCard label="Week Orders"   value={`${dash?.weekSalesCount ?? 0}`}                loading={dashLoading} />
-        </div>
-      </div>
-
       {/* Sales Trend Chart */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
@@ -131,7 +119,14 @@ export default function ReportsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {trendLoading ? <Skeleton className="h-56 w-full" /> : (
+          {trendLoading ? <Skeleton className="h-56 w-full" /> :
+           trendData.length === 0 || trendData.every(d => d.Revenue === 0) ? (
+            <div className="h-56 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <TrendingUp size={32} className="opacity-20" />
+              <p className="text-sm">No sales recorded in this period yet.</p>
+              <p className="text-xs">Record sales to see revenue trends here.</p>
+            </div>
+          ) : (
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />

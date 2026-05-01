@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable } from "@workspace/db";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
@@ -76,6 +76,13 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) allSalesConds.push(eq(salesTable.branchId, branchFilter));
   const allSalesEver = await db.select().from(salesTable).where(and(...allSalesConds));
 
+  /* Fetch all returns — restorable reasons add back to stock, damage/expired are wasted */
+  const returnsConds = [eq(productReturnsTable.companyId, companyId)];
+  if (branchFilter) returnsConds.push(eq(productReturnsTable.branchId, branchFilter));
+  const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
+  const RESTORABLE = ["not_sold", "wrong_item", "other"];
+  const DAMAGED    = ["damaged", "expired"];
+
   function aggregateByProduct(sales: typeof salesTable.$inferSelect[]) {
     const map = new Map<string, { quantity: number; amount: number }>();
     for (const s of sales) {
@@ -95,13 +102,26 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   for (const s of allSalesEver) {
     salesByType.set(s.breadType, (salesByType.get(s.breadType) ?? 0) + s.quantity);
   }
+  /* restorable returns go back to stock; damaged ones are wasted (excluded from remaining) */
+  const restorableByType = new Map<string, number>();
+  const damagedByType    = new Map<string, number>();
+  for (const r of allReturns) {
+    if (RESTORABLE.includes(r.reason)) {
+      restorableByType.set(r.breadType, (restorableByType.get(r.breadType) ?? 0) + r.quantity);
+    } else if (DAMAGED.includes(r.reason)) {
+      damagedByType.set(r.breadType, (damagedByType.get(r.breadType) ?? 0) + r.quantity);
+    }
+  }
 
-  const remaining = activeProducts.map(p => ({
-    name: p.name,
-    produced: productionByType.get(p.name) ?? 0,
-    sold: salesByType.get(p.name) ?? 0,
-    remaining: Math.max(0, (productionByType.get(p.name) ?? 0) - (salesByType.get(p.name) ?? 0)),
-  }));
+  const remaining = activeProducts.map(p => {
+    const produced   = productionByType.get(p.name) ?? 0;
+    const sold       = salesByType.get(p.name) ?? 0;
+    const restored   = restorableByType.get(p.name) ?? 0;
+    const damaged    = damagedByType.get(p.name) ?? 0;
+    /* remaining = net_produced + restorable_returns - sold - damaged_returns */
+    const rem = Math.max(0, produced + restored - sold - damaged);
+    return { name: p.name, produced, sold, restored, damaged, remaining: rem };
+  });
 
   res.json({
     activeProductCount: activeProducts.length,

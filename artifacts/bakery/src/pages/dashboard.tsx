@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useActiveBranch } from "@/lib/branch-context";
-import { useGetDailySalesSummary, useListSales } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,42 +61,56 @@ function KpiCard({
    ══════════════════════════════════════════════ */
 interface Allocation { id: number; breadType: string; quantity: number; issuedByName: string; allocationDate: string }
 interface Sale { id: number; breadType: string; quantity: number; totalAmount: number; paymentMethod: string; saleDate: string; receiptNumber: string }
+interface ReturnItem { id: number; breadType: string; quantity: number; reason: string; reasonLabel: string; returnDate: string }
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function SellerDashboard() {
   const [, setLocation] = useLocation();
-  const [allocations, setAllocations] = useState<Allocation[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allocations, setAllocations]   = useState<Allocation[]>([]);
+  const [allTimeSales, setAllTimeSales] = useState<Sale[]>([]);
+  const [todaySales, setTodaySales]     = useState<Sale[]>([]);
+  const [returns, setReturns]           = useState<ReturnItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+
+  const todayDate = todayIso();
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const startOfDay = `${todayDate}T00:00:00`;
+    const endOfDay   = `${todayDate}T23:59:59`;
     Promise.all([
       fetch("/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
-    ]).then(([a, s]) => {
+      fetch(`/api/sales?startDate=${startOfDay}&endDate=${endOfDay}`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch("/api/returns", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([a, allS, todayS, ret]) => {
       setAllocations(a);
-      setSales(s);
+      setAllTimeSales(allS);
+      setTodaySales(todayS);
+      setReturns(ret);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [todayDate]);
 
-  const today = new Date().toDateString();
+  /* Today's allocations — filter by today's date prefix */
+  const todayAllocations = allocations.filter(a => a.allocationDate.startsWith(todayDate));
 
-  /* Today's data only */
-  const todayAllocations = allocations.filter(a => new Date(a.allocationDate).toDateString() === today);
-  const todaySales = sales.filter(s => new Date(s.saleDate).toDateString() === today);
-
-  /* Stock remaining by bread type (total allocation - total sold, all time for this seller) */
-  const breadTypes = [...new Set([...allocations.map(a => a.breadType), ...sales.map(s => s.breadType)])];
+  /* In Hand per bread type: total_allocated - total_sold_alltime - total_returned */
+  const breadTypes = [...new Set(allocations.map(a => a.breadType))];
   const remaining = breadTypes.map(bt => {
     const allocated = allocations.filter(a => a.breadType === bt).reduce((s, a) => s + a.quantity, 0);
-    const sold = sales.filter(s => s.breadType === bt).reduce((s2, s) => s2 + s.quantity, 0);
-    return { breadType: bt, allocated, sold, remaining: Math.max(0, allocated - sold) };
+    const sold      = allTimeSales.filter(s => s.breadType === bt).reduce((s, x) => s + x.quantity, 0);
+    const returned  = returns.filter(r => r.breadType === bt).reduce((s, r) => s + r.quantity, 0);
+    return { breadType: bt, allocated, sold, returned, remaining: Math.max(0, allocated - sold - returned) };
   });
 
   const todayAllocatedUnits = todayAllocations.reduce((s, a) => s + a.quantity, 0);
   const todaySoldUnits = todaySales.reduce((s, s2) => s + s2.quantity, 0);
-  const todayRevenue = todaySales.reduce((s, s2) => s + s2.totalAmount, 0);
+  const todayRevenue   = todaySales.reduce((s, s2) => s + s2.totalAmount, 0);
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -238,29 +251,40 @@ function SellerDashboard() {
    ══════════════════════════════════════════════ */
 function ReceptionistDashboard() {
   const [, setLocation] = useLocation();
-  const { data: daily, isLoading: dailyLoading } = useGetDailySalesSummary({});
-  const { data: sales, isLoading: salesLoading } = useListSales({});
-  const [stockData, setStockData] = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
+  const [stockData, setStockData]  = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
   const [stockLoading, setStockLoading] = useState(true);
-  const [returns, setReturns] = useState<{ id: number; breadType: string; quantity: number; reasonLabel: string; returnDate: string; receptionistName: string | null }[]>([]);
+  const [returns, setReturns]      = useState<{ id: number; breadType: string; quantity: number; reasonLabel: string; returnDate: string; receptionistName: string | null }[]>([]);
+  const [dailySummary, setDailySummary] = useState<{ totalSales: number; cashSales: number; totalUnits: number } | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(true);
+  const [todaySales, setTodaySales]     = useState<Sale[]>([]);
+
+  const todayDate = todayIso();
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    const startOfDay = `${todayDate}T00:00:00`;
+    const endOfDay   = `${todayDate}T23:59:59`;
+    setDailyLoading(true);
+    setStockLoading(true);
     Promise.all([
       fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch("/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-    ]).then(([dash, ret]) => {
+      fetch(`/api/sales?startDate=${startOfDay}&endDate=${endOfDay}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([dash, ret, ts]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setReturns(ret);
-    }).catch(() => {}).finally(() => setStockLoading(false));
-  }, []);
+      const salesArr = ts as Sale[];
+      setTodaySales(salesArr);
+      const totalUnits = salesArr.reduce((s: number, x: Sale) => s + x.quantity, 0);
+      const cashSales  = salesArr.filter((x: Sale) => x.paymentMethod === "cash").reduce((s: number, x: Sale) => s + x.totalAmount, 0);
+      setDailySummary({ totalSales: salesArr.length, cashSales, totalUnits });
+    }).catch(() => {}).finally(() => { setStockLoading(false); setDailyLoading(false); });
+  }, [todayDate]);
 
-  const today = new Date().toDateString();
-  const todaySales = (sales ?? []).filter(s => new Date(s.saleDate).toDateString() === today);
-  const todayUnits = todaySales.reduce((sum, s) => sum + s.quantity, 0);
+  const todayUnits = dailySummary?.totalUnits ?? 0;
   const pendingReturns = returns.filter(r => !r.receptionistName);
-  const todayPendingReturns = pendingReturns.filter(r => new Date(r.returnDate).toDateString() === today);
+  const todayPendingReturns = pendingReturns.filter(r => r.returnDate.startsWith(todayDate));
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -277,9 +301,9 @@ function ReceptionistDashboard() {
 
       {/* Daily KPIs — no total revenue */}
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard title="Sales Today" value={`${daily?.totalSales ?? 0}`} sub="orders" icon={ShoppingCart} loading={dailyLoading} />
-        <KpiCard title="Units Sold" value={`${todayUnits}`} sub="today" icon={Package} loading={salesLoading} accent="amber" />
-        <KpiCard title="Cash Collected" value={formatCurrency(daily?.cashSales ?? 0)} sub="cash today" icon={TrendingUp} loading={dailyLoading} accent="green" />
+        <KpiCard title="Sales Today" value={`${dailySummary?.totalSales ?? 0}`} sub="orders" icon={ShoppingCart} loading={dailyLoading} />
+        <KpiCard title="Units Sold" value={`${todayUnits}`} sub="today" icon={Package} loading={dailyLoading} accent="amber" />
+        <KpiCard title="Cash Collected" value={formatCurrency(dailySummary?.cashSales ?? 0)} sub="cash today" icon={TrendingUp} loading={dailyLoading} accent="green" />
         <KpiCard title="Pending Returns" value={`${todayPendingReturns.length}`} sub="from sellers today" icon={RotateCcw} loading={stockLoading} accent={todayPendingReturns.length > 0 ? "red" : "default"} />
       </div>
 
@@ -346,7 +370,7 @@ function ReceptionistDashboard() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {salesLoading ? (
+          {dailyLoading ? (
             <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : todaySales.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">

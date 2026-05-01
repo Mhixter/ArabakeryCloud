@@ -124,6 +124,7 @@ export default function SubscriptionPage() {
             </CardContent>
           </Card>
 
+          {(sub.status === "expired" || sub.status === "trial" || sub.daysRemaining <= 5) && (
           <Card>
             <CardHeader>
               <CardTitle>Renew Plan</CardTitle>
@@ -144,6 +145,7 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground text-center">Paystack payment integration coming soon. Contact support to process payment.</p>
             </CardContent>
           </Card>
+          )}
         </>
       )}
     </div>
