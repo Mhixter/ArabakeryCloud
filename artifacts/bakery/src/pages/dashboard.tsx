@@ -720,7 +720,7 @@ interface ProductDashboard {
   activeProductCount: number;
   today: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
   week: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
-  remaining: { name: string; produced: number; sold: number; remaining: number }[];
+  remaining: { name: string; produced: number; sold: number; allocated: number; remaining: number }[];
 }
 
 interface Branch { id: number; name: string }
@@ -783,25 +783,29 @@ function ManagerDashboard() {
         }
       />
 
-      {isDirector && !isBranchLocked && branches.length > 1 && (
+      {isDirector && !isBranchLocked && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Branch:</span>
-          <div className="relative">
-            <select
-              value={selectedBranchId ?? ""}
-              onChange={e => {
-                const id = e.target.value ? parseInt(e.target.value) : null;
-                setSelectedBranchId(id);
-                const branch = id ? branches.find(b => b.id === id) ?? null : null;
-                setActiveBranch(branch);
-              }}
-              className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-xl bg-muted border-0 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
-            >
-              <option value="">All Branches</option>
-              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
+          <span className="text-sm text-muted-foreground font-medium">Viewing branch:</span>
+          {branches.length === 0 ? (
+            <span className="text-sm text-muted-foreground italic">Loading…</span>
+          ) : (
+            <div className="relative">
+              <select
+                value={selectedBranchId ?? ""}
+                onChange={e => {
+                  const id = e.target.value ? parseInt(e.target.value) : null;
+                  setSelectedBranchId(id);
+                  const branch = id ? branches.find(b => b.id === id) ?? null : null;
+                  setActiveBranch(branch);
+                }}
+                className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-xl bg-muted border-0 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                <option value="">All Branches</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            </div>
+          )}
         </div>
       )}
 
@@ -861,7 +865,7 @@ function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Remaining stock per bread type */}
+      {/* Remaining stock per bread type — in store vs with suppliers */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2.5">
@@ -870,13 +874,13 @@ function ManagerDashboard() {
             </div>
             <div>
               <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
-              <CardDescription className="text-xs">Total produced minus total sold</CardDescription>
+              <CardDescription className="text-xs">In-store stock vs with suppliers</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
           ) : !data?.remaining?.length ? (
             <div className="text-center py-10 text-muted-foreground">
               <Factory size={28} className="mx-auto mb-2 opacity-20" />
@@ -886,19 +890,28 @@ function ManagerDashboard() {
           ) : (
             <div className="divide-y divide-border/50">
               {data.remaining.map(item => {
-                const pct = item.produced > 0 ? Math.round((item.sold / item.produced) * 100) : 0;
-                const low = item.remaining < 10;
+                const inStore = item.remaining;
+                const withSuppliers = item.allocated ?? 0;
+                const total = inStore + withSuppliers;
+                const inStorePct = total > 0 ? Math.round((inStore / total) * 100) : 0;
+                const supplierPct = total > 0 ? Math.round((withSuppliers / total) * 100) : 0;
+                const low = inStore < 10;
                 return (
                   <div key={item.name} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                      <Badge variant={low ? "destructive" : "secondary"} className="text-xs">{item.remaining} left</Badge>
+                      {low && <Badge variant="destructive" className="text-xs">Low</Badge>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-                        <div className={`h-full rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    {/* Stacked bar: amber = in store, slate = with suppliers */}
+                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden mb-1.5">
+                      <div className="flex h-full">
+                        <div className="bg-amber-400 h-full rounded-l-full" style={{ width: `${inStorePct}%` }} />
+                        <div className="bg-slate-400 h-full rounded-r-full" style={{ width: `${supplierPct}%` }} />
                       </div>
-                      <p className="text-xs text-muted-foreground flex-shrink-0">{item.sold}/{item.produced} sold</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />{inStore} in store</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />{withSuppliers} with suppliers</span>
                     </div>
                   </div>
                 );

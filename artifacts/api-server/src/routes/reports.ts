@@ -76,8 +76,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) allSalesConds.push(eq(salesTable.branchId, branchFilter));
   const allSalesEver = await db.select().from(salesTable).where(and(...allSalesConds));
 
-  /* Fetch all returns — restorable reasons add back to stock, damage/expired are wasted */
-  const returnsConds = [eq(productReturnsTable.companyId, companyId)];
+  /* Fetch approved returns only — pending/rejected returns don't affect stock */
+  const returnsConds = [
+    eq(productReturnsTable.companyId, companyId),
+    eq(productReturnsTable.status, "approved" as const),
+  ];
   if (branchFilter) returnsConds.push(eq(productReturnsTable.branchId, branchFilter));
   const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];

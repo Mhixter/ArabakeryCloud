@@ -20,7 +20,14 @@ import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } 
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
-const SLIPS_KEY = "nmb_slips";
+/** Per-company receipt storage — prevents receipts leaking between different companies */
+function getSlipsKey(): string {
+  try {
+    const raw = localStorage.getItem("nmb_user");
+    const user = raw ? JSON.parse(raw) : null;
+    return user?.companyId ? `nmb_slips_${user.companyId}` : "nmb_slips";
+  } catch { return "nmb_slips"; }
+}
 
 const ROLE_LABELS: Record<string, string> = {
   supplier: "Supplier",
@@ -52,7 +59,7 @@ export interface ReceiptData {
 /* ── localStorage helpers ── */
 function loadSlips(): ReceiptData[] {
   try {
-    const raw = localStorage.getItem(SLIPS_KEY);
+    const raw = localStorage.getItem(getSlipsKey());
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
@@ -62,7 +69,7 @@ function saveSlip(receipt: ReceiptData) {
   const exists = slips.some(s => s.receiptNumber === receipt.receiptNumber);
   if (!exists) {
     slips.unshift({ ...receipt, savedAt: new Date().toISOString() });
-    localStorage.setItem(SLIPS_KEY, JSON.stringify(slips.slice(0, 200)));
+    localStorage.setItem(getSlipsKey(), JSON.stringify(slips.slice(0, 200)));
   }
 }
 

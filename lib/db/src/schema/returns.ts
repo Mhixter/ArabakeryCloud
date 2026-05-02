@@ -6,6 +6,8 @@ import { usersTable } from "./users";
 export const RETURN_REASONS = ["not_sold", "damaged", "expired", "wrong_item", "other"] as const;
 export type ReturnReason = typeof RETURN_REASONS[number];
 
+export type ReturnStatus = "pending" | "approved" | "rejected";
+
 export const productReturnsTable = pgTable("product_returns", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companiesTable.id),
@@ -15,6 +17,7 @@ export const productReturnsTable = pgTable("product_returns", {
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),
   reason: text("reason").$type<ReturnReason>().notNull().default("not_sold"),
+  status: text("status").$type<ReturnStatus>().notNull().default("pending"),
   notes: text("notes"),
   returnDate: timestamp("return_date", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

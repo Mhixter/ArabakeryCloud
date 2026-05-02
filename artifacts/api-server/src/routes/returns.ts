@@ -17,7 +17,7 @@ const RETURN_REASON_LABELS: Record<string, string> = {
 const formatReturn = (
   r: typeof productReturnsTable.$inferSelect,
   sellerName: string,
-  receptionistName: string | null,
+  approvedByName: string | null,
   branchName: string,
 ) => ({
   id: r.id,
@@ -27,11 +27,12 @@ const formatReturn = (
   sellerId: r.sellerId,
   sellerName,
   receptionistId: r.receptionistId,
-  receptionistName,
+  approvedByName,
   breadType: r.breadType,
   quantity: r.quantity,
   reason: r.reason,
   reasonLabel: RETURN_REASON_LABELS[r.reason] ?? r.reason,
+  status: r.status,
   notes: r.notes,
   returnDate: r.returnDate.toISOString(),
   createdAt: r.createdAt.toISOString(),
@@ -83,12 +84,12 @@ router.get("/returns", authenticate, async (req: AuthenticatedRequest, res): Pro
   ));
 });
 
-/* POST /returns — seller submits a return */
+/* POST /returns — supplier submits a return (starts as "pending") */
 router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
 
-  if (role !== "seller") {
-    res.status(403).json({ error: "Only sellers can submit returns" }); return;
+  if (role !== "supplier") {
+    res.status(403).json({ error: "Only suppliers can submit returns" }); return;
   }
 
   const { breadType, quantity, reason, notes, branchId: bodyBranchId } = req.body;
@@ -111,6 +112,7 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
     breadType,
     quantity: parseInt(quantity),
     reason,
+    status: "pending",
     notes: notes ?? null,
     returnDate: new Date(),
   }).returning();
@@ -120,7 +122,7 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
     action: "RETURN_SUBMITTED" as any,
     entityType: "return",
     entityId: ret.id,
-    details: `Seller returned ${quantity}x ${breadType} — ${reason}`,
+    details: `Supplier returned ${quantity}x ${breadType} — ${reason} (awaiting approval)`,
     branchId: branchId ?? undefined,
   });
 
@@ -132,29 +134,97 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
   res.status(201).json(formatReturn(ret, sellerRow?.fullName ?? "Unknown", null, branchRow?.name ?? "Unknown"));
 });
 
-/* PATCH /returns/:id/acknowledge — receptionist acknowledges a return */
-router.patch("/returns/:id/acknowledge", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+/* PATCH /returns/:id/approve — receptionist/manager/MD approves a pending return */
+router.patch("/returns/:id/approve", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId } = req.user!;
 
   if (!["receptionist", "manager", "managing_director"].includes(role)) {
-    res.status(403).json({ error: "Not authorized" }); return;
+    res.status(403).json({ error: "Not authorised to approve returns" }); return;
   }
 
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
   const [existing] = await db
     .select()
     .from(productReturnsTable)
     .where(and(eq(productReturnsTable.id, id), eq(productReturnsTable.companyId, companyId)));
+
   if (!existing) { res.status(404).json({ error: "Return not found" }); return; }
+  if (existing.status !== "pending") {
+    res.status(400).json({ error: `Return is already ${existing.status}` }); return;
+  }
 
-  await db
+  const [updated] = await db
     .update(productReturnsTable)
-    .set({ receptionistId: userId })
-    .where(eq(productReturnsTable.id, id));
+    .set({ status: "approved", receptionistId: userId })
+    .where(eq(productReturnsTable.id, id))
+    .returning();
 
-  res.json({ success: true });
+  await logAudit({
+    req, userId, companyId,
+    action: "RETURN_APPROVED" as any,
+    entityType: "return",
+    entityId: id,
+    details: `Approved return of ${existing.quantity}x ${existing.breadType} from supplier`,
+    branchId: existing.branchId ?? undefined,
+  });
+
+  const companyUsers = await db
+    .select({ id: usersTable.id, fullName: usersTable.fullName })
+    .from(usersTable)
+    .where(eq(usersTable.companyId, companyId));
+  const userMap = new Map(companyUsers.map(u => [u.id, u.fullName]));
+  const [sellerRow] = await db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, existing.sellerId));
+  const [branchRow] = existing.branchId
+    ? await db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, existing.branchId))
+    : [{ name: "Unknown" }];
+
+  res.json(formatReturn(updated, sellerRow?.fullName ?? "Unknown", userMap.get(userId) ?? "Unknown", branchRow?.name ?? "Unknown"));
+});
+
+/* PATCH /returns/:id/reject — receptionist/manager/MD rejects a pending return */
+router.patch("/returns/:id/reject", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { userId, role, companyId } = req.user!;
+
+  if (!["receptionist", "manager", "managing_director"].includes(role)) {
+    res.status(403).json({ error: "Not authorised to reject returns" }); return;
+  }
+
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [existing] = await db
+    .select()
+    .from(productReturnsTable)
+    .where(and(eq(productReturnsTable.id, id), eq(productReturnsTable.companyId, companyId)));
+
+  if (!existing) { res.status(404).json({ error: "Return not found" }); return; }
+  if (existing.status !== "pending") {
+    res.status(400).json({ error: `Return is already ${existing.status}` }); return;
+  }
+
+  const [updated] = await db
+    .update(productReturnsTable)
+    .set({ status: "rejected", receptionistId: userId })
+    .where(eq(productReturnsTable.id, id))
+    .returning();
+
+  await logAudit({
+    req, userId, companyId,
+    action: "RETURN_REJECTED" as any,
+    entityType: "return",
+    entityId: id,
+    details: `Rejected return of ${existing.quantity}x ${existing.breadType} from supplier`,
+    branchId: existing.branchId ?? undefined,
+  });
+
+  const [sellerRow] = await db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, existing.sellerId));
+  const [branchRow] = existing.branchId
+    ? await db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, existing.branchId))
+    : [{ name: "Unknown" }];
+
+  res.json(formatReturn(updated, sellerRow?.fullName ?? "Unknown", null, branchRow?.name ?? "Unknown"));
 });
 
 export default router;

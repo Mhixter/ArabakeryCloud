@@ -54,7 +54,10 @@ interface Return {
   reason: string;
   reasonLabel: string;
   notes: string | null;
+  sellerName: string;
   receptionistName: string | null;
+  approvedByName: string | null;
+  status: "pending" | "approved" | "rejected";
   returnDate: string;
 }
 
@@ -372,8 +375,51 @@ export default function AllocationsPage() {
     }
   };
 
+  const canApproveReturns = ["managing_director", "manager", "receptionist"].includes(role);
+
+  const handleApproveReturn = async (id: number) => {
+    const token = localStorage.getItem("nmb_token");
+    try {
+      const res = await fetch(`/api/returns/${id}/approve`, {
+        method: "PATCH",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast({ title: data.error ?? "Failed to approve return", variant: "destructive" }); return;
+      }
+      const updated: Return = await res.json();
+      setReturns(prev => prev.map(r => r.id === id ? updated : r));
+      toast({ title: "Return approved — stock updated" });
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
+
+  const handleRejectReturn = async (id: number) => {
+    const token = localStorage.getItem("nmb_token");
+    try {
+      const res = await fetch(`/api/returns/${id}/reject`, {
+        method: "PATCH",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast({ title: data.error ?? "Failed to reject return", variant: "destructive" }); return;
+      }
+      const updated: Return = await res.json();
+      setReturns(prev => prev.map(r => r.id === id ? updated : r));
+      toast({ title: "Return rejected" });
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
+
   const totalQty = allocations.reduce((s, a) => s + a.quantity, 0);
   const todayReturns = returns.filter(r => new Date(r.returnDate).toDateString() === new Date().toDateString());
+  const pendingReturns = returns.filter(r => r.status === "pending");
 
   return (
     <div className="space-y-6" data-testid="page-allocations">
@@ -409,8 +455,8 @@ export default function AllocationsPage() {
               tab === t ? "bg-amber-400 text-slate-950" : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}>
             {t === "allocations" ? "Allocations" : "Returns"}
-            {t === "returns" && todayReturns.length > 0 && (
-              <span className="ml-1.5 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{todayReturns.length}</span>
+            {t === "returns" && pendingReturns.length > 0 && (
+              <span className="ml-1.5 bg-amber-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{pendingReturns.length}</span>
             )}
           </button>
         ))}
@@ -554,10 +600,12 @@ export default function AllocationsPage() {
                   <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
                     onClick={() => downloadCSV([...returns].reverse().map(r => ({
                       Date: formatDate(r.returnDate),
+                      Supplier: r.sellerName,
                       "Bread Type": r.breadType,
                       Quantity: r.quantity,
                       Reason: r.reasonLabel,
-                      "Received By": r.receptionistName ?? "",
+                      Status: r.status,
+                      "Actioned By": r.approvedByName ?? "",
                       Notes: r.notes ?? "",
                     })), `returns-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
                     <Download size={12} /> Download CSV
@@ -585,12 +633,24 @@ export default function AllocationsPage() {
                 {[...returns].reverse().map(ret => (
                   <div key={ret.id} className="px-4 py-3 hover:bg-muted/20 transition-colors">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <RotateCcw size={15} className="text-rose-500" />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${ret.status === "approved" ? "bg-emerald-50" : ret.status === "rejected" ? "bg-red-50" : "bg-amber-50"}`}>
+                        <RotateCcw size={15} className={ret.status === "approved" ? "text-emerald-500" : ret.status === "rejected" ? "text-red-500" : "text-amber-500"} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-sm text-foreground truncate">{ret.breadType}</p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="font-semibold text-sm text-foreground truncate">{ret.breadType}</p>
+                            {/* Status badge */}
+                            {ret.status === "pending" && (
+                              <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-300" variant="outline">Pending</Badge>
+                            )}
+                            {ret.status === "approved" && (
+                              <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-300" variant="outline">Approved</Badge>
+                            )}
+                            {ret.status === "rejected" && (
+                              <Badge className="text-xs bg-red-100 text-red-700 border-red-200" variant="outline">Rejected</Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <Badge variant="outline" className="text-xs">{ret.quantity} units</Badge>
                             <Badge
@@ -601,20 +661,49 @@ export default function AllocationsPage() {
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                           <Calendar size={11} className="text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">{formatDate(ret.returnDate)}</p>
-                          {ret.receptionistName && (
+                          {!isSeller && ret.sellerName && (
                             <>
                               <span className="text-muted-foreground/40 text-xs">·</span>
-                              <p className="text-xs text-emerald-600 font-medium">Acknowledged by {ret.receptionistName}</p>
+                              <p className="text-xs text-muted-foreground">by <span className="font-medium">{ret.sellerName}</span></p>
                             </>
                           )}
-                          {!ret.receptionistName && !isSeller && (
-                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 ml-1">Pending</Badge>
+                          {ret.status === "approved" && ret.approvedByName && (
+                            <>
+                              <span className="text-muted-foreground/40 text-xs">·</span>
+                              <p className="text-xs text-emerald-600 font-medium">Approved by {ret.approvedByName}</p>
+                            </>
+                          )}
+                          {ret.status === "rejected" && ret.approvedByName && (
+                            <>
+                              <span className="text-muted-foreground/40 text-xs">·</span>
+                              <p className="text-xs text-red-600 font-medium">Rejected by {ret.approvedByName}</p>
+                            </>
                           )}
                         </div>
                         {ret.notes && <p className="text-xs text-muted-foreground/70 mt-1 italic">{ret.notes}</p>}
+                        {/* Approve / Reject buttons — only for authorised staff on pending returns */}
+                        {ret.status === "pending" && canApproveReturns && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => handleApproveReturn(ret.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                              onClick={() => handleRejectReturn(ret.id)}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
