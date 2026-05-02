@@ -731,15 +731,15 @@ function ManagerDashboard() {
   const isDirector = user?.role === "managing_director";
   const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
 
-  /* Initialise to persisted activeBranch (survives reload/re-login) or fixed branch for non-MD */
-  const userFixedBranchId = user?.branchId ?? null;
-  const initBranchId = userFixedBranchId ?? activeBranch?.id ?? null;
-
+  /* activeBranch already comes from localStorage (via BranchContext initBranch).
+     Use it directly as the single source of truth — avoids the bug where
+     user.branchId (the MD's own home branch) would shadow a persisted selection. */
   const [period, setPeriod] = useState<"today" | "week">("today");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(initBranchId);
+  /* selectedBranchId mirrors context — updated when user picks from dropdown */
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(activeBranch?.id ?? null);
 
   const fetchDashboard = useCallback((branchId: number | null) => {
     const token = localStorage.getItem("nmb_token");
@@ -762,7 +762,7 @@ function ManagerDashboard() {
         .then((bs: Branch[]) => setBranches(bs))
         .catch(() => {});
     }
-    fetchDashboard(initBranchId);
+    fetchDashboard(activeBranch?.id ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirector, fetchDashboard]);
 

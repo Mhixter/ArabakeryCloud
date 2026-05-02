@@ -38,11 +38,13 @@ function savePersistedBranch(branch: ActiveBranch | null) {
 
 function initBranch(): ActiveBranch | null {
   const user = getStoredUser();
-  // Branch-locked users (non-MD staff with assigned branch) always use their own branch
-  if (user?.branchId && user?.branchName) {
+  // MDs can freely switch branches — always restore their last persisted selection.
+  // Non-MD staff who are assigned to a specific branch are locked to that branch.
+  const isBranchLocked = !!(user?.branchId && user?.role !== "managing_director");
+  if (isBranchLocked && user?.branchId && user?.branchName) {
     return { id: user.branchId, name: user.branchName };
   }
-  // MD/managers without a fixed branch: restore their last-selected branch from storage
+  // MD / managers without a fixed branch: restore from localStorage
   return readPersistedBranch();
 }
 
