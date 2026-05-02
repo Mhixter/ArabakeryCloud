@@ -343,11 +343,11 @@ export default function SalesPage() {
     }
   }, [activeBranch]);
 
-  /* Build API params — use date filter for supplier/receptionist or when filter is set */
+  /* Build API params — convert local midnight → UTC ISO so the server query is timezone-correct */
   const listParams: Record<string, string | number | null> = { branchId: branchParam };
   if (filterDate) {
-    listParams.startDate = `${filterDate}T00:00:00`;
-    listParams.endDate = `${filterDate}T23:59:59`;
+    listParams.startDate = new Date(`${filterDate}T00:00:00`).toISOString();
+    listParams.endDate   = new Date(`${filterDate}T23:59:59`).toISOString();
   }
 
   const { data: sales, isLoading } = useListSales(listParams as any);

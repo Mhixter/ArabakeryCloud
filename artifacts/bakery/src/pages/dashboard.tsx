@@ -109,8 +109,8 @@ function SellerDashboard() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [todayDate]);
 
-  /* Today's allocations — filter by today's date prefix */
-  const todayAllocations = allocations.filter(a => a.allocationDate.startsWith(todayDate));
+  /* Today's allocations — compare local date (not UTC prefix) so timezone-shifted records land on the right day */
+  const todayAllocations = allocations.filter(a => toLocalDateStr(new Date(a.allocationDate)) === todayDate);
 
   /* In Hand per bread type: total_allocated - total_sold_alltime - approved_returned
      Only approved returns reduce stock — pending/rejected don't change the count yet. */
@@ -302,7 +302,7 @@ function ReceptionistDashboard() {
   const todayUnits = dailySummary?.totalUnits ?? 0;
   /* Use status field — pending returns are those awaiting receptionist action */
   const pendingReturns = returns.filter(r => r.status === "pending");
-  const todayPendingReturns = pendingReturns.filter(r => r.returnDate.startsWith(todayDate));
+  const todayPendingReturns = pendingReturns.filter(r => toLocalDateStr(new Date(r.returnDate)) === todayDate);
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
