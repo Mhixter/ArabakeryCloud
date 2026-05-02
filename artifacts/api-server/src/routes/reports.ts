@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable } from "@workspace/db";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
@@ -62,21 +62,27 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = await db.select().from(salesTable).where(and(...todayConds));
+  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds));
 
   const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = await db.select().from(salesTable).where(and(...weekConds));
+  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
   const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (branchFilter) prodConds.push(eq(productionBatchesTable.branchId, branchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
+  /* Join sales with cashier role so we can split direct vs supplier sales.
+     Supplier sales are WITHIN allocated bread — counting both would double-subtract. */
   const allSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
   if (branchFilter) allSalesConds.push(eq(salesTable.branchId, branchFilter));
-  const allSalesEver = await db.select().from(salesTable).where(and(...allSalesConds));
+  const allSalesEver = await db
+    .select({ sale: salesTable, cashierRole: usersTable.role })
+    .from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...allSalesConds));
 
-  /* Fetch approved returns only — pending/rejected returns don't affect stock */
+  /* Fetch approved returns only — pending/rejected don't affect stock */
   const returnsConds = [
     eq(productReturnsTable.companyId, companyId),
     eq(productReturnsTable.status, "approved" as const),
@@ -86,14 +92,14 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
 
-  /* Fetch active allocations — bread held by suppliers, not yet sold or returned */
+  /* Total allocations ever made (bread sent out to suppliers) */
   const allocConds = [eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt)];
   if (branchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, branchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
 
-  function aggregateByProduct(sales: typeof salesTable.$inferSelect[]) {
+  function aggregateByProduct(rows: { sale: typeof salesTable.$inferSelect }[]) {
     const map = new Map<string, { quantity: number; amount: number }>();
-    for (const s of sales) {
+    for (const { sale: s } of rows) {
       const p = map.get(s.breadType) ?? { quantity: 0, amount: 0 };
       map.set(s.breadType, { quantity: p.quantity + s.quantity, amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
     }
@@ -106,48 +112,84 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   for (const b of allProduction) {
     productionByType.set(b.breadType, (productionByType.get(b.breadType) ?? 0) + b.quantityProduced - b.wasteQuantity);
   }
-  const salesByType = new Map<string, number>();
-  for (const s of allSalesEver) {
-    salesByType.set(s.breadType, (salesByType.get(s.breadType) ?? 0) + s.quantity);
+
+  /* Split sales: direct (non-supplier staff sell from store) vs supplier (sell from their allocation) */
+  const directSalesByType   = new Map<string, number>();
+  const supplierSalesByType = new Map<string, number>();
+  const allSalesByType      = new Map<string, number>(); // for today/week display
+  for (const { sale: s, cashierRole } of allSalesEver) {
+    allSalesByType.set(s.breadType, (allSalesByType.get(s.breadType) ?? 0) + s.quantity);
+    if (cashierRole === "supplier") {
+      supplierSalesByType.set(s.breadType, (supplierSalesByType.get(s.breadType) ?? 0) + s.quantity);
+    } else {
+      directSalesByType.set(s.breadType, (directSalesByType.get(s.breadType) ?? 0) + s.quantity);
+    }
   }
-  /* restorable returns go back to stock; damaged ones are wasted (excluded from remaining) */
+
+  /* Approved returns: restorable goes back to store, damaged is wasted */
   const restorableByType = new Map<string, number>();
   const damagedByType    = new Map<string, number>();
+  const allReturnsByType = new Map<string, number>(); // all approved returns (restorable + damaged)
   for (const r of allReturns) {
+    allReturnsByType.set(r.breadType, (allReturnsByType.get(r.breadType) ?? 0) + r.quantity);
     if (RESTORABLE.includes(r.reason)) {
       restorableByType.set(r.breadType, (restorableByType.get(r.breadType) ?? 0) + r.quantity);
     } else if (DAMAGED.includes(r.reason)) {
       damagedByType.set(r.breadType, (damagedByType.get(r.breadType) ?? 0) + r.quantity);
     }
   }
-  /* bread currently in suppliers' hands (allocated but not yet sold or returned) */
-  const allocatedByType = new Map<string, number>();
+
+  const totalAllocatedByType = new Map<string, number>();
   for (const a of activeAllocations) {
-    allocatedByType.set(a.breadType, (allocatedByType.get(a.breadType) ?? 0) + a.quantity);
+    totalAllocatedByType.set(a.breadType, (totalAllocatedByType.get(a.breadType) ?? 0) + a.quantity);
   }
 
   const remaining = activeProducts.map(p => {
-    const produced   = productionByType.get(p.name) ?? 0;
-    const sold       = salesByType.get(p.name) ?? 0;
-    const restored   = restorableByType.get(p.name) ?? 0;
-    const damaged    = damagedByType.get(p.name) ?? 0;
-    const allocated  = allocatedByType.get(p.name) ?? 0;
-    /* remaining = net_produced + restorable_returns - sold - damaged_returns - currently_allocated */
-    const rem = Math.max(0, produced + restored - sold - damaged - allocated);
-    return { name: p.name, produced, sold, restored, damaged, allocated, remaining: rem };
+    const produced      = productionByType.get(p.name) ?? 0;
+    const totalAllocated = totalAllocatedByType.get(p.name) ?? 0;
+    const directSold    = directSalesByType.get(p.name) ?? 0;
+    const supplierSold  = supplierSalesByType.get(p.name) ?? 0;
+    const restored      = restorableByType.get(p.name) ?? 0;
+    const damaged       = damagedByType.get(p.name) ?? 0;
+    const allReturned   = allReturnsByType.get(p.name) ?? 0;
+    const totalSold     = allSalesByType.get(p.name) ?? 0;
+
+    /*
+     * Bread flow:
+     *   produced → store → [sold directly] OR [allocated to suppliers]
+     *   allocated → suppliers → [sold by suppliers] OR [returned: restored back / damaged wasted]
+     *
+     * In-store = net_produced + restorable_returns - direct_sales - total_allocated
+     *   (allocations remove bread from store; restorable returns bring some back)
+     *
+     * With-suppliers = total_allocated - supplier_sales - all_approved_returns
+     *   (what suppliers currently hold, net of what they sold or gave back)
+     */
+    const inStore       = Math.max(0, produced + restored - directSold - totalAllocated);
+    const withSuppliers = Math.max(0, totalAllocated - supplierSold - allReturned);
+
+    return {
+      name: p.name,
+      produced,
+      sold: totalSold,        // all sales (for display as "X sold total")
+      restored,
+      damaged,
+      allocated: withSuppliers, // how many are CURRENTLY with suppliers
+      remaining: inStore,       // how many are in the store right now
+    };
   });
 
   res.json({
     activeProductCount: activeProducts.length,
     today: {
-      totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
-      totalQuantity: todaySales.reduce((s, x) => s + x.quantity, 0),
+      totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
+      totalQuantity: todaySales.reduce((s, x) => s + x.sale.quantity, 0),
       salesCount: todaySales.length,
       byProduct: aggregateByProduct(todaySales),
     },
     week: {
-      totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
-      totalQuantity: weekSales.reduce((s, x) => s + x.quantity, 0),
+      totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
+      totalQuantity: weekSales.reduce((s, x) => s + x.sale.quantity, 0),
       salesCount: weekSales.length,
       byProduct: aggregateByProduct(weekSales),
     },

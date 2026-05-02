@@ -62,7 +62,7 @@ function KpiCard({
    ══════════════════════════════════════════════ */
 interface Allocation { id: number; breadType: string; quantity: number; issuedByName: string; allocationDate: string }
 interface Sale { id: number; breadType: string; quantity: number; totalAmount: number; paymentMethod: string; saleDate: string; receiptNumber: string }
-interface ReturnItem { id: number; breadType: string; quantity: number; reason: string; reasonLabel: string; returnDate: string }
+interface ReturnItem { id: number; breadType: string; quantity: number; reason: string; reasonLabel: string; returnDate: string; status: string }
 
 function todayIso() {
   const d = new Date();
@@ -82,12 +82,14 @@ function SellerDashboard() {
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const startOfDay = `${todayDate}T00:00:00`;
-    const endOfDay   = `${todayDate}T23:59:59`;
+    /* Convert local-midnight and local-end-of-day to UTC ISO strings so the server
+       comparison is timezone-correct regardless of where the server runs. */
+    const startOfDay = new Date(`${todayDate}T00:00:00`).toISOString();
+    const endOfDay   = new Date(`${todayDate}T23:59:59`).toISOString();
     Promise.all([
       fetch("/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/sales?startDate=${startOfDay}&endDate=${endOfDay}`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/returns", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([a, allS, todayS, ret]) => {
       setAllocations(a);
@@ -100,12 +102,14 @@ function SellerDashboard() {
   /* Today's allocations — filter by today's date prefix */
   const todayAllocations = allocations.filter(a => a.allocationDate.startsWith(todayDate));
 
-  /* In Hand per bread type: total_allocated - total_sold_alltime - total_returned */
+  /* In Hand per bread type: total_allocated - total_sold_alltime - approved_returned
+     Only approved returns reduce stock — pending/rejected don't change the count yet. */
+  const approvedReturns = returns.filter(r => r.status === "approved");
   const breadTypes = [...new Set(allocations.map(a => a.breadType))];
   const remaining = breadTypes.map(bt => {
     const allocated = allocations.filter(a => a.breadType === bt).reduce((s, a) => s + a.quantity, 0);
     const sold      = allTimeSales.filter(s => s.breadType === bt).reduce((s, x) => s + x.quantity, 0);
-    const returned  = returns.filter(r => r.breadType === bt).reduce((s, r) => s + r.quantity, 0);
+    const returned  = approvedReturns.filter(r => r.breadType === bt).reduce((s, r) => s + r.quantity, 0);
     return { breadType: bt, allocated, sold, returned, remaining: Math.max(0, allocated - sold - returned) };
   });
 
@@ -254,7 +258,7 @@ function ReceptionistDashboard() {
   const [, setLocation] = useLocation();
   const [stockData, setStockData]  = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
   const [stockLoading, setStockLoading] = useState(true);
-  const [returns, setReturns]      = useState<{ id: number; breadType: string; quantity: number; reasonLabel: string; returnDate: string; receptionistName: string | null }[]>([]);
+  const [returns, setReturns]      = useState<{ id: number; breadType: string; quantity: number; reasonLabel: string; returnDate: string; status: string }[]>([]);
   const [dailySummary, setDailySummary] = useState<{ totalSales: number; cashSales: number; totalUnits: number } | null>(null);
   const [dailyLoading, setDailyLoading] = useState(true);
   const [todaySales, setTodaySales]     = useState<Sale[]>([]);
@@ -264,14 +268,15 @@ function ReceptionistDashboard() {
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const startOfDay = `${todayDate}T00:00:00`;
-    const endOfDay   = `${todayDate}T23:59:59`;
+    /* Use UTC-converted timestamps for accurate date filtering on the server */
+    const startOfDay = new Date(`${todayDate}T00:00:00`).toISOString();
+    const endOfDay   = new Date(`${todayDate}T23:59:59`).toISOString();
     setDailyLoading(true);
     setStockLoading(true);
     Promise.all([
       fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch("/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/sales?startDate=${startOfDay}&endDate=${endOfDay}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([dash, ret, ts]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setReturns(ret);
@@ -284,7 +289,8 @@ function ReceptionistDashboard() {
   }, [todayDate]);
 
   const todayUnits = dailySummary?.totalUnits ?? 0;
-  const pendingReturns = returns.filter(r => !r.receptionistName);
+  /* Use status field — pending returns are those awaiting receptionist action */
+  const pendingReturns = returns.filter(r => r.status === "pending");
   const todayPendingReturns = pendingReturns.filter(r => r.returnDate.startsWith(todayDate));
 
   return (
@@ -466,13 +472,16 @@ function ProductionDashboard() {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const today = format(new Date(), "yyyy-MM-dd");
+    const todayStart = new Date(`${today}T00:00:00`).toISOString();
+    const todayEnd   = new Date(`${today}T23:59:59`).toISOString();
     // Week: last 7 days
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 6);
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekStartUtc = new Date(`${weekStartStr}T00:00:00`).toISOString();
     Promise.all([
       fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
-      fetch(`/api/production?startDate=${today}T00:00:00&endDate=${today}T23:59:59`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/production?startDate=${weekStartStr}T00:00:00&endDate=${today}T23:59:59`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/production?startDate=${encodeURIComponent(todayStart)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/production?startDate=${encodeURIComponent(weekStartUtc)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([dash, today_prod, week_prod]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setTodayBatches(today_prod);

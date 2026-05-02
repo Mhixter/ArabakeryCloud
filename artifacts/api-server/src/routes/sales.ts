@@ -133,7 +133,19 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   const price = parseFloat(pricePerUnit);
   const totalAmount = qty * price;
   const receiptNumber = generateReceiptNumber();
-  const effectiveBranchId = parseInt(branchId) || userBranchId || 1;
+
+  /* Resolve branchId: use request body value, else user's branchId.
+     For suppliers without a branchId, fall back to their most recent allocation's branch. */
+  let effectiveBranchId = parseInt(branchId) || userBranchId;
+  if (!effectiveBranchId && role === "supplier") {
+    const [recentAlloc] = await db
+      .select()
+      .from(sellerAllocationsTable)
+      .where(and(eq(sellerAllocationsTable.sellerId, userId), isNull(sellerAllocationsTable.deletedAt)))
+      .limit(1);
+    if (recentAlloc?.branchId) effectiveBranchId = recentAlloc.branchId;
+  }
+  effectiveBranchId = effectiveBranchId || 1;
 
   const [sale] = await db.insert(salesTable).values({
     companyId, receiptNumber, breadType, quantity: qty,
