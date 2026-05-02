@@ -8,6 +8,8 @@ export const branchesTable = pgTable("branches", {
   companyId: integer("company_id").notNull().references(() => companiesTable.id),
   name: text("name").notNull(),
   location: text("location"),
+  address: text("address"),
+  phone: text("phone"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

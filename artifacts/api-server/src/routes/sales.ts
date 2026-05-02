@@ -7,7 +7,14 @@ import crypto from "crypto";
 
 const router: IRouter = Router();
 
-const formatSale = (s: typeof salesTable.$inferSelect, cashierName: string, branchName: string, cashierRole?: string) => ({
+const formatSale = (
+  s: typeof salesTable.$inferSelect,
+  cashierName: string,
+  branchName: string,
+  cashierRole?: string,
+  branchPhone?: string | null,
+  branchAddress?: string | null,
+) => ({
   id: s.id,
   receiptNumber: s.receiptNumber,
   breadType: s.breadType,
@@ -22,6 +29,8 @@ const formatSale = (s: typeof salesTable.$inferSelect, cashierName: string, bran
   cashierRole: cashierRole ?? null,
   branchId: s.branchId,
   branchName,
+  branchPhone: branchPhone ?? null,
+  branchAddress: branchAddress ?? null,
   notes: s.notes,
   saleDate: s.saleDate.toISOString(),
   createdAt: s.createdAt.toISOString(),
@@ -55,14 +64,14 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   if (endDate) conditions.push(lte(salesTable.saleDate, new Date(endDate)));
 
   const sales = await db
-    .select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name })
+    .select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
     .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
     .where(and(...conditions))
     .orderBy(salesTable.saleDate);
 
-  res.json(sales.map(({ sale, cashierName, cashierRole, branchName }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown", cashierRole ?? undefined)));
+  res.json(sales.map(({ sale, cashierName, cashierRole, branchName, branchPhone, branchAddress }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown", cashierRole ?? undefined, branchPhone, branchAddress)));
 });
 
 router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -161,7 +170,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   ]);
 
   await logAudit({ req, userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
-  res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown"));
+  res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown", undefined, branch?.phone, branch?.address));
 });
 
 router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -195,7 +204,7 @@ router.get("/sales/:id", authenticate, async (req: AuthenticatedRequest, res): P
   const { userId, role, companyId } = req.user!;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name })
+  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
     .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
@@ -205,7 +214,7 @@ router.get("/sales/:id", authenticate, async (req: AuthenticatedRequest, res): P
   if (role === "supplier" && result.sale.cashierId !== userId) {
     res.status(403).json({ error: "Access denied" }); return;
   }
-  res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown"));
+  res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown", undefined, result.branchPhone, result.branchAddress));
 });
 
 export default router;

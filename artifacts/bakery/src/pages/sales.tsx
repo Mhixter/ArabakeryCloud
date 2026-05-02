@@ -52,6 +52,8 @@ export interface ReceiptData {
   cashierName: string;
   cashierRole?: string | null;
   branchName: string;
+  branchPhone?: string | null;
+  branchAddress?: string | null;
   saleDate: string;
   savedAt?: string;
 }
@@ -97,7 +99,9 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
 <body>
   <div class="center bold" style="font-size:18px;margin-bottom:2px;">${companyName}</div>
   ${companyPhone ? `<div class="center" style="font-size:12px;color:#666;">${companyPhone}</div>` : ""}
-  <div class="center" style="font-size:12px;color:#666;">${sale.branchName}</div>
+  <div class="center bold" style="font-size:13px;margin-top:6px;">${sale.branchName}</div>
+  ${sale.branchPhone ? `<div class="center" style="font-size:12px;color:#666;">Tel: ${sale.branchPhone}</div>` : ""}
+  ${sale.branchAddress ? `<div class="center" style="font-size:12px;color:#666;">${sale.branchAddress}</div>` : ""}
   <hr class="divider"/>
   <div class="row"><span class="label">Receipt No.</span><span class="bold">${sale.receiptNumber}</span></div>
   <div class="row"><span class="label">Date</span><span>${format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span></div>
@@ -151,7 +155,9 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             )}
             <p className="font-bold text-base">{companyName}</p>
             {company?.phone && <p className="text-muted-foreground text-xs">{company.phone}</p>}
-            <p className="text-muted-foreground text-xs">{sale.branchName}</p>
+            <p className="font-semibold text-xs mt-1">{sale.branchName}</p>
+            {sale.branchPhone && <p className="text-muted-foreground text-xs">Tel: {sale.branchPhone}</p>}
+            {sale.branchAddress && <p className="text-muted-foreground text-xs">{sale.branchAddress}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -381,6 +387,8 @@ export default function SalesPage() {
             cashierName:   sale.cashierName,
             cashierRole:   (sale as any).cashierRole ?? null,
             branchName:    sale.branchName,
+            branchPhone:   (sale as any).branchPhone ?? null,
+            branchAddress: (sale as any).branchAddress ?? null,
             saleDate:      sale.saleDate,
           };
           saveSlip(receipt);
@@ -405,6 +413,8 @@ export default function SalesPage() {
     cashierName:   sale.cashierName,
     cashierRole:   (sale as any).cashierRole ?? null,
     branchName:    sale.branchName,
+    branchPhone:   (sale as any).branchPhone ?? null,
+    branchAddress: (sale as any).branchAddress ?? null,
     saleDate:      sale.saleDate,
   });
 
