@@ -240,7 +240,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
-        body: JSON.stringify({ sellerId, breadType, quantity: parseInt(quantity), notes: notes || null }),
+        body: JSON.stringify({ sellerId, breadType, quantity: parseInt(quantity), notes: notes || null, branchId: activeBranch?.id ?? null }),
       });
       const data = await res.json();
       if (!res.ok) { toast({ title: data.error ?? "Failed to create allocation", variant: "destructive" }); return; }

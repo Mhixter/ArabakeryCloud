@@ -110,10 +110,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     res.status(400).json({ error: "sellerId, breadType, and quantity are required" }); return;
   }
 
-  const branchId = bodyBranchId ? parseInt(bodyBranchId) : userBranchId;
-  if (!branchId) { res.status(400).json({ error: "branchId is required" }); return; }
-
-  /* Verify seller */
+  /* Verify seller first — we use their branchId as fallback */
   const [seller] = await db
     .select()
     .from(usersTable)
@@ -121,6 +118,10 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
 
   if (!seller) { res.status(404).json({ error: "Supplier not found" }); return; }
   if (seller.role !== "supplier") { res.status(400).json({ error: "Selected user is not a supplier" }); return; }
+
+  /* Resolve branchId: explicit body > seller's branch > issuer's branch */
+  const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId;
+  if (!branchId) { res.status(400).json({ error: "branchId could not be determined — please select a branch" }); return; }
 
   /* Stock check: produced - sold - already allocated */
   const [production, sales, existingAllocations] = await Promise.all([
