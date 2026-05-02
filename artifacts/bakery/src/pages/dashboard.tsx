@@ -17,6 +17,20 @@ function formatCurrency(n: number) {
   return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+/* Auto-refreshing current date — updates every 60 s so the UI never shows yesterday's date */
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+function toLocalDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4">
@@ -64,11 +78,6 @@ interface Allocation { id: number; breadType: string; quantity: number; issuedBy
 interface Sale { id: number; breadType: string; quantity: number; totalAmount: number; paymentMethod: string; saleDate: string; receiptNumber: string }
 interface ReturnItem { id: number; breadType: string; quantity: number; reason: string; reasonLabel: string; returnDate: string; status: string }
 
-function todayIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function SellerDashboard() {
   const [, setLocation] = useLocation();
   const [allocations, setAllocations]   = useState<Allocation[]>([]);
@@ -77,7 +86,8 @@ function SellerDashboard() {
   const [returns, setReturns]           = useState<ReturnItem[]>([]);
   const [loading, setLoading]           = useState(true);
 
-  const todayDate = todayIso();
+  const now = useNow();
+  const todayDate = toLocalDateStr(now);
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
@@ -120,7 +130,7 @@ function SellerDashboard() {
   return (
     <div className="space-y-6" data-testid="page-dashboard">
       <PageHeader
-        title={format(new Date(), "EEEE, d MMMM")}
+        title={format(now, "EEEE, d MMMM")}
         subtitle="Your daily allocation and sales"
         action={
           <Button onClick={() => setLocation("/sales")} size="sm">
@@ -263,7 +273,8 @@ function ReceptionistDashboard() {
   const [dailyLoading, setDailyLoading] = useState(true);
   const [todaySales, setTodaySales]     = useState<Sale[]>([]);
 
-  const todayDate = todayIso();
+  const now = useNow();
+  const todayDate = toLocalDateStr(now);
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
@@ -296,7 +307,7 @@ function ReceptionistDashboard() {
   return (
     <div className="space-y-6" data-testid="page-dashboard">
       <PageHeader
-        title={format(new Date(), "EEEE, d MMMM")}
+        title={format(now, "EEEE, d MMMM")}
         subtitle="Today's activity overview"
         action={
           <Button onClick={() => setLocation("/allocations")} size="sm">
@@ -463,21 +474,23 @@ function downloadCSV(rows: Record<string, string | number>[], filename: string) 
 
 function ProductionDashboard() {
   const [, setLocation] = useLocation();
-  const [stockData, setStockData] = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
+  const [stockData, setStockData] = useState<{ name: string; produced: number; sold: number; remaining: number; allocated: number }[]>([]);
   const [todayBatches, setTodayBatches] = useState<ProdBatch[]>([]);
   const [weekBatches, setWeekBatches] = useState<ProdBatch[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const now = useNow();
+  const todayStr = toLocalDateStr(now);
+
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const today = format(new Date(), "yyyy-MM-dd");
-    const todayStart = new Date(`${today}T00:00:00`).toISOString();
-    const todayEnd   = new Date(`${today}T23:59:59`).toISOString();
+    const todayStart = new Date(`${todayStr}T00:00:00`).toISOString();
+    const todayEnd   = new Date(`${todayStr}T23:59:59`).toISOString();
     // Week: last 7 days
-    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 6);
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekStartUtc = new Date(`${weekStartStr}T00:00:00`).toISOString();
+    const weekStartDate = new Date(now); weekStartDate.setDate(weekStartDate.getDate() - 6);
+    const weekStartStr  = toLocalDateStr(weekStartDate);
+    const weekStartUtc  = new Date(`${weekStartStr}T00:00:00`).toISOString();
     Promise.all([
       fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`/api/production?startDate=${encodeURIComponent(todayStart)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
@@ -487,7 +500,8 @@ function ProductionDashboard() {
       setTodayBatches(today_prod);
       setWeekBatches(week_prod);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayStr]);
 
   /* Today stats */
   const todayProduced = todayBatches.reduce((s, p) => s + p.quantityProduced, 0);
@@ -501,8 +515,10 @@ function ProductionDashboard() {
   const weekNet      = weekProduced - weekWaste;
 
   /* Stock */
-  const totalStock = stockData.reduce((s, r) => s + r.remaining, 0);
-  const lowStockTypes = stockData.filter(s => s.remaining < 20).length;
+  const totalInStore   = stockData.reduce((s, r) => s + r.remaining, 0);
+  const totalWithSups  = stockData.reduce((s, r) => s + (r.allocated ?? 0), 0);
+  const totalStock     = totalInStore + totalWithSups;
+  const lowStockTypes  = stockData.filter(s => s.remaining < 20).length;
 
   const effBadge = (eff: number) => {
     if (eff >= 95) return { label: "Excellent", cls: "bg-emerald-100 text-emerald-700 border-emerald-200" };
@@ -516,7 +532,7 @@ function ProductionDashboard() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">{format(new Date(), "EEEE, d MMMM")}</h1>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{format(now, "EEEE, d MMMM")}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Production overview — your shift today</p>
         </div>
         <Button onClick={() => setLocation("/production")} size="sm">
@@ -590,7 +606,7 @@ function ProductionDashboard() {
                     Net: b.quantityProduced - b.wasteQuantity,
                     "Efficiency (%)": b.quantityProduced > 0 ? Math.round(((b.quantityProduced - b.wasteQuantity) / b.quantityProduced) * 100) : 100,
                     Notes: b.notes ?? "",
-                  })), `batches-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
+                  })), `batches-${todayStr}.csv`)}>
                   <Download size={12} /> CSV
                 </Button>
               )}
@@ -669,8 +685,11 @@ function ProductionDashboard() {
                 <Package size={15} className="text-amber-400" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold tracking-tight">Stock by Bread Type</CardTitle>
-                <CardDescription className="text-xs">{totalStock} units in stock · {lowStockTypes > 0 ? `${lowStockTypes} type${lowStockTypes > 1 ? "s" : ""} running low` : "all levels ok"}</CardDescription>
+                <CardTitle className="text-sm font-bold tracking-tight">Remaining Stock</CardTitle>
+                <CardDescription className="text-xs">
+                  {totalInStore} in store · {totalWithSups} with suppliers
+                  {lowStockTypes > 0 ? ` · ${lowStockTypes} type${lowStockTypes > 1 ? "s" : ""} low` : ""}
+                </CardDescription>
               </div>
             </div>
           </div>
@@ -686,9 +705,11 @@ function ProductionDashboard() {
           ) : (
             <div className="divide-y divide-border/50">
               {stockData.map(item => {
-                const soldPct = item.produced > 0 ? Math.min(100, Math.round((item.sold / item.produced) * 100)) : 0;
-                const remainingPct = 100 - soldPct;
-                const isLow = item.remaining < 20;
+                const withSups   = item.allocated ?? 0;
+                const total      = item.remaining + withSups;
+                const inStorePct = total > 0 ? Math.round((item.remaining / total) * 100) : 0;
+                const supsPct    = total > 0 ? 100 - inStorePct : 0;
+                const isLow      = item.remaining < 20;
                 return (
                   <div key={item.name} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
@@ -696,20 +717,20 @@ function ProductionDashboard() {
                         <p className="font-semibold text-sm text-foreground">{item.name}</p>
                         {isLow && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Low</Badge>}
                       </div>
-                      <p className="text-sm font-bold text-foreground">{item.remaining}<span className="text-xs font-normal text-muted-foreground ml-1">left</span></p>
+                      <p className="text-sm font-bold text-foreground">{total}<span className="text-xs font-normal text-muted-foreground ml-1">total</span></p>
                     </div>
-                    {/* Stacked bar: remaining (amber) vs sold (slate) */}
+                    {/* Stacked bar: in-store (amber) vs with-suppliers (slate) */}
                     <div className="flex h-2 rounded-full overflow-hidden bg-muted gap-0.5">
-                      {remainingPct > 0 && (
-                        <div className={`h-full rounded-l-full ${isLow ? "bg-red-400" : "bg-amber-400"}`} style={{ width: `${remainingPct}%` }} />
+                      {inStorePct > 0 && (
+                        <div className={`h-full rounded-l-full ${isLow ? "bg-red-400" : "bg-amber-400"}`} style={{ width: `${inStorePct}%` }} />
                       )}
-                      {soldPct > 0 && (
-                        <div className="h-full rounded-r-full bg-slate-300" style={{ width: `${soldPct}%` }} />
+                      {supsPct > 0 && (
+                        <div className="h-full rounded-r-full bg-slate-400" style={{ width: `${supsPct}%` }} />
                       )}
                     </div>
                     <div className="flex justify-between mt-1">
-                      <p className="text-[11px] text-muted-foreground">{item.remaining} remaining</p>
-                      <p className="text-[11px] text-muted-foreground">{item.sold} sold of {item.produced}</p>
+                      <p className="text-[11px] text-muted-foreground">{item.remaining} in store</p>
+                      <p className="text-[11px] text-muted-foreground">{withSups} with suppliers</p>
                     </div>
                   </div>
                 );
@@ -828,7 +849,7 @@ function ManagerDashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard title="Active Products" value={loading ? "—" : `${data?.activeProductCount ?? 0}`} sub="in catalogue" icon={Layers} loading={loading} accent="amber" />
+        <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
         <KpiCard title={period === "today" ? "Revenue Today" : "Revenue This Week"} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} accent="green" />
         <KpiCard title={period === "today" ? "Units Sold Today" : "Units Sold This Week"} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
         <KpiCard title="Total In Stock" value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`} sub="across all types" icon={Package} loading={loading} accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"} />
