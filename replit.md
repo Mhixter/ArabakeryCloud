@@ -59,10 +59,11 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ### Roles & Access
 | Role | Pages |
 |------|-------|
-| managing_director | All pages + Company + Subscription |
-| manager | Dashboard, Production, Inventory, Reports |
-| receptionist | Dashboard, Sales |
-| production_staff | Production only |
+| managing_director | All pages + Company + Subscription + Users + User Activity + Audit Logs |
+| manager | Dashboard, Production, Inventory, Reports, User Activity |
+| receptionist | Dashboard, Sales, Allocations, Products |
+| supplier | Dashboard, Sales, Allocations |
+| production_staff | Dashboard, Production, Inventory |
 
 ### Seed Credentials (Demo Company: "New Model Bread")
 | Role | Username | Password |
@@ -83,7 +84,8 @@ Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
 - `/inventory` — Inventory management with low-stock alerts
 - `/reports` — Analytics charts (sales trend, production by type, efficiency pie chart)
 - `/users` — User management (MD only)
-- `/audit-logs` — Audit trail (MD only)
+- `/user-activity` — Staff performance dashboard: KPI cards per user, role filter tabs, click-to-detail sheet with role-specific metrics + recent activity feed (MD + manager)
+- `/audit-logs` — Audit trail with filters (action type, user, date range) + CSV export + pagination (MD only)
 - `/settings` — Branch management (MD only)
 - `/company-settings` — Company profile, logo upload (base64 ≤200KB), 5 theme colors (MD only)
 - `/subscription` — Subscription status + renewal (₦3,000/month) (MD only)
@@ -95,6 +97,9 @@ Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
 - `PATCH /api/company` — Update name/phone/address/logo/theme
 - `GET /api/subscription` — Subscription status (auto-expires trial)
 - `POST /api/subscription/renew` — Renew for 1 month
+- `GET /api/reports/user-activity` — All-user performance summary (MD + manager): salesCount, totalRevenue, batchesLogged, allocationsIssued, returnsApproved, lastActiveAt per user
+- `GET /api/reports/user-activity/:userId` — Detailed user activity: role-specific data (sales/returns/batches/allocations) + last 100 audit log entries
+- `GET /api/audit-logs` — Paginated audit log with filters: action, userId, branchId, startDate, endDate, limit, offset
 
 ### API Routes (Super Admin — /api/admin/*)
 - `POST /api/admin/auth/login` — Super admin login (returns 8h JWT with role: "super_admin")

@@ -12,6 +12,7 @@ import InventoryPage from "@/pages/inventory";
 import ReportsPage from "@/pages/reports";
 import UsersPage from "@/pages/users";
 import AuditLogsPage from "@/pages/audit-logs";
+import UserActivityPage from "@/pages/user-activity";
 import SettingsPage from "@/pages/settings";
 import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
@@ -116,6 +117,7 @@ function Router() {
       <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/users"><ProtectedRole roles={["managing_director"]}><UsersPage /></ProtectedRole></Route>
       <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
+      <Route path="/user-activity"><ProtectedRole roles={["managing_director","manager"]}><UserActivityPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>

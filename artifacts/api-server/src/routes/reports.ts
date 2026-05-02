@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable } from "@workspace/db";
-import { eq, and, isNull, gte, lte } from "drizzle-orm";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable, auditLogsTable, branchesTable } from "@workspace/db";
+import { eq, and, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -237,6 +237,142 @@ router.get("/reports/production-summary", authenticate, async (req: Authenticate
     breadTypeMap.set(b.breadType, { produced: existing.produced + b.quantityProduced, waste: existing.waste + b.wasteQuantity });
   }
   res.json({ totalProduced, totalWaste, wastePercentage, efficiency: 100 - wastePercentage, byBreadType: Array.from(breadTypeMap.entries()).map(([breadType, data]) => ({ breadType, totalProduced: data.produced, totalWaste: data.waste })) });
+});
+
+/* ── User activity summary (all users) ── */
+router.get("/reports/user-activity", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { companyId, role } = req.user!;
+  if (role !== "managing_director" && role !== "manager") { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const [users, allSales, allReturns, allBatches, allAllocations, lastLogs] = await Promise.all([
+    db.select().from(usersTable).where(and(eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt))),
+    db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt))),
+    db.select().from(productReturnsTable).where(eq(productReturnsTable.companyId, companyId)),
+    db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt))),
+    db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt))),
+    db.select({ userId: auditLogsTable.userId, createdAt: auditLogsTable.createdAt })
+      .from(auditLogsTable).where(eq(auditLogsTable.companyId, companyId))
+      .orderBy(desc(auditLogsTable.createdAt)),
+  ]);
+
+  const branches = await db.select().from(branchesTable).where(eq(branchesTable.companyId, companyId));
+  const branchMap = new Map(branches.map(b => [b.id, b.name]));
+
+  /* Last activity per user */
+  const lastActiveMap = new Map<number, string>();
+  for (const l of lastLogs) {
+    if (l.userId && !lastActiveMap.has(l.userId)) lastActiveMap.set(l.userId, l.createdAt.toISOString());
+  }
+
+  const result = users
+    .filter(u => u.role !== "managing_director")
+    .map(u => {
+      const uid = u.id;
+      const userSales = allSales.filter(s => s.cashierId === uid);
+      const supplierReturns = allReturns.filter(r => r.sellerId === uid);
+      const approvedReturns = allReturns.filter(r => r.receptionistId === uid && r.status === "approved");
+      const batches = allBatches.filter(b => b.staffId === uid);
+      const allocIssued = allAllocations.filter(a => a.issuedById === uid);
+
+      return {
+        id: uid,
+        fullName: u.fullName,
+        role: u.role,
+        agentId: u.agentId,
+        branchId: u.branchId,
+        branchName: u.branchId ? branchMap.get(u.branchId) ?? null : null,
+        lastActiveAt: lastActiveMap.get(uid) ?? null,
+        /* Sales stats */
+        salesCount: userSales.length,
+        totalRevenue: userSales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
+        totalUnitsSold: userSales.reduce((s, x) => s + x.quantity, 0),
+        /* Returns */
+        returnsSubmitted: supplierReturns.length,
+        returnsApproved: approvedReturns.length,
+        /* Production */
+        batchesLogged: batches.length,
+        totalProduced: batches.reduce((s, b) => s + b.quantityProduced, 0),
+        totalWaste: batches.reduce((s, b) => s + b.wasteQuantity, 0),
+        /* Allocations issued (receptionist) */
+        allocationsIssued: allocIssued.length,
+        totalAllocatedUnits: allocIssued.reduce((s, a) => s + a.quantity, 0),
+      };
+    });
+
+  res.json(result);
+});
+
+/* ── User activity detail (single user) ── */
+router.get("/reports/user-activity/:userId", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { companyId, role } = req.user!;
+  if (role !== "managing_director" && role !== "manager") { res.status(403).json({ error: "Forbidden" }); return; }
+  const targetId = parseInt(Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId);
+  if (isNaN(targetId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+
+  const [userRows, recentLogs] = await Promise.all([
+    db.select().from(usersTable).where(and(eq(usersTable.id, targetId), eq(usersTable.companyId, companyId))),
+    db.select().from(auditLogsTable)
+      .where(and(eq(auditLogsTable.userId, targetId), eq(auditLogsTable.companyId, companyId)))
+      .orderBy(desc(auditLogsTable.createdAt))
+      .limit(100),
+  ]);
+  const user = userRows[0];
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const targetRole = user.role;
+
+  const [userSales, supplierReturns, approvedByUser, batches, allocIssued] = await Promise.all([
+    db.select({ sale: salesTable }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+      .where(and(eq(salesTable.cashierId, targetId), isNull(salesTable.deletedAt))).orderBy(desc(salesTable.saleDate)),
+    targetRole === "supplier"
+      ? db.select().from(productReturnsTable).where(eq(productReturnsTable.sellerId, targetId)).orderBy(desc(productReturnsTable.returnDate))
+      : Promise.resolve([]),
+    (targetRole === "receptionist" || targetRole === "manager" || targetRole === "managing_director")
+      ? db.select().from(productReturnsTable).where(and(eq(productReturnsTable.receptionistId, targetId), eq(productReturnsTable.status, "approved" as const))).orderBy(desc(productReturnsTable.returnDate))
+      : Promise.resolve([]),
+    targetRole === "production_staff"
+      ? db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.staffId, targetId), isNull(productionBatchesTable.deletedAt))).orderBy(desc(productionBatchesTable.productionDate))
+      : Promise.resolve([]),
+    (targetRole === "receptionist" || targetRole === "manager" || targetRole === "managing_director")
+      ? db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.issuedById, targetId), isNull(sellerAllocationsTable.deletedAt))).orderBy(desc(sellerAllocationsTable.allocationDate))
+      : Promise.resolve([]),
+  ]);
+
+  const branches = await db.select().from(branchesTable).where(eq(branchesTable.companyId, companyId));
+  const branchMap = new Map(branches.map(b => [b.id, b.name]));
+
+  res.json({
+    user: {
+      id: user.id, fullName: user.fullName, role: user.role, agentId: user.agentId,
+      branchName: user.branchId ? branchMap.get(user.branchId) ?? null : null,
+    },
+    sales: userSales.map(({ sale: s }) => ({
+      id: s.id, breadType: s.breadType, quantity: s.quantity,
+      totalAmount: parseFloat(s.totalAmount as unknown as string),
+      paymentMethod: s.paymentMethod, saleDate: s.saleDate.toISOString(),
+      receiptNumber: s.receiptNumber,
+    })),
+    returns: (supplierReturns as typeof productReturnsTable.$inferSelect[]).map(r => ({
+      id: r.id, breadType: r.breadType, quantity: r.quantity, reason: r.reason,
+      status: r.status, returnDate: r.returnDate.toISOString(),
+    })),
+    approvedReturns: (approvedByUser as typeof productReturnsTable.$inferSelect[]).map(r => ({
+      id: r.id, breadType: r.breadType, quantity: r.quantity, reason: r.reason,
+      returnDate: r.returnDate.toISOString(),
+    })),
+    batches: (batches as typeof productionBatchesTable.$inferSelect[]).map(b => ({
+      id: b.id, breadType: b.breadType, quantityProduced: b.quantityProduced,
+      wasteQuantity: b.wasteQuantity, productionDate: b.productionDate.toISOString(),
+    })),
+    allocationsIssued: (allocIssued as typeof sellerAllocationsTable.$inferSelect[]).map(a => ({
+      id: a.id, breadType: a.breadType, quantity: a.quantity,
+      allocationDate: a.allocationDate.toISOString(),
+    })),
+    recentLogs: recentLogs.map(l => ({
+      id: l.id, action: l.action, entityType: l.entityType,
+      details: l.details, createdAt: l.createdAt.toISOString(),
+    })),
+  });
 });
 
 export default router;
