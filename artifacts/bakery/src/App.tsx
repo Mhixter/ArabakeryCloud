@@ -29,7 +29,7 @@ import LandingPricing from "@/pages/landing/pricing";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { initTheme } from "@/lib/theme";
 import SubscriptionGuard from "@/components/subscription-guard";
-import { BranchProvider } from "@/lib/branch-context";
+import { BranchProvider, useActiveBranch } from "@/lib/branch-context";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
@@ -78,6 +78,15 @@ function ProtectedRole({ roles, children }: { roles: string[]; children: React.R
   );
 }
 
+/**
+ * Wraps a branch-aware page so it fully remounts whenever the active branch
+ * changes — clean slate data, no stale state, no flash.
+ */
+function BranchedPage({ children }: { children: React.ReactNode }) {
+  const { activeBranch } = useActiveBranch();
+  return <div key={activeBranch?.id ?? "all"}>{children}</div>;
+}
+
 function Router() {
   return (
     <Switch>
@@ -97,16 +106,18 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettingsPage} />
       <Route path="/admin"><AdminDashboardPage /></Route>
 
-      {/* Bakery app — each route enforces the roles that match the nav definition */}
-      <Route path="/dashboard"><Protected><DashboardPage /></Protected></Route>
-      <Route path="/sales"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><SalesPage /></ProtectedRole></Route>
-      <Route path="/production"><ProtectedRole roles={["managing_director","manager","production_staff"]}><ProductionPage /></ProtectedRole></Route>
-      <Route path="/inventory"><ProtectedRole roles={["managing_director","manager"]}><InventoryPage /></ProtectedRole></Route>
-      <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><ReportsPage /></ProtectedRole></Route>
+      {/* Bakery app — each route enforces the roles that match the nav definition.
+          Branch-aware pages are wrapped in BranchedPage so they fully remount
+          whenever the active branch changes — clean data, no stale state. */}
+      <Route path="/dashboard"><Protected><BranchedPage><DashboardPage /></BranchedPage></Protected></Route>
+      <Route path="/sales"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><SalesPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/production"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><ProductionPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/inventory"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><InventoryPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/users"><ProtectedRole roles={["managing_director"]}><UsersPage /></ProtectedRole></Route>
       <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
-      <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><AllocationsPage /></ProtectedRole></Route>
+      <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>
       <Route path="/company-settings"><ProtectedRole roles={["managing_director"]}><CompanySettingsPage /></ProtectedRole></Route>
       <Route path="/subscription"><ProtectedRole roles={["managing_director"]}><SubscriptionPage /></ProtectedRole></Route>
