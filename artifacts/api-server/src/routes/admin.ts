@@ -168,6 +168,30 @@ router.put("/admin/gateway", authenticateSuperAdmin, async (req: any, res) => {
   res.json(created);
 });
 
+/* ─ Reset MD password for a company ─ */
+router.patch("/admin/companies/:id/reset-password", authenticateSuperAdmin, async (req, res) => {
+  const companyId = parseInt(req.params.id);
+  const { newPassword } = req.body ?? {};
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: "New password must be at least 4 characters" });
+  }
+
+  const md = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.companyId, companyId));
+
+  const managingDirector = md.find(u => u.role === "managing_director" && !u.deletedAt);
+  if (!managingDirector) return res.status(404).json({ error: "Managing Director not found for this company" });
+
+  await db
+    .update(usersTable)
+    .set({ passwordHash: hashPassword(newPassword) })
+    .where(eq(usersTable.id, managingDirector.id));
+
+  res.json({ success: true, message: `Password reset for ${managingDirector.username}` });
+});
+
 /* ─ Transactions ─ */
 router.get("/admin/transactions", authenticateSuperAdmin, async (_req, res) => {
   const txs = await db

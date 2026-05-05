@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Users, Pencil, Trash2, KeyRound } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
-import { getToken } from "@/lib/auth";
+import { getToken, getStoredUser } from "@/lib/auth";
 
 const ROLES = [
   { value: "managing_director", label: "Managing Director" },
@@ -45,6 +45,8 @@ export default function UsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { activeBranch } = useActiveBranch();
+  const currentUser = getStoredUser();
+  const isManager = currentUser?.role === "manager";
 
   const [showNew, setShowNew] = useState(false);
   const [editUser, setEditUser] = useState<{ id: number; fullName: string; role: string; branchId: number | null } | null>(null);
@@ -180,10 +182,12 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-foreground">Users</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage staff accounts and permissions</p>
         </div>
-        <Button onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-new-user">
-          <Plus size={16} className="mr-2" />
-          Add User
-        </Button>
+        {!isManager && (
+          <Button onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-new-user">
+            <Plus size={16} className="mr-2" />
+            Add User
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -231,39 +235,46 @@ export default function UsersPage() {
                       <TableCell className="text-muted-foreground text-sm">{user.branchName ?? "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            title="Reset Password"
-                            disabled={isExpired}
-                            onClick={() => { setResetUser(user); setNewPassword(""); }}
-                          >
-                            <KeyRound size={13} />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            data-testid={`button-edit-user-${user.id}`}
-                            disabled={isExpired}
-                            onClick={() => {
-                              setEditUser({ id: user.id, fullName: user.fullName, role: user.role, branchId: user.branchId ?? null });
-                              setEditForm({ fullName: user.fullName, role: user.role, branchId: user.branchId?.toString() ?? "", password: "" });
-                            }}
-                          >
-                            <Pencil size={13} />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            data-testid={`button-delete-user-${user.id}`}
-                            disabled={isExpired}
-                            onClick={() => setDeleteConfirm(user.id)}
-                          >
-                            <Trash2 size={13} />
-                          </Button>
+                          {/* managers can reset passwords for non-MD users only */}
+                          {(!isManager || user.role !== "managing_director") && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Reset Password"
+                              disabled={isExpired}
+                              onClick={() => { setResetUser(user); setNewPassword(""); }}
+                            >
+                              <KeyRound size={13} />
+                            </Button>
+                          )}
+                          {!isManager && (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                data-testid={`button-edit-user-${user.id}`}
+                                disabled={isExpired}
+                                onClick={() => {
+                                  setEditUser({ id: user.id, fullName: user.fullName, role: user.role, branchId: user.branchId ?? null });
+                                  setEditForm({ fullName: user.fullName, role: user.role, branchId: user.branchId?.toString() ?? "", password: "" });
+                                }}
+                              >
+                                <Pencil size={13} />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                data-testid={`button-delete-user-${user.id}`}
+                                disabled={isExpired}
+                                onClick={() => setDeleteConfirm(user.id)}
+                              >
+                                <Trash2 size={13} />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Search, Building2, CheckCircle, Clock, XCircle, MoreVertical } from "lucide-react";
+import { Search, Building2, CheckCircle, Clock, XCircle, MoreVertical, KeyRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -54,6 +55,11 @@ export default function AdminCompaniesPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
+  const [resetCompany, setResetCompany] = useState<Company | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
+
   const token = getAdminToken();
 
   const loadCompanies = useCallback(() => {
@@ -73,6 +79,30 @@ export default function AdminCompaniesPage() {
     setEditStatus(co.subStatus ?? "active");
     setEditDays("30");
     setSaveMsg("");
+  };
+
+  const handleResetMDPassword = async () => {
+    if (!resetCompany || !token) return;
+    if (!resetPassword || resetPassword.length < 4) {
+      setResetMsg("✗ Password must be at least 4 characters");
+      return;
+    }
+    setResetting(true); setResetMsg("");
+    try {
+      const res = await fetch(`/api/admin/companies/${resetCompany.id}/reset-password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newPassword: resetPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      setResetMsg("✓ Password reset successfully");
+      setResetPassword("");
+    } catch (e) {
+      setResetMsg(`✗ ${(e as Error).message}`);
+    } finally {
+      setResetting(false);
+    }
   };
 
   const handleSaveSubscription = async () => {
@@ -190,9 +220,14 @@ export default function AdminCompaniesPage() {
                           {co.createdAt ? format(new Date(co.createdAt), "MMM d, yyyy") : "—"}
                         </td>
                         <td className="px-5 py-3.5">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(co)} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700">
-                            <MoreVertical size={15} />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => { setResetCompany(co); setResetPassword(""); setResetMsg(""); }} className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600" title="Reset MD Password">
+                              <KeyRound size={14} />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(co)} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700" title="Manage Subscription">
+                              <MoreVertical size={15} />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -203,6 +238,39 @@ export default function AdminCompaniesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Reset MD Password dialog */}
+      <Dialog open={!!resetCompany} onOpenChange={open => { if (!open) { setResetCompany(null); setResetMsg(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset MD Password — {resetCompany?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for the <span className="font-medium text-foreground">Managing Director</span> of <span className="font-medium text-foreground">{resetCompany?.name}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                placeholder="Min. 4 characters"
+                value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleResetMDPassword()}
+              />
+            </div>
+            {resetMsg && (
+              <p className={`text-sm font-medium ${resetMsg.startsWith("✓") ? "text-green-600" : "text-red-600"}`}>{resetMsg}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetCompany(null); setResetMsg(""); }}>Cancel</Button>
+            <Button onClick={handleResetMDPassword} disabled={resetting}>
+              {resetting ? "Resetting…" : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit subscription dialog */}
       <Dialog open={!!selectedCompany} onOpenChange={open => { if (!open) setSelectedCompany(null); }}>

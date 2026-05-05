@@ -96,8 +96,8 @@ router.patch("/users/:id", authenticate, requireRole("managing_director"), async
   res.json(formatUser(user));
 });
 
-/* Reset password — managing_director only */
-router.patch("/users/:id/reset-password", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+/* Reset password — managing_director can reset any user; manager can reset any user except managing_director */
+router.patch("/users/:id/reset-password", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
@@ -109,6 +109,10 @@ router.patch("/users/:id/reset-password", authenticate, requireRole("managing_di
 
   const [existing] = await db.select().from(usersTable).where(and(eq(usersTable.id, id), eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)));
   if (!existing) { res.status(404).json({ error: "User not found" }); return; }
+
+  if (req.user!.role === "manager" && existing.role === "managing_director") {
+    res.status(403).json({ error: "Managers cannot reset the Managing Director's password" }); return;
+  }
 
   const [user] = await db.update(usersTable).set({ passwordHash: hashPassword(newPassword) }).where(and(eq(usersTable.id, id), eq(usersTable.companyId, companyId))).returning();
   await logAudit({ req, userId: req.user!.userId, companyId, action: "PASSWORD_RESET", entityType: "user", entityId: id, details: `Password reset for ${existing.username}` });

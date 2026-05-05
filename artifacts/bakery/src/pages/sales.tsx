@@ -105,7 +105,6 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
   <hr class="divider"/>
   <div class="row"><span class="label">Receipt No.</span><span class="bold">${sale.receiptNumber}</span></div>
   <div class="row"><span class="label">Date</span><span>${format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span></div>
-  <div class="row"><span class="label">${roleLabel || "Served by"}</span><span>${sale.cashierName}</span></div>
   <hr class="divider"/>
   <div class="row"><span class="label">Item</span><span>${sale.breadType}</span></div>
   <div class="row"><span class="label">Qty × Price</span><span>${sale.quantity} × ${formatCurrency(sale.pricePerUnit)}</span></div>
@@ -168,10 +167,6 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             <div className="flex justify-between">
               <span className="text-muted-foreground">Date</span>
               <span>{format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{roleLabel ?? "Served by"}</span>
-              <span className="font-medium">{sale.cashierName}</span>
             </div>
           </div>
 
