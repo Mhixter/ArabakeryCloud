@@ -4,7 +4,7 @@ import { hashPassword } from "./lib/auth";
 
 async function seedSuperAdmin() {
   const username = "saidumuhammed664@gmail.com";
-  const password = "Mhixter@664";
+  const password = "Mhixter664@gmail.com";
 
   const existing = await db
     .select()

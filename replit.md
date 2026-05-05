@@ -111,7 +111,7 @@ Run seed: `cd artifacts/api-server && pnpm exec tsx src/seed.ts`
 ### Super Admin Credentials
 | Email | Password |
 |-------|----------|
-| saidumuhammed664@gmail.com | Mhixter@664 |
+| saidumuhammed664@gmail.com | Mhixter664@gmail.com |
 
 Access at: `/admin/login` → `/admin` (dashboard) → `/admin/companies` → `/admin/settings` (payment gateway)
 Super admin has its own dark blue UI (separate from bakery theme system).

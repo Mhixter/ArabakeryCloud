@@ -27,7 +27,7 @@ async function ensureSuperAdmin() {
     await db.delete(superAdminsTable).where(eq(superAdminsTable.username, "superadmin"));
     await db.insert(superAdminsTable).values({
       username,
-      passwordHash: hashPassword("Mhixter@664"),
+      passwordHash: hashPassword("Mhixter664@gmail.com"),
       fullName: "Platform Administrator",
       isActive: true,
     });
