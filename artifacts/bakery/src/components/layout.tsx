@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import NotificationsDropdown from "@/components/notifications-dropdown";
 
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
@@ -290,8 +291,9 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
           </span>
         </div>
 
-        <div className="hidden lg:flex items-center gap-3 flex-shrink-0 border-l border-sidebar-border pl-4 ml-2">
-          <div className="text-right">
+        <div className="hidden lg:flex items-center gap-2 flex-shrink-0 border-l border-sidebar-border pl-4 ml-2">
+          <NotificationsDropdown themeClass="sidebar" />
+          <div className="text-right ml-1">
             <p className="text-xs font-semibold text-sidebar-foreground leading-none">{user?.fullName ?? "User"}</p>
             <p className="text-[10px] text-sidebar-foreground/50 mt-0.5">{ROLE_LABELS[userRole] ?? userRole}</p>
           </div>
@@ -299,6 +301,10 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
             className="p-1.5 rounded hover:bg-destructive/20 hover:text-destructive text-sidebar-foreground/60 transition-colors">
             <LogOut size={15} />
           </button>
+        </div>
+        {/* Mobile bell */}
+        <div className="flex lg:hidden items-center mr-2 flex-shrink-0">
+          <NotificationsDropdown />
         </div>
       </header>
 
@@ -426,9 +432,12 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
               {company?.name ?? "Ara Bakery Cloud"}
             </span>
           </div>
-          {/* User initial avatar */}
-          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-            <span className="text-amber-700 font-bold text-xs">{(user?.fullName ?? "U").charAt(0).toUpperCase()}</span>
+          <div className="flex items-center gap-2">
+            <NotificationsDropdown />
+            {/* User initial avatar */}
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+              <span className="text-amber-700 font-bold text-xs">{(user?.fullName ?? "U").charAt(0).toUpperCase()}</span>
+            </div>
           </div>
         </header>
 
