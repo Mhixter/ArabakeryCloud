@@ -751,6 +751,7 @@ interface ProductDashboard {
   activeProductCount: number;
   today: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
   week: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
+  allTime: { totalAmount: number; totalQuantity: number; salesCount: number };
   remaining: { name: string; produced: number; sold: number; allocated: number; remaining: number }[];
 }
 
@@ -874,9 +875,11 @@ function ManagerDashboard() {
 
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
-        <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} accent="green" />
-        <KpiCard title={`Units Sold — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
         <KpiCard title="Total In Stock" value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`} sub="across all types" icon={Package} loading={loading} accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"} />
+        <KpiCard title="Total Revenue" value={loading ? "—" : formatCurrency(data?.allTime?.totalAmount ?? 0)} sub={`${data?.allTime?.salesCount ?? 0} orders all time`} icon={TrendingUp} loading={loading} accent="green" />
+        <KpiCard title="Total Sold" value={loading ? "—" : `${data?.allTime?.totalQuantity ?? 0}`} sub="units all time" icon={ShoppingCart} loading={loading} accent="amber" />
+        <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} />
+        <KpiCard title={`Units Sold — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
       </div>
 
       {/* Sales by product */}

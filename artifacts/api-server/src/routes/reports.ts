@@ -195,6 +195,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       salesCount: weekSales.length,
       byProduct: aggregateByProduct(weekSales),
     },
+    allTime: {
+      totalAmount: allSalesEver.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
+      totalQuantity: allSalesEver.reduce((s, x) => s + x.sale.quantity, 0),
+      salesCount: allSalesEver.length,
+    },
     remaining,
   });
 });
