@@ -20,12 +20,14 @@ import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } 
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
-/** Per-company receipt storage — prevents receipts leaking between different companies */
+/** Per-user receipt storage — prevents receipts leaking between suppliers/users in the same company */
 function getSlipsKey(): string {
   try {
     const raw = localStorage.getItem("nmb_user");
     const user = raw ? JSON.parse(raw) : null;
-    return user?.companyId ? `nmb_slips_${user.companyId}` : "nmb_slips";
+    if (user?.companyId && user?.id) return `nmb_slips_${user.companyId}_${user.id}`;
+    if (user?.companyId) return `nmb_slips_${user.companyId}`;
+    return "nmb_slips";
   } catch { return "nmb_slips"; }
 }
 

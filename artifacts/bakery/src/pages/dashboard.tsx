@@ -317,12 +317,13 @@ function ReceptionistDashboard() {
         }
       />
 
-      {/* Daily KPIs — no total revenue */}
+      {/* Daily KPIs */}
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Sales Today" value={`${dailySummary?.totalSales ?? 0}`} sub="orders" icon={ShoppingCart} loading={dailyLoading} />
         <KpiCard title="Units Sold" value={`${todayUnits}`} sub="today" icon={Package} loading={dailyLoading} accent="amber" />
         <KpiCard title="Cash Collected" value={formatCurrency(dailySummary?.cashSales ?? 0)} sub="cash today" icon={TrendingUp} loading={dailyLoading} accent="green" />
         <KpiCard title="Pending Returns" value={`${todayPendingReturns.length}`} sub="from suppliers today" icon={RotateCcw} loading={stockLoading} accent={todayPendingReturns.length > 0 ? "red" : "default"} />
+        <KpiCard title="Total In Stock" value={stockLoading ? "—" : `${stockData.reduce((s, i) => s + i.remaining, 0)}`} sub="across all types" icon={Layers} loading={stockLoading} accent={stockData.some(i => i.remaining < 10) ? "red" : "default"} />
       </div>
 
       {/* Remaining stock by bread type */}
@@ -764,17 +765,22 @@ function ManagerDashboard() {
   /* activeBranch already comes from localStorage (via BranchContext initBranch).
      Use it directly as the single source of truth — avoids the bug where
      user.branchId (the MD's own home branch) would shadow a persisted selection. */
-  const [period, setPeriod] = useState<"today" | "week">("today");
+  const [period, setPeriod] = useState<"today" | "week" | "date">("today");
+  const [customDate, setCustomDate] = useState<string>("");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
   /* selectedBranchId mirrors context — updated when user picks from dropdown */
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(activeBranch?.id ?? null);
 
-  const fetchDashboard = useCallback((branchId: number | null) => {
+  const fetchDashboard = useCallback((branchId: number | null, date?: string) => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const url = `/api/reports/product-dashboard${branchId ? `?branchId=${branchId}` : ""}`;
+    const params = new URLSearchParams();
+    if (branchId) params.set("branchId", branchId.toString());
+    if (date) params.set("date", date);
+    const qs = params.toString();
+    const url = `/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
     setLoading(true);
     fetch(url, { headers, credentials: "include" })
       .then(r => r.ok ? r.json() : null)
@@ -796,9 +802,18 @@ function ManagerDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirector, fetchDashboard]);
 
-  useEffect(() => { fetchDashboard(selectedBranchId); }, [selectedBranchId, fetchDashboard]);
+  useEffect(() => {
+    fetchDashboard(selectedBranchId, period === "date" && customDate ? customDate : undefined);
+  }, [selectedBranchId, fetchDashboard]);
 
-  const periodData = data ? data[period] : null;
+  /* When user picks a custom date, re-fetch */
+  useEffect(() => {
+    if (period === "date" && customDate) fetchDashboard(selectedBranchId, customDate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customDate]);
+
+  const periodData = data ? (period === "date" ? data["today"] : data[period]) : null;
+  const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : customDate ? format(new Date(customDate + "T12:00:00"), "d MMM yyyy") : "Selected Date";
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -839,19 +854,28 @@ function ManagerDashboard() {
         </div>
       )}
 
-      <div className="flex gap-2">
-        {(["today", "week"] as const).map(p => (
+      <div className="flex flex-wrap gap-2 items-center">
+        {(["today", "week", "date"] as const).map(p => (
           <button key={p} onClick={() => setPeriod(p)}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${period === p ? "bg-amber-400 text-slate-950" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            {p === "today" ? "Today" : "This Week"}
+            {p === "today" ? "Today" : p === "week" ? "This Week" : "Pick Date"}
           </button>
         ))}
+        {period === "date" && (
+          <input
+            type="date"
+            value={customDate}
+            max={format(new Date(), "yyyy-MM-dd")}
+            onChange={e => setCustomDate(e.target.value)}
+            className="text-sm border border-border rounded-xl px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
-        <KpiCard title={period === "today" ? "Revenue Today" : "Revenue This Week"} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} accent="green" />
-        <KpiCard title={period === "today" ? "Units Sold Today" : "Units Sold This Week"} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
+        <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} accent="green" />
+        <KpiCard title={`Units Sold — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
         <KpiCard title="Total In Stock" value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`} sub="across all types" icon={Package} loading={loading} accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"} />
       </div>
 
@@ -863,7 +887,7 @@ function ManagerDashboard() {
               <ShoppingCart size={15} className="text-amber-400" />
             </div>
             <div>
-              <CardTitle className="text-sm font-bold tracking-tight">Sold by Product — {period === "today" ? "Today" : "This Week"}</CardTitle>
+              <CardTitle className="text-sm font-bold tracking-tight">Sold by Product — {periodLabel}</CardTitle>
               <CardDescription className="text-xs">Units and revenue per bread type</CardDescription>
             </div>
           </div>
@@ -874,7 +898,7 @@ function ManagerDashboard() {
           ) : !periodData?.byProduct?.length ? (
             <div className="text-center py-10 text-muted-foreground">
               <Package size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No sales {period === "today" ? "today" : "this week"} yet.</p>
+              <p className="text-sm">No sales {period === "date" ? `on ${periodLabel}` : period === "today" ? "today" : "this week"} yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">

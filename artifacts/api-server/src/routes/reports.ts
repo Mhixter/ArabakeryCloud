@@ -46,13 +46,15 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
 /* ── Product-focused dashboard (new) ── */
 router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId, role, branchId: userBranchId } = req.user!;
-  const { branchId: queryBranchId } = req.query as { branchId?: string };
+  const { branchId: queryBranchId, date: queryDate } = req.query as { branchId?: string; date?: string };
   const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
     : role !== "managing_director" ? userBranchId : null;
+  /* Support custom date for "view by date" filter — fallback to today */
+  const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
   const now = new Date();
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const todayStart = new Date(baseDate); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(baseDate); todayEnd.setHours(23, 59, 59, 999);
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
 
   const activeProducts = await db
