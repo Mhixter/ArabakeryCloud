@@ -873,13 +873,23 @@ function ManagerDashboard() {
         )}
       </div>
 
+      {/* Stock overview */}
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
         <KpiCard title="Total In Stock" value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`} sub="across all types" icon={Package} loading={loading} accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"} />
-        <KpiCard title="Total Revenue" value={loading ? "—" : formatCurrency(data?.allTime?.totalAmount ?? 0)} sub={`${data?.allTime?.salesCount ?? 0} orders all time`} icon={TrendingUp} loading={loading} accent="green" />
-        <KpiCard title="Total Sold" value={loading ? "—" : `${data?.allTime?.totalQuantity ?? 0}`} sub="units all time" icon={ShoppingCart} loading={loading} accent="amber" />
+      </div>
+
+      {/* All-time totals — always visible regardless of period */}
+      <div className="grid grid-cols-3 gap-3">
+        <KpiCard title="Total Revenue" value={loading ? "—" : formatCurrency(data?.allTime?.totalAmount ?? 0)} sub="all time" icon={TrendingUp} loading={loading} accent="green" />
+        <KpiCard title="Total Orders" value={loading ? "—" : `${data?.allTime?.salesCount ?? 0}`} sub="all time" icon={FileText} loading={loading} accent="amber" />
+        <KpiCard title="Total Sold" value={loading ? "—" : `${data?.allTime?.totalQuantity ?? 0}`} sub="units all time" icon={ShoppingCart} loading={loading} />
+      </div>
+
+      {/* Period-filtered totals */}
+      <div className="grid grid-cols-2 gap-3">
         <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} />
-        <KpiCard title={`Units Sold — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
+        <KpiCard title={`Units — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
       </div>
 
       {/* Sales by product */}
