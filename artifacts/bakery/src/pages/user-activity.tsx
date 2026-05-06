@@ -29,6 +29,9 @@ type UserSummary = {
   totalWaste: number;
   allocationsIssued: number;
   totalAllocatedUnits: number;
+  allocationsReceived: number;
+  totalReceivedUnits: number;
+  inHandUnits: number;
 };
 
 type SaleItem = { id: number; breadType: string; quantity: number; totalAmount: number; paymentMethod: string; saleDate: string; receiptNumber?: string | null };
@@ -44,6 +47,7 @@ type UserDetail = {
   approvedReturns: ReturnItem[];
   batches: BatchItem[];
   allocationsIssued: AllocItem[];
+  allocationsReceived: AllocItem[];
   recentLogs: LogEntry[];
 };
 
@@ -92,14 +96,24 @@ function KpiCard({ label, value, sub }: { label: string; value: string | number;
 function SupplierDetail({ d }: { d: UserDetail }) {
   const totalReturn = d.returns.reduce((s, r) => s + r.quantity, 0);
   const approvedReturn = d.returns.filter(r => r.status === "approved").reduce((s, r) => s + r.quantity, 0);
+  const totalReceived = d.allocationsReceived.reduce((s, a) => s + a.quantity, 0);
+  const totalSoldUnits = d.sales.reduce((s, x) => s + x.quantity, 0);
+  const inHand = Math.max(0, totalReceived - totalSoldUnits - approvedReturn);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Total Sales" value={d.sales.length} sub={`${d.sales.reduce((s,x) => s+x.quantity,0)} units`} />
+        <KpiCard label="Total Sales" value={d.sales.length} sub={`${totalSoldUnits} units sold`} />
         <KpiCard label="Revenue" value={fmtCurrency(d.sales.reduce((s,x) => s+x.totalAmount,0))} />
+        <KpiCard label="Allocated to Them" value={totalReceived} sub={`${d.allocationsReceived.length} batch${d.allocationsReceived.length !== 1 ? "es" : ""}`} />
+        <KpiCard label="In Hand (Unsold)" value={inHand} sub={inHand > 0 ? "units still with supplier" : "fully accounted"} />
         <KpiCard label="Returns Submitted" value={d.returns.length} sub={`${totalReturn} units`} />
         <KpiCard label="Returns Approved" value={d.returns.filter(r=>r.status==="approved").length} sub={`${approvedReturn} units refunded`} />
       </div>
+      {d.allocationsReceived.length > 0 && d.sales.length === 0 && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+          This supplier has <span className="font-semibold">{inHand} units</span> in hand but has not recorded any sales yet. Ask them to log their sales through the app.
+        </div>
+      )}
       {d.sales.length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recent Sales</h4>
@@ -192,8 +206,8 @@ function UserCard({ u, onClick }: { u: UserSummary; onClick: () => void }) {
   const stats: { label: string; value: string }[] = [];
   if (u.role === "supplier") {
     stats.push({ label: "Sales", value: u.salesCount.toLocaleString() });
+    stats.push({ label: "In Hand", value: u.inHandUnits.toLocaleString() });
     stats.push({ label: "Revenue", value: fmtCurrency(u.totalRevenue) });
-    stats.push({ label: "Returns", value: u.returnsSubmitted.toLocaleString() });
   } else if (u.role === "receptionist" || u.role === "manager") {
     stats.push({ label: "Sales Handled", value: u.salesCount.toLocaleString() });
     stats.push({ label: "Allocations", value: u.allocationsIssued.toLocaleString() });

@@ -280,6 +280,12 @@ router.get("/reports/user-activity", authenticate, async (req: AuthenticatedRequ
       const approvedReturns = allReturns.filter(r => r.receptionistId === uid && r.status === "approved");
       const batches = allBatches.filter(b => b.staffId === uid);
       const allocIssued = allAllocations.filter(a => a.issuedById === uid);
+      /* Allocations received by this user (as a supplier) */
+      const allocReceived = allAllocations.filter(a => a.sellerId === uid);
+      const totalReceivedUnits = allocReceived.reduce((s, a) => s + a.quantity, 0);
+      const unitsSold = userSales.reduce((s, x) => s + x.quantity, 0);
+      const unitsReturned = supplierReturns.filter(r => r.status === "approved").reduce((s, r) => s + r.quantity, 0);
+      const inHandUnits = Math.max(0, totalReceivedUnits - unitsSold - unitsReturned);
 
       return {
         id: uid,
@@ -292,7 +298,7 @@ router.get("/reports/user-activity", authenticate, async (req: AuthenticatedRequ
         /* Sales stats */
         salesCount: userSales.length,
         totalRevenue: userSales.reduce((s, x) => s + parseFloat(x.totalAmount as unknown as string), 0),
-        totalUnitsSold: userSales.reduce((s, x) => s + x.quantity, 0),
+        totalUnitsSold: unitsSold,
         /* Returns */
         returnsSubmitted: supplierReturns.length,
         returnsApproved: approvedReturns.length,
@@ -300,9 +306,13 @@ router.get("/reports/user-activity", authenticate, async (req: AuthenticatedRequ
         batchesLogged: batches.length,
         totalProduced: batches.reduce((s, b) => s + b.quantityProduced, 0),
         totalWaste: batches.reduce((s, b) => s + b.wasteQuantity, 0),
-        /* Allocations issued (receptionist) */
+        /* Allocations issued (receptionist/manager) */
         allocationsIssued: allocIssued.length,
         totalAllocatedUnits: allocIssued.reduce((s, a) => s + a.quantity, 0),
+        /* Allocations received (supplier) */
+        allocationsReceived: allocReceived.length,
+        totalReceivedUnits,
+        inHandUnits,
       };
     });
 
@@ -328,7 +338,7 @@ router.get("/reports/user-activity/:userId", authenticate, async (req: Authentic
 
   const targetRole = user.role;
 
-  const [userSales, supplierReturns, approvedByUser, batches, allocIssued] = await Promise.all([
+  const [userSales, supplierReturns, approvedByUser, batches, allocIssued, allocReceived] = await Promise.all([
     db.select({ sale: salesTable }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
       .where(and(eq(salesTable.cashierId, targetId), isNull(salesTable.deletedAt))).orderBy(desc(salesTable.saleDate)),
     targetRole === "supplier"
@@ -342,6 +352,9 @@ router.get("/reports/user-activity/:userId", authenticate, async (req: Authentic
       : Promise.resolve([]),
     (targetRole === "receptionist" || targetRole === "manager" || targetRole === "managing_director")
       ? db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.issuedById, targetId), isNull(sellerAllocationsTable.deletedAt))).orderBy(desc(sellerAllocationsTable.allocationDate))
+      : Promise.resolve([]),
+    targetRole === "supplier"
+      ? db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.sellerId, targetId), isNull(sellerAllocationsTable.deletedAt))).orderBy(desc(sellerAllocationsTable.allocationDate))
       : Promise.resolve([]),
   ]);
 
@@ -372,6 +385,10 @@ router.get("/reports/user-activity/:userId", authenticate, async (req: Authentic
       wasteQuantity: b.wasteQuantity, productionDate: b.productionDate.toISOString(),
     })),
     allocationsIssued: (allocIssued as typeof sellerAllocationsTable.$inferSelect[]).map(a => ({
+      id: a.id, breadType: a.breadType, quantity: a.quantity,
+      allocationDate: a.allocationDate.toISOString(),
+    })),
+    allocationsReceived: (allocReceived as typeof sellerAllocationsTable.$inferSelect[]).map(a => ({
       id: a.id, breadType: a.breadType, quantity: a.quantity,
       allocationDate: a.allocationDate.toISOString(),
     })),
