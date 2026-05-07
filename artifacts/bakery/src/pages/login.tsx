@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { setToken, setStoredUser, setStoredCompany } from "@/lib/auth";
@@ -7,13 +7,48 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wheat, Loader2 } from "lucide-react";
+import { Wheat, Loader2, User, X } from "lucide-react";
+
+const ROLE_LABELS: Record<string, string> = {
+  managing_director: "Managing Director",
+  manager: "Manager",
+  receptionist: "Receptionist",
+  supplier: "Supplier",
+  production_staff: "Production Staff",
+};
+
+interface LastUser {
+  fullName: string;
+  role: string;
+  branchName: string;
+  username?: string;
+}
+
+function getLastUser(): LastUser | null {
+  try {
+    const raw = localStorage.getItem("nmb_last_login");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveLastUser(u: LastUser) {
+  try { localStorage.setItem("nmb_last_login", JSON.stringify(u)); } catch {}
+}
+
+function clearLastUser() {
+  try { localStorage.removeItem("nmb_last_login"); } catch {}
+}
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [lastUser, setLastUser] = useState<LastUser | null>(null);
+
+  useEffect(() => {
+    setLastUser(getLastUser());
+  }, []);
 
   const login = useLogin();
 
@@ -30,10 +65,18 @@ export default function LoginPage() {
         onSuccess: (data) => {
           setToken(data.token);
           setStoredUser(data.user);
-          if ((data as { company?: { themeColor?: string } }).company) {
-            setStoredCompany((data as { company: unknown }).company);
-            applyTheme(((data as { company: { themeColor?: string } }).company).themeColor ?? "amber");
+          const company = (data as { company?: { themeColor?: string; name?: string } }).company;
+          if (company) {
+            setStoredCompany((data as unknown as { company: unknown }).company);
+            applyTheme((company.themeColor) ?? "amber");
           }
+          const user = data.user as { fullName?: string; role?: string; branchName?: string };
+          saveLastUser({
+            fullName: user.fullName ?? username,
+            role: user.role ?? "",
+            branchName: (user.branchName ?? (data as any).branch?.name ?? company?.name ?? ""),
+            username,
+          });
           setLocation("/dashboard");
         },
         onError: (error) => {
@@ -55,6 +98,29 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold tracking-tight text-white">Ara Bakery Cloud</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your bakery dashboard</p>
         </div>
+
+        {/* Last user chip */}
+        {lastUser && (
+          <div className="mb-4 rounded-xl bg-slate-800 border border-slate-700 px-4 py-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+              <User size={16} className="text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-semibold truncate">{lastUser.fullName}</p>
+              <p className="text-slate-400 text-xs truncate">
+                {ROLE_LABELS[lastUser.role] ?? lastUser.role}
+                {lastUser.branchName ? ` · ${lastUser.branchName}` : ""}
+              </p>
+            </div>
+            <button
+              onClick={() => { clearLastUser(); setLastUser(null); setUsername(""); }}
+              className="text-slate-500 hover:text-slate-300 flex-shrink-0 p-1 rounded"
+              title="Not you? Switch account"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <form onSubmit={handleSubmit} className="space-y-4">

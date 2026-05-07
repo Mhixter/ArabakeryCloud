@@ -80,6 +80,7 @@ function saveSlip(receipt: ReceiptData) {
 /* ── Generate printable HTML for download ── */
 function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhone?: string) {
   const roleLabel = sale.cashierRole ? ROLE_LABELS[sale.cashierRole] ?? sale.cashierRole : "";
+  const watermarkText = sale.branchName.toUpperCase();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,7 +88,7 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Receipt ${sale.receiptNumber}</title>
   <style>
-    body { font-family: 'Courier New', monospace; max-width: 320px; margin: 40px auto; padding: 0 16px; background:#fff; color:#111; }
+    body { font-family: 'Courier New', monospace; max-width: 320px; margin: 40px auto; padding: 0 16px; background:#fff; color:#111; position:relative; }
     .center { text-align:center; }
     .bold { font-weight:bold; }
     .divider { border:none; border-top:1px dashed #999; margin:10px 0; }
@@ -95,15 +96,16 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
     .label { color:#666; }
     .total { font-size:16px; font-weight:bold; }
     .footer { text-align:center; font-size:11px; color:#999; margin-top:12px; }
+    .watermark { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-35deg); font-size:36px; font-weight:900; color:rgba(0,0,0,0.04); white-space:nowrap; pointer-events:none; letter-spacing:4px; z-index:0; }
     @media print { body { margin:0; } }
   </style>
 </head>
 <body>
-  <div class="center bold" style="font-size:18px;margin-bottom:2px;">${companyName}</div>
-  ${companyPhone ? `<div class="center" style="font-size:12px;color:#666;">${companyPhone}</div>` : ""}
-  <div class="center bold" style="font-size:13px;margin-top:6px;">${sale.branchName}</div>
-  ${sale.branchPhone ? `<div class="center" style="font-size:12px;color:#666;">Tel: ${sale.branchPhone}</div>` : ""}
+  <div class="watermark">${watermarkText}</div>
+  <div class="center bold" style="font-size:20px;margin-bottom:2px;letter-spacing:0.5px;">${sale.branchName.toUpperCase()}</div>
+  ${sale.branchPhone ? `<div class="center" style="font-size:12px;color:#666;">${sale.branchPhone}</div>` : ""}
   ${sale.branchAddress ? `<div class="center" style="font-size:12px;color:#666;">${sale.branchAddress}</div>` : ""}
+  <div class="center" style="font-size:11px;color:#999;margin-top:3px;">${companyName}${companyPhone ? ` · ${companyPhone}` : ""}</div>
   <hr class="divider"/>
   <div class="row"><span class="label">Receipt No.</span><span class="bold">${sale.receiptNumber}</span></div>
   <div class="row"><span class="label">Date</span><span>${format(new Date(sale.saleDate), "dd/MM/yyyy HH:mm")}</span></div>
@@ -114,7 +116,8 @@ function generateReceiptHtml(sale: ReceiptData, companyName: string, companyPhon
   <div class="row total"><span>TOTAL</span><span>${formatCurrency(sale.totalAmount)}</span></div>
   <div class="row"><span class="label">Payment</span><span style="text-transform:capitalize;">${sale.paymentMethod}</span></div>
   <hr class="divider"/>
-  <div class="footer">Thank you for your purchase!<br/>Powered by Ara Bakery Cloud</div>
+  ${sale.cashierName ? `<div class="row"><span class="label">Served by</span><span>${sale.cashierName}${roleLabel ? ` (${roleLabel})` : ""}</span></div><hr class="divider"/>` : ""}
+  <div class="footer">Thank you for your purchase!<br/>Powered by Ara Tech</div>
   <script>window.onload=()=>window.print();</script>
 </body>
 </html>`;
@@ -149,19 +152,26 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
           </DialogTitle>
         </DialogHeader>
 
-        <div className="border border-border rounded-xl p-5 space-y-3 text-sm font-mono bg-slate-50" id="receipt-print-area">
-          <div className="text-center border-b border-border pb-3">
+        <div className="border border-border rounded-xl p-5 space-y-3 text-sm font-mono bg-slate-50 relative overflow-hidden" id="receipt-print-area">
+          {/* Watermark */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" aria-hidden>
+            <span className="text-[40px] font-black text-black/[0.04] rotate-[-35deg] whitespace-nowrap tracking-widest uppercase leading-none">
+              {sale.branchName}
+            </span>
+          </div>
+
+          {/* Header — branch name is the primary identity */}
+          <div className="text-center border-b border-border pb-3 relative z-10">
             {company?.logoUrl && (
               <img src={company.logoUrl} alt="Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
             )}
-            <p className="font-bold text-base">{companyName}</p>
-            {company?.phone && <p className="text-muted-foreground text-xs">{company.phone}</p>}
-            <p className="font-semibold text-xs mt-1">{sale.branchName}</p>
+            <p className="font-black text-base tracking-wide uppercase">{sale.branchName}</p>
             {sale.branchPhone && <p className="text-muted-foreground text-xs">Tel: {sale.branchPhone}</p>}
             {sale.branchAddress && <p className="text-muted-foreground text-xs">{sale.branchAddress}</p>}
+            <p className="text-muted-foreground text-[10px] mt-1">{companyName}{company?.phone ? ` · ${company.phone}` : ""}</p>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative z-10">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Receipt No.</span>
               <span className="font-bold">{sale.receiptNumber}</span>
@@ -172,7 +182,7 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             </div>
           </div>
 
-          <div className="border-t border-dashed border-border pt-3 space-y-1.5">
+          <div className="border-t border-dashed border-border pt-3 space-y-1.5 relative z-10">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Item</span>
               <span>{sale.breadType}</span>
@@ -191,8 +201,18 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
             </div>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground border-t border-dashed border-border pt-3">
-            Thank you for your purchase!
+          {sale.cashierName && (
+            <div className="border-t border-dashed border-border pt-3 relative z-10">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Served by</span>
+                <span className="font-medium">{sale.cashierName}{roleLabel ? ` (${roleLabel})` : ""}</span>
+              </div>
+            </div>
+          )}
+
+          <p className="text-center text-xs text-muted-foreground border-t border-dashed border-border pt-3 relative z-10">
+            Thank you for your purchase!<br />
+            <span className="text-[10px] opacity-60">Powered by Ara Tech</span>
           </p>
         </div>
 

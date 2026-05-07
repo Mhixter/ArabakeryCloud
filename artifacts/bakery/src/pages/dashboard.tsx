@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useActiveBranch } from "@/lib/branch-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,11 +7,51 @@ import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, ShoppingCart, Factory, Package, PackageCheck,
   Plus, FileText, Clock, ArrowUpRight, Layers, ChevronDown, RotateCcw, Download,
-  CheckCircle2, AlertTriangle,
+  CheckCircle2, AlertTriangle, Smartphone, Share,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
+
+/* ── PWA Install Prompt ── */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+function useInstallPrompt() {
+  const deferredRef = useRef<BeforeInstallPromptEvent | null>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showIosHint, setShowIosHint] = useState(false);
+
+  useEffect(() => {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as any).standalone === true;
+    setIsIos(ios);
+    setIsStandalone(standalone);
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      deferredRef.current = e as BeforeInstallPromptEvent;
+      setCanInstall(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const install = async () => {
+    if (isIos) { setShowIosHint(h => !h); return; }
+    if (!deferredRef.current) return;
+    await deferredRef.current.prompt();
+    const { outcome } = await deferredRef.current.userChoice;
+    if (outcome === "accepted") { deferredRef.current = null; setCanInstall(false); }
+  };
+
+  return { canInstall: canInstall || (isIos && !isStandalone), install, isIos, isStandalone, showIosHint, setShowIosHint };
+}
 
 function formatCurrency(n: number) {
   return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -762,6 +802,7 @@ function ManagerDashboard() {
   const user = getStoredUser();
   const isDirector = user?.role === "managing_director";
   const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
+  const { canInstall, install, showIosHint } = useInstallPrompt();
 
   /* activeBranch already comes from localStorage (via BranchContext initBranch).
      Use it directly as the single source of truth — avoids the bug where
@@ -822,12 +863,32 @@ function ManagerDashboard() {
         title="Dashboard"
         subtitle="Product sales and stock overview"
         action={
-          <Button onClick={() => setLocation("/sales")} size="sm">
-            <Plus size={14} className="mr-1.5" />
-            New Sale
-          </Button>
+          <div className="flex items-center gap-2">
+            {canInstall && (
+              <Button variant="outline" size="sm" onClick={install} title="Install the app on your device">
+                <Smartphone size={14} className="mr-1.5" />
+                Install App
+              </Button>
+            )}
+            <Button onClick={() => setLocation("/sales")} size="sm">
+              <Plus size={14} className="mr-1.5" />
+              New Sale
+            </Button>
+          </div>
         }
       />
+
+      {showIosHint && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
+          <Share size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Add to Home Screen on iPhone/iPad</p>
+            <p className="text-xs text-blue-700">
+              Tap the <Share size={11} className="inline" /> <strong>Share</strong> button at the bottom of Safari, then choose <strong>"Add to Home Screen"</strong>. The app will work like a native app — no App Store needed.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isDirector && !isBranchLocked && (
         <div className="flex items-center gap-2">
