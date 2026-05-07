@@ -84,23 +84,44 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
+  const [mySales, setMySales] = useState<{ breadType: string; quantity: number }[]>([]);
+  const [myReturns, setMyReturns] = useState<{ breadType: string; quantity: number; status: string }[]>([]);
+
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch("/api/allocations", { headers: h, credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then((allocs: Allocation[]) => setMyAllocations(allocs))
+    Promise.all([
+      fetch("/api/allocations", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch("/api/sales", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch("/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ])
+      .then(([allocs, sales, returns]) => {
+        setMyAllocations(allocs);
+        setMySales(sales);
+        setMyReturns(returns);
+      })
       .catch(() => {})
       .finally(() => setLoadingAlloc(false));
   }, []);
 
-  /* Group by breadType so each type appears once */
-  const availableTypes = Array.from(
-    myAllocations.reduce((m, a) => {
-      m.set(a.breadType, (m.get(a.breadType) ?? 0) + a.quantity);
-      return m;
-    }, new Map<string, number>()).entries()
-  ).map(([name, qty]) => ({ name, qty }));
+  /* Compute in-hand = allocated - sold - pending/approved returns per bread type
+     Only bread the supplier still physically has can be returned */
+  const inHandByType = new Map<string, number>();
+  for (const a of myAllocations) {
+    inHandByType.set(a.breadType, (inHandByType.get(a.breadType) ?? 0) + a.quantity);
+  }
+  for (const s of mySales) {
+    inHandByType.set(s.breadType, Math.max(0, (inHandByType.get(s.breadType) ?? 0) - s.quantity));
+  }
+  for (const r of myReturns) {
+    if (r.status !== "rejected") {
+      inHandByType.set(r.breadType, Math.max(0, (inHandByType.get(r.breadType) ?? 0) - r.quantity));
+    }
+  }
+
+  const availableTypes = Array.from(inHandByType.entries())
+    .filter(([, qty]) => qty > 0)
+    .map(([name, qty]) => ({ name, qty }));
 
   const maxQty = availableTypes.find(t => t.name === breadType)?.qty ?? undefined;
 
@@ -141,8 +162,14 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
         ) : availableTypes.length === 0 ? (
           <div className="p-8 text-center">
             <PackageCheck size={32} className="mx-auto mb-3 text-muted-foreground/30" />
-            <p className="font-semibold text-foreground text-sm">No products to return</p>
-            <p className="text-muted-foreground text-xs mt-1">You don't have any product held with you to return.</p>
+            <p className="font-semibold text-foreground text-sm">
+              {myAllocations.length > 0 ? "All bread accounted for" : "No products to return"}
+            </p>
+            <p className="text-muted-foreground text-xs mt-1">
+              {myAllocations.length > 0
+                ? "All allocated bread has been sold or already returned. Nothing left in hand to return."
+                : "You don't have any bread allocated to you yet."}
+            </p>
             <Button variant="outline" size="sm" className="mt-4" onClick={onClose}>Close</Button>
           </div>
         ) : (
@@ -211,11 +238,12 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const sellersUrl = activeBranch ? `/api/allocations/sellers?branchId=${activeBranch.id}` : "/api/allocations/sellers";
-    const dashUrl = activeBranch ? `/api/reports/product-dashboard?branchId=${activeBranch.id}` : "/api/reports/product-dashboard";
+    /* Always fetch company-wide stock (no branch filter) — the API validates per-company not per-branch,
+       and branch-filtered dashboard can show 0 when production was logged to a different branch. */
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch("/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(dashUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));

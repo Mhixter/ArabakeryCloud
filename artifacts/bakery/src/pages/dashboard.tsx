@@ -125,6 +125,7 @@ function SellerDashboard() {
   const [todaySales, setTodaySales]     = useState<Sale[]>([]);
   const [returns, setReturns]           = useState<ReturnItem[]>([]);
   const [loading, setLoading]           = useState(true);
+  const { canInstall, install, showIosHint } = useInstallPrompt();
 
   const now = useNow();
   const todayDate = toLocalDateStr(now);
@@ -173,12 +174,29 @@ function SellerDashboard() {
         title={format(now, "EEEE, d MMMM")}
         subtitle="Your daily allocation and sales"
         action={
-          <Button onClick={() => setLocation("/sales")} size="sm">
-            <Plus size={14} className="mr-1.5" />
-            Record Sale
-          </Button>
+          <div className="flex items-center gap-2">
+            {canInstall && (
+              <Button variant="outline" size="sm" onClick={install} title="Install the app">
+                <Smartphone size={14} className="mr-1.5" />
+                Install
+              </Button>
+            )}
+            <Button onClick={() => setLocation("/sales")} size="sm">
+              <Plus size={14} className="mr-1.5" />
+              Record Sale
+            </Button>
+          </div>
         }
       />
+      {showIosHint && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
+          <Share size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Add to Home Screen on iPhone/iPad</p>
+            <p className="text-xs text-blue-700">Tap the <strong>Share</strong> button in Safari, then choose <strong>"Add to Home Screen"</strong>.</p>
+          </div>
+        </div>
+      )}
 
       {/* Today's KPIs only */}
       <div className="grid grid-cols-2 gap-3">
@@ -312,6 +330,7 @@ function ReceptionistDashboard() {
   const [dailySummary, setDailySummary] = useState<{ totalSales: number; cashSales: number; totalUnits: number } | null>(null);
   const [dailyLoading, setDailyLoading] = useState(true);
   const [todaySales, setTodaySales]     = useState<Sale[]>([]);
+  const { canInstall, install, showIosHint } = useInstallPrompt();
 
   const now = useNow();
   const todayDate = toLocalDateStr(now);
@@ -350,12 +369,29 @@ function ReceptionistDashboard() {
         title={format(now, "EEEE, d MMMM")}
         subtitle="Today's activity overview"
         action={
-          <Button onClick={() => setLocation("/allocations")} size="sm">
-            <Plus size={14} className="mr-1.5" />
-            Allocate
-          </Button>
+          <div className="flex items-center gap-2">
+            {canInstall && (
+              <Button variant="outline" size="sm" onClick={install} title="Install the app">
+                <Smartphone size={14} className="mr-1.5" />
+                Install
+              </Button>
+            )}
+            <Button onClick={() => setLocation("/allocations")} size="sm">
+              <Plus size={14} className="mr-1.5" />
+              Allocate
+            </Button>
+          </div>
         }
       />
+      {showIosHint && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
+          <Share size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Add to Home Screen on iPhone/iPad</p>
+            <p className="text-xs text-blue-700">Tap the <strong>Share</strong> button in Safari, then choose <strong>"Add to Home Screen"</strong>.</p>
+          </div>
+        </div>
+      )}
 
       {/* Daily KPIs */}
       <div className="grid grid-cols-2 gap-3">
@@ -519,6 +555,7 @@ function ProductionDashboard() {
   const [todayBatches, setTodayBatches] = useState<ProdBatch[]>([]);
   const [weekBatches, setWeekBatches] = useState<ProdBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const { canInstall, install, showIosHint } = useInstallPrompt();
 
   const now = useNow();
   const todayStr = toLocalDateStr(now);
@@ -576,11 +613,28 @@ function ProductionDashboard() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">{format(now, "EEEE, d MMMM")}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Production overview — your shift today</p>
         </div>
-        <Button onClick={() => setLocation("/production")} size="sm">
-          <Plus size={14} className="mr-1.5" />
-          Log Batch
-        </Button>
+        <div className="flex items-center gap-2">
+          {canInstall && (
+            <Button variant="outline" size="sm" onClick={install} title="Install the app">
+              <Smartphone size={14} className="mr-1.5" />
+              Install
+            </Button>
+          )}
+          <Button onClick={() => setLocation("/production")} size="sm">
+            <Plus size={14} className="mr-1.5" />
+            Log Batch
+          </Button>
+        </div>
       </div>
+      {showIosHint && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 flex items-start gap-3">
+          <Share size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">Add to Home Screen on iPhone/iPad</p>
+            <p className="text-xs text-blue-700">Tap the <strong>Share</strong> button in Safari, then choose <strong>"Add to Home Screen"</strong>.</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3">
