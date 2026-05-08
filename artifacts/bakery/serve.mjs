@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { request as httpRequest } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "dist/public");
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
+const API_PORT = parseInt(process.env["API_PORT"] ?? "8080", 10);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -28,6 +30,31 @@ const MIME = {
 const server = createServer(async (req, res) => {
   try {
     const urlPath = (req.url ?? "/").split("?")[0];
+
+    // Proxy /api requests to the API server
+    if (urlPath.startsWith("/api")) {
+      const proxyReq = httpRequest(
+        {
+          hostname: "localhost",
+          port: API_PORT,
+          path: req.url,
+          method: req.method,
+          headers: req.headers,
+        },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+          proxyRes.pipe(res);
+        }
+      );
+      proxyReq.on("error", (err) => {
+        console.error("API proxy error:", err.message);
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "API server unavailable" }));
+      });
+      req.pipe(proxyReq);
+      return;
+    }
+
     const filePath = join(PUBLIC_DIR, urlPath);
 
     try {
