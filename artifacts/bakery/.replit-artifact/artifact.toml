@@ -12,7 +12,7 @@ version = "1.0.0"
 [[services]]
 name = "web"
 paths = [ "/" ]
-localPort = 23375
+localPort = 3000
 
 [services.development]
 run = "pnpm --filter @workspace/bakery run dev"
@@ -23,7 +23,7 @@ run = "pnpm --filter @workspace/bakery run dev"
 args = [ "pnpm", "--filter", "@workspace/bakery", "run", "build" ]
 
 [services.production.build.env]
-PORT = "23375"
+PORT = "3000"
 BASE_PATH = "/"
 NODE_ENV = "production"
 
@@ -31,11 +31,11 @@ NODE_ENV = "production"
 args = [ "node", "artifacts/bakery/serve.mjs" ]
 
 [services.production.run.env]
-PORT = "23375"
+PORT = "3000"
 
 [services.production.health.startup]
 path = "/"
 
 [services.env]
-PORT = "23375"
+PORT = "3000"
 BASE_PATH = "/"
