@@ -27,15 +27,6 @@ PORT = "3000"
 BASE_PATH = "/"
 NODE_ENV = "production"
 
-[services.production.run]
-args = [ "node", "artifacts/bakery/serve.mjs" ]
-
-[services.production.run.env]
-PORT = "3000"
-
-[services.production.health.startup]
-path = "/"
-
 [services.env]
 PORT = "3000"
 BASE_PATH = "/"
