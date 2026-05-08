@@ -27,64 +27,111 @@ const MIME = {
   ".webmanifest": "application/manifest+json",
 };
 
-const server = createServer(async (req, res) => {
+// Headers that must NOT be forwarded when proxying (hop-by-hop headers)
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailers",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+function buildProxyHeaders(reqHeaders) {
+  const out = {};
+  for (const [key, value] of Object.entries(reqHeaders)) {
+    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "host") {
+      out[key] = value;
+    }
+  }
+  // Let Node set Host automatically as localhost:API_PORT
+  return out;
+}
+
+const server = createServer((req, res) => {
   try {
     const urlPath = (req.url ?? "/").split("?")[0];
 
     // Proxy /api requests to the API server
     if (urlPath.startsWith("/api")) {
+      const proxyHeaders = buildProxyHeaders(req.headers);
+
       const proxyReq = httpRequest(
         {
           hostname: "localhost",
           port: API_PORT,
           path: req.url,
           method: req.method,
-          headers: req.headers,
+          headers: proxyHeaders,
         },
         (proxyRes) => {
-          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-          proxyRes.pipe(res);
+          // Strip hop-by-hop headers from the API response before forwarding
+          const responseHeaders = {};
+          for (const [key, value] of Object.entries(proxyRes.headers)) {
+            if (!HOP_BY_HOP.has(key.toLowerCase())) {
+              responseHeaders[key] = value;
+            }
+          }
+          res.writeHead(proxyRes.statusCode ?? 502, responseHeaders);
+          proxyRes.pipe(res, { end: true });
         }
       );
+
       proxyReq.on("error", (err) => {
         console.error("API proxy error:", err.message);
-        res.writeHead(502, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "API server unavailable" }));
+        if (!res.headersSent) {
+          res.writeHead(502, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "API server unavailable" }));
+        }
       });
-      req.pipe(proxyReq);
+
+      req.pipe(proxyReq, { end: true });
       return;
     }
 
-    const filePath = join(PUBLIC_DIR, urlPath);
-
-    try {
-      const s = await stat(filePath);
-      if (s.isFile()) {
-        const content = await readFile(filePath);
-        const mime = MIME[extname(filePath)] ?? "application/octet-stream";
-        res.writeHead(200, {
-          "Content-Type": mime,
-          "Cache-Control": urlPath.startsWith("/assets/")
-            ? "public, max-age=31536000, immutable"
-            : "no-cache",
-        });
-        res.end(content);
-        return;
+    // Serve static files
+    (async () => {
+      const filePath = join(PUBLIC_DIR, urlPath);
+      try {
+        const s = await stat(filePath);
+        if (s.isFile()) {
+          const content = await readFile(filePath);
+          const mime = MIME[extname(filePath)] ?? "application/octet-stream";
+          res.writeHead(200, {
+            "Content-Type": mime,
+            "Cache-Control": urlPath.startsWith("/assets/")
+              ? "public, max-age=31536000, immutable"
+              : "no-cache",
+          });
+          res.end(content);
+          return;
+        }
+      } catch {
+        // file not found — fall through to SPA fallback
       }
-    } catch {
-      // file not found — fall through to SPA fallback
-    }
 
-    // SPA fallback: serve index.html
-    const index = await readFile(join(PUBLIC_DIR, "index.html"));
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-    res.end(index);
+      // SPA fallback: serve index.html
+      const index = await readFile(join(PUBLIC_DIR, "index.html"));
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+      res.end(index);
+    })().catch((err) => {
+      console.error("Static serve error:", err.message);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("Internal server error");
+      }
+    });
   } catch (err) {
-    res.writeHead(500, { "Content-Type": "text/plain" });
-    res.end("Internal server error");
+    console.error("Request handler error:", err.message);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Internal server error");
+    }
   }
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Bakery frontend serving on port ${PORT}`);
+  console.log(`Bakery frontend serving on port ${PORT}, proxying /api to localhost:${API_PORT}`);
 });
