@@ -15,9 +15,11 @@ run = "pnpm --filter @workspace/api-server run dev"
 [services.production]
 
 [services.production.build]
-args = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
+args = ["sh", "-c", "pnpm --filter @workspace/bakery run build && pnpm --filter @workspace/api-server run build"]
 
 [services.production.build.env]
+PORT = "3000"
+BASE_PATH = "/"
 NODE_ENV = "production"
 
 [services.production.run]
