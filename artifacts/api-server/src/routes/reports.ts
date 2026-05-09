@@ -57,10 +57,12 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const todayEnd = new Date(baseDate); todayEnd.setHours(23, 59, 59, 999);
   const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
 
+  const productConds = [eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)];
+  if (branchFilter) productConds.push(eq(productsTable.branchId, branchFilter));
   const activeProducts = await db
     .select()
     .from(productsTable)
-    .where(and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)));
+    .where(and(...productConds));
 
   const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
