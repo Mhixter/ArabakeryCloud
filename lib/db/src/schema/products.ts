@@ -2,10 +2,12 @@ import { pgTable, text, serial, timestamp, integer, boolean, numeric } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
+import { branchesTable } from "./branches";
 
 export const productsTable = pgTable("products", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companiesTable.id),
+  branchId: integer("branch_id").references(() => branchesTable.id),
   name: text("name").notNull(),
   description: text("description"),
   pricePerUnit: numeric("price_per_unit", { precision: 12, scale: 2 }).notNull().default("0"),

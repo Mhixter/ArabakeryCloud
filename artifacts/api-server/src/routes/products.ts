@@ -9,6 +9,7 @@ const router: IRouter = Router();
 const formatProduct = (p: typeof productsTable.$inferSelect) => ({
   id: p.id,
   companyId: p.companyId,
+  branchId: p.branchId ?? null,
   name: p.name,
   description: p.description ?? null,
   pricePerUnit: parseFloat(p.pricePerUnit as unknown as string),
@@ -18,20 +19,26 @@ const formatProduct = (p: typeof productsTable.$inferSelect) => ({
   updatedAt: p.updatedAt.toISOString(),
 });
 
-/* LIST — all users can read products */
+/* LIST — scoped to the user's branch when branchId is present */
 router.get("/products", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { companyId, branchId } = req.user!;
+
   const products = await db
     .select()
     .from(productsTable)
-    .where(eq(productsTable.companyId, companyId))
+    .where(
+      branchId
+        ? and(eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
+        : eq(productsTable.companyId, companyId),
+    )
     .orderBy(productsTable.name);
+
   res.json(products.map(formatProduct));
 });
 
 /* CREATE — managing_director or manager only */
 router.post("/products", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { companyId, branchId } = req.user!;
   const { name, description, pricePerUnit, unit } = req.body;
 
   if (!name?.trim()) {
@@ -41,6 +48,7 @@ router.post("/products", authenticate, requireRole("managing_director", "manager
 
   const [product] = await db.insert(productsTable).values({
     companyId,
+    branchId: branchId ?? null,
     name: name.trim(),
     description: description?.trim() || null,
     pricePerUnit: (parseFloat(pricePerUnit) || 0).toFixed(2),
@@ -55,7 +63,7 @@ router.post("/products", authenticate, requireRole("managing_director", "manager
     action: "PRODUCT_CREATED",
     entityType: "product",
     entityId: product.id,
-    details: `Created product: ${product.name}`,
+    details: `Created product: ${product.name}${branchId ? ` (branch ${branchId})` : ""}`,
   });
 
   res.status(201).json(formatProduct(product));
@@ -63,7 +71,7 @@ router.post("/products", authenticate, requireRole("managing_director", "manager
 
 /* UPDATE — managing_director or manager only */
 router.patch("/products/:id", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { companyId, branchId } = req.user!;
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
@@ -76,10 +84,14 @@ router.patch("/products/:id", authenticate, requireRole("managing_director", "ma
   if (unit !== undefined) updates.unit = unit.trim();
   if (isActive !== undefined) updates.isActive = Boolean(isActive);
 
-  const [existing] = await db.select().from(productsTable).where(and(eq(productsTable.id, id), eq(productsTable.companyId, companyId)));
+  const ownerFilter = branchId
+    ? and(eq(productsTable.id, id), eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
+    : and(eq(productsTable.id, id), eq(productsTable.companyId, companyId));
+
+  const [existing] = await db.select().from(productsTable).where(ownerFilter);
   if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
 
-  const [updated] = await db.update(productsTable).set(updates).where(and(eq(productsTable.id, id), eq(productsTable.companyId, companyId))).returning();
+  const [updated] = await db.update(productsTable).set(updates).where(ownerFilter).returning();
 
   await logAudit({
     req,
@@ -96,14 +108,18 @@ router.patch("/products/:id", authenticate, requireRole("managing_director", "ma
 
 /* DELETE — managing_director only */
 router.delete("/products/:id", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
+  const { companyId, branchId } = req.user!;
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
-  const [existing] = await db.select().from(productsTable).where(and(eq(productsTable.id, id), eq(productsTable.companyId, companyId)));
+  const ownerFilter = branchId
+    ? and(eq(productsTable.id, id), eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
+    : and(eq(productsTable.id, id), eq(productsTable.companyId, companyId));
+
+  const [existing] = await db.select().from(productsTable).where(ownerFilter);
   if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
 
-  await db.delete(productsTable).where(and(eq(productsTable.id, id), eq(productsTable.companyId, companyId)));
+  await db.delete(productsTable).where(ownerFilter);
 
   await logAudit({
     req,
