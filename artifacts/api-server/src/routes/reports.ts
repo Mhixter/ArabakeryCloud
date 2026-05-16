@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable, auditLogsTable, branchesTable } from "@workspace/db";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
@@ -398,6 +398,102 @@ router.get("/reports/user-activity/:userId", authenticate, async (req: Authentic
       id: l.id, action: l.action, entityType: l.entityType,
       details: l.details, createdAt: l.createdAt.toISOString(),
     })),
+  });
+});
+
+/* ─ Weekly Summary Report ─ */
+router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { companyId, role, branchId: userBranchId } = req.user!;
+  const { weekStart: weekStartStr, branchId: qBranch } = req.query as { weekStart?: string; branchId?: string };
+
+  const weekStart = weekStartStr ? new Date(`${weekStartStr}T00:00:00`) : (() => {
+    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
+  })();
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6); weekEnd.setHours(23,59,59,999);
+
+  const effectiveBranchId = qBranch ? parseInt(qBranch) : role !== "managing_director" ? userBranchId : null;
+
+  const saleConds: any[] = [eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt), gte(salesTable.saleDate, weekStart), lte(salesTable.saleDate, weekEnd)];
+  if (effectiveBranchId) saleConds.push(eq(salesTable.branchId, effectiveBranchId));
+
+  const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt), gte(productionBatchesTable.productionDate, weekStart), lte(productionBatchesTable.productionDate, weekEnd)];
+  if (effectiveBranchId) prodConds.push(eq(productionBatchesTable.branchId, effectiveBranchId));
+
+  const expConds: any[] = [eq(expensesTable.companyId, companyId), isNull(expensesTable.deletedAt), gte(expensesTable.expenseDate, weekStart), lte(expensesTable.expenseDate, weekEnd)];
+  if (effectiveBranchId) expConds.push(eq(expensesTable.branchId, effectiveBranchId));
+
+  const [sales, production, expenses] = await Promise.all([
+    db.select({ revenue: salesTable.revenue, profit: salesTable.profit, quantitySold: salesTable.quantitySold, productId: salesTable.productId, saleDate: salesTable.saleDate, branchId: salesTable.branchId })
+      .from(salesTable).where(and(...saleConds)),
+    db.select({ breadType: productionBatchesTable.breadType, quantityProduced: productionBatchesTable.quantityProduced, wasteQuantity: productionBatchesTable.wasteQuantity, productionDate: productionBatchesTable.productionDate })
+      .from(productionBatchesTable).where(and(...prodConds)),
+    db.select({ amount: expensesTable.amount, categoryId: expensesTable.expenseCategoryId, note: expensesTable.note, expenseDate: expensesTable.expenseDate, categoryName: expenseCategoriesTable.name })
+      .from(expensesTable)
+      .leftJoin(expenseCategoriesTable, eq(expensesTable.expenseCategoryId, expenseCategoriesTable.id))
+      .where(and(...expConds)),
+  ]);
+
+  /* aggregate sales by product */
+  const salesByProduct: Record<number, { productId: number; revenue: number; profit: number; qty: number }> = {};
+  let totalRevenue = 0, totalProfit = 0, totalQty = 0;
+  sales.forEach(s => {
+    totalRevenue += Number(s.revenue ?? 0);
+    totalProfit  += Number(s.profit ?? 0);
+    totalQty     += Number(s.quantitySold ?? 0);
+    if (s.productId) {
+      if (!salesByProduct[s.productId]) salesByProduct[s.productId] = { productId: s.productId, revenue: 0, profit: 0, qty: 0 };
+      salesByProduct[s.productId].revenue += Number(s.revenue ?? 0);
+      salesByProduct[s.productId].profit  += Number(s.profit ?? 0);
+      salesByProduct[s.productId].qty     += Number(s.quantitySold ?? 0);
+    }
+  });
+
+  /* aggregate production by bread type */
+  const prodByType: Record<string, { produced: number; waste: number }> = {};
+  let totalProduced = 0, totalWaste = 0;
+  production.forEach(p => {
+    totalProduced += Number(p.quantityProduced ?? 0);
+    totalWaste    += Number(p.wasteQuantity ?? 0);
+    const k = p.breadType ?? "Unknown";
+    if (!prodByType[k]) prodByType[k] = { produced: 0, waste: 0 };
+    prodByType[k].produced += Number(p.quantityProduced ?? 0);
+    prodByType[k].waste    += Number(p.wasteQuantity ?? 0);
+  });
+
+  /* aggregate expenses by category */
+  const expByCat: Record<string, number> = {};
+  let totalExpenses = 0;
+  expenses.forEach(e => {
+    totalExpenses += Number(e.amount ?? 0);
+    const k = e.categoryName ?? "Uncategorised";
+    expByCat[k] = (expByCat[k] ?? 0) + Number(e.amount ?? 0);
+  });
+
+  /* fetch product names for sold products */
+  const productIds = Object.keys(salesByProduct).map(Number);
+  const productNames: Record<number, string> = {};
+  if (productIds.length > 0) {
+    const prods = await db.select({ id: productsTable.id, name: productsTable.name }).from(productsTable).where(eq(productsTable.companyId, companyId));
+    prods.forEach(p => { productNames[p.id] = p.name; });
+  }
+
+  res.json({
+    weekStart: weekStart.toISOString(),
+    weekEnd: weekEnd.toISOString(),
+    branchId: effectiveBranchId,
+    sales: {
+      total: { revenue: totalRevenue, profit: totalProfit, qty: totalQty },
+      byProduct: Object.values(salesByProduct).map(s => ({ ...s, productName: productNames[s.productId] ?? `Product #${s.productId}` })),
+    },
+    production: {
+      total: { produced: totalProduced, waste: totalWaste },
+      byType: Object.entries(prodByType).map(([type, d]) => ({ type, ...d })),
+    },
+    expenses: {
+      total: totalExpenses,
+      byCategory: Object.entries(expByCat).map(([category, amount]) => ({ category, amount })),
+      records: expenses.map(e => ({ note: e.note, amount: Number(e.amount), category: e.categoryName ?? "Uncategorised", date: e.expenseDate })),
+    },
   });
 });
 

@@ -15,6 +15,8 @@ import productsRouter from "./products";
 import allocationsRouter from "./allocations";
 import returnsRouter from "./returns";
 import notificationsRouter from "./notifications";
+import workersRouter from "./workers";
+import expensesRouter from "./expenses";
 import { verifyToken } from "../lib/auth";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -111,6 +113,8 @@ router.use(productsRouter);
 router.use(allocationsRouter);
 router.use(returnsRouter);
 router.use(notificationsRouter);
+router.use(workersRouter);
+router.use(expensesRouter);
 router.use(adminRouter);
 
 export default router;

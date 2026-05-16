@@ -12,3 +12,5 @@ export * from "./transactions";
 export * from "./products";
 export * from "./allocations";
 export * from "./returns";
+export * from "./workers";
+export * from "./expenses";

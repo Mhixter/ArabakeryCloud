@@ -18,12 +18,15 @@ import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
 import ProductsPage from "@/pages/products";
 import AllocationsPage from "@/pages/allocations";
+import ExpensesPage from "@/pages/expenses";
+import WorkersPage from "@/pages/workers";
 import Layout from "@/components/layout";
 import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminCompaniesPage from "@/pages/admin/companies";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminTransactionsPage from "@/pages/admin/transactions";
+import AdminBackupPage from "@/pages/admin/backup";
 import LandingHome from "@/pages/landing/home";
 import LandingFeatures from "@/pages/landing/features";
 import LandingPricing from "@/pages/landing/pricing";
@@ -105,6 +108,7 @@ function Router() {
       <Route path="/admin/companies" component={AdminCompaniesPage} />
       <Route path="/admin/transactions" component={AdminTransactionsPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
+      <Route path="/admin/backup" component={AdminBackupPage} />
       <Route path="/admin"><AdminDashboardPage /></Route>
 
       {/* Bakery app — each route enforces the roles that match the nav definition.
@@ -120,6 +124,8 @@ function Router() {
       <Route path="/user-activity"><ProtectedRole roles={["managing_director","manager"]}><UserActivityPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/expenses"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><ExpensesPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/workers"><ProtectedRole roles={["managing_director","manager","receptionist"]}><WorkersPage /></ProtectedRole></Route>
       <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>
       <Route path="/company-settings"><ProtectedRole roles={["managing_director"]}><CompanySettingsPage /></ProtectedRole></Route>
       <Route path="/subscription"><ProtectedRole roles={["managing_director"]}><SubscriptionPage /></ProtectedRole></Route>

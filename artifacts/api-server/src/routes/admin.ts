@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, superAdminsTable, companiesTable, subscriptionsTable, usersTable, paymentGatewayConfigTable, transactionsTable } from "@workspace/db";
-import { eq, desc, count } from "drizzle-orm";
+import { db, superAdminsTable, companiesTable, subscriptionsTable, usersTable, paymentGatewayConfigTable, transactionsTable, branchesTable, productsTable, salesTable, productionBatchesTable, sellerAllocationsTable, productReturnsTable, inventoryItemsTable, inventoryLogsTable, expensesTable, expenseCategoriesTable, workersTable, workerCategoriesTable } from "@workspace/db";
+import { eq, desc, count, isNull } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
 import jwt from "jsonwebtoken";
 
@@ -226,6 +226,38 @@ router.patch("/admin/transactions/:id/status", authenticateSuperAdmin, async (re
     .returning();
   if (!updated) return res.status(404).json({ error: "Transaction not found" });
   res.json(updated);
+});
+
+/* ─ Company backup (super-admin only) ─ */
+router.get("/admin/backup/:companyId", authenticateSuperAdmin, async (req, res) => {
+  const companyId = parseInt(req.params.companyId);
+
+  const [company]  = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company) return res.status(404).json({ error: "Company not found" });
+
+  const [branches, users, products, sales, production, allocations, returns_, inventory, invLogs, expenses, expCats, workers, workerCats] = await Promise.all([
+    db.select().from(branchesTable).where(eq(branchesTable.companyId, companyId)),
+    db.select({ id: usersTable.id, fullName: usersTable.fullName, username: usersTable.username, role: usersTable.role, branchId: usersTable.branchId, isActive: usersTable.isActive, createdAt: usersTable.createdAt }).from(usersTable).where(eq(usersTable.companyId, companyId)),
+    db.select().from(productsTable).where(eq(productsTable.companyId, companyId)),
+    db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt))),
+    db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt))),
+    db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt))),
+    db.select().from(productReturnsTable).where(eq(productReturnsTable.companyId, companyId)),
+    db.select().from(inventoryItemsTable).where(and(eq(inventoryItemsTable.companyId, companyId), isNull(inventoryItemsTable.deletedAt))),
+    db.select().from(inventoryLogsTable).where(eq(inventoryLogsTable.companyId, companyId)),
+    db.select().from(expensesTable).where(and(eq(expensesTable.companyId, companyId), isNull(expensesTable.deletedAt))),
+    db.select().from(expenseCategoriesTable).where(eq(expenseCategoriesTable.companyId, companyId)),
+    db.select().from(workersTable).where(and(eq(workersTable.companyId, companyId), isNull(workersTable.deletedAt))),
+    db.select().from(workerCategoriesTable).where(eq(workerCategoriesTable.companyId, companyId)),
+  ]);
+
+  res.json({
+    meta: { exportedAt: new Date().toISOString(), companyId, companyName: company.name },
+    company: { ...company, passwordHash: undefined },
+    branches, users, products, sales, production, allocations,
+    returns: returns_, inventory, inventoryLogs: invLogs,
+    expenses, expenseCategories: expCats, workers, workerCategories: workerCats,
+  });
 });
 
 export default router;

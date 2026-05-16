@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, LogOut, Shield, CreditCard, Receipt } from "lucide-react";
+import { LayoutDashboard, Building2, LogOut, Shield, CreditCard, Receipt, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
@@ -7,6 +7,7 @@ const ADMIN_NAV = [
   { href: "/admin/companies",    label: "Companies",    icon: Building2 },
   { href: "/admin/transactions", label: "Transactions", icon: Receipt },
   { href: "/admin/settings",     label: "Gateway",      icon: CreditCard },
+  { href: "/admin/backup",       label: "Backup",       icon: Database },
 ];
 
 function getAdminUser() {
