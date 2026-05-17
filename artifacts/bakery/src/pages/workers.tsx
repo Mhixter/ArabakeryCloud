@@ -78,12 +78,18 @@ export default function WorkersPage() {
       const url = editCat ? `/api/worker-categories/${editCat.id}` : "/api/worker-categories";
       const method = editCat ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: apiHeaders(), body: JSON.stringify({ name: catName }) });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: (data as any).error ?? "Failed to save category", variant: "destructive" });
+        return;
+      }
       const data = await res.json();
-      if (!res.ok) { toast({ title: data.error ?? "Failed", variant: "destructive" }); return; }
       toast({ title: editCat ? "Category updated" : "Category created" });
       setCatDialog(false);
       await loadCategories();
       if (!editCat) setSelectedCat(data);
+    } catch {
+      toast({ title: "Network error. Please try again.", variant: "destructive" });
     } finally { setCatSaving(false); }
   };
 
@@ -114,11 +120,16 @@ export default function WorkersPage() {
       const url = editWorker ? `/api/workers/${editWorker.id}` : "/api/workers";
       const method = editWorker ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: apiHeaders(), body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok) { toast({ title: data.error ?? "Failed", variant: "destructive" }); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: (data as any).error ?? "Failed to save worker", variant: "destructive" });
+        return;
+      }
       toast({ title: editWorker ? "Worker updated" : "Worker added" });
       setWorkerDialog(false);
       await loadWorkers(selectedCat.id);
+    } catch {
+      toast({ title: "Network error. Please try again.", variant: "destructive" });
     } finally { setWorkerSaving(false); }
   };
 

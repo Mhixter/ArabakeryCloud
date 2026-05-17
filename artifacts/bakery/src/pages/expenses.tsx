@@ -117,11 +117,16 @@ export default function ExpensesPage() {
         branchId: form.branchId || null,
         expenseDate: form.expenseDate ? new Date(`${form.expenseDate}T12:00:00`).toISOString() : undefined,
       })});
-      const data = await res.json();
-      if (!res.ok) { toast({ title: data.error ?? "Failed", variant: "destructive" }); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: (data as any).error ?? "Failed to save expense", variant: "destructive" });
+        return;
+      }
       toast({ title: editExp ? "Expense updated" : "Expense recorded" });
       setDialog(false);
       await loadAll();
+    } catch {
+      toast({ title: "Network error. Please try again.", variant: "destructive" });
     } finally { setSaving(false); }
   };
 
@@ -138,9 +143,15 @@ export default function ExpensesPage() {
     setCatSaving(true);
     try {
       const res = await fetch("/api/expense-categories", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ name: newCatName }) });
-      if (!res.ok) { toast({ title: "Failed to add category", variant: "destructive" }); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: (data as any).error ?? "Failed to add category", variant: "destructive" });
+        return;
+      }
       setNewCatName(""); setCatDialog(false);
       await loadAll();
+    } catch {
+      toast({ title: "Network error. Please try again.", variant: "destructive" });
     } finally { setCatSaving(false); }
   };
 
