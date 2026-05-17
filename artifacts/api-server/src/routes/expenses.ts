@@ -26,7 +26,7 @@ router.post("/expense-categories", authenticate, requireRole("managing_director"
 
 router.delete("/expense-categories/:id", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   await db.delete(expenseCategoriesTable)
     .where(and(eq(expenseCategoriesTable.id, id), eq(expenseCategoriesTable.companyId, companyId)));
   res.json({ success: true });
@@ -100,7 +100,7 @@ router.post("/expenses", authenticate, requireRole(...ALLOWED_ROLES), async (req
 
 router.patch("/expenses/:id", authenticate, requireRole(...ALLOWED_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId, role, branchId: userBranchId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { note, amount, expenseCategoryId, workerId, expenseDate } = req.body ?? {};
   const updates: Record<string, any> = {};
   if (note !== undefined) updates.note = note.trim();
@@ -120,7 +120,7 @@ router.patch("/expenses/:id", authenticate, requireRole(...ALLOWED_ROLES), async
 
 router.delete("/expenses/:id", authenticate, requireRole(...ALLOWED_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   await db.update(expensesTable).set({ deletedAt: new Date() })
     .where(and(eq(expensesTable.id, id), eq(expensesTable.companyId, companyId)));
   res.json({ success: true });

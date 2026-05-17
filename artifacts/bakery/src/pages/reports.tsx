@@ -15,7 +15,7 @@ import {
   Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
 } from "recharts";
 import { TrendingUp, Factory, BarChart3, FileText, Download } from "lucide-react";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { generatePdf, fmtCurrency } from "@/lib/pdf";
 
 function formatCurrency(n: number | undefined | null) {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, superAdminsTable, companiesTable, subscriptionsTable, usersTable, paymentGatewayConfigTable, transactionsTable, branchesTable, productsTable, salesTable, productionBatchesTable, sellerAllocationsTable, productReturnsTable, inventoryItemsTable, inventoryLogsTable, expensesTable, expenseCategoriesTable, workersTable, workerCategoriesTable } from "@workspace/db";
-import { eq, desc, count, isNull } from "drizzle-orm";
+import { eq, desc, count, isNull, and } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
 import jwt from "jsonwebtoken";
 

@@ -15,9 +15,11 @@ import { useListBranches } from "@workspace/api-client-react";
 interface WorkerCategory { id: number; name: string; }
 interface Worker { id: number; fullName: string; phone: string | null; isActive: boolean; workerCategoryId: number; categoryName: string; branchId: number | null; branchName: string | null; }
 
-function apiHeaders() {
+function apiHeaders(): Record<string, string> {
   const t = getToken();
-  return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" };
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (t) h["Authorization"] = `Bearer ${t}`;
+  return h;
 }
 
 export default function WorkersPage() {

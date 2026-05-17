@@ -24,9 +24,11 @@ interface Expense {
   expenseCategoryId: number | null; workerId: number | null; branchId: number | null;
 }
 
-function apiHeaders() {
+function apiHeaders(): Record<string, string> {
   const t = getToken();
-  return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" };
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (t) h["Authorization"] = `Bearer ${t}`;
+  return h;
 }
 
 function toLocalDate(d: Date) {

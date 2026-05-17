@@ -27,7 +27,7 @@ router.post("/worker-categories", authenticate, requireRole(...MANAGE_ROLES), as
 
 router.patch("/worker-categories/:id", authenticate, requireRole(...MANAGE_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { name } = req.body ?? {};
   if (!name?.trim()) { res.status(400).json({ error: "Category name is required" }); return; }
   const [updated] = await db.update(workerCategoriesTable)
@@ -40,7 +40,7 @@ router.patch("/worker-categories/:id", authenticate, requireRole(...MANAGE_ROLES
 
 router.delete("/worker-categories/:id", authenticate, requireRole(...MANAGE_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const workers = await db.select().from(workersTable)
     .where(and(eq(workersTable.workerCategoryId, id), eq(workersTable.companyId, companyId), isNull(workersTable.deletedAt)));
   if (workers.length > 0) { res.status(400).json({ error: "Cannot delete category that has active workers" }); return; }
@@ -94,7 +94,7 @@ router.post("/workers", authenticate, requireRole(...MANAGE_ROLES), async (req: 
 
 router.patch("/workers/:id", authenticate, requireRole(...MANAGE_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { fullName, phone, workerCategoryId, branchId, isActive } = req.body ?? {};
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (fullName !== undefined) updates.fullName = fullName.trim();
@@ -111,7 +111,7 @@ router.patch("/workers/:id", authenticate, requireRole(...MANAGE_ROLES), async (
 
 router.delete("/workers/:id", authenticate, requireRole(...MANAGE_ROLES), async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId } = req.user!;
-  const id = parseInt(req.params.id);
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   await db.update(workersTable).set({ deletedAt: new Date() })
     .where(and(eq(workersTable.id, id), eq(workersTable.companyId, companyId)));
   res.json({ success: true });
