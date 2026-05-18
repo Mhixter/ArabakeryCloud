@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Wheat, Loader2, Building2, CheckCircle } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
@@ -22,7 +23,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch(API_BASE + "/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

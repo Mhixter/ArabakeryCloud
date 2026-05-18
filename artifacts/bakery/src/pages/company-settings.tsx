@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, Upload, Building2, Palette, CheckCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_BASE } from "@/lib/api";
 
 export default function CompanySettingsPage() {
   const { toast } = useToast();
@@ -21,7 +22,7 @@ export default function CompanySettingsPage() {
     const loadCompany = async () => {
       try {
         const token = getToken();
-        const res = await fetch("/api/company", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(API_BASE + "/api/company", { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
           setCompany(data);
@@ -53,7 +54,7 @@ export default function CompanySettingsPage() {
     setLoading(true);
     try {
       const token = getToken();
-      const res = await fetch("/api/company", {
+      const res = await fetch(API_BASE + "/api/company", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: form.name, phone: form.phone || null, address: form.address || null, themeColor: form.themeColor, logoUrl: form.logoUrl || null }),

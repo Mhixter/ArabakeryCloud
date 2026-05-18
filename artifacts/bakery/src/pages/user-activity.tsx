@@ -10,6 +10,7 @@ import {
   Clock, ArrowRight, ShoppingBag, AlertCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 /* ── Types ── */
 type UserSummary = {
@@ -269,7 +270,7 @@ export default function UserActivityPage() {
     try {
       const token = getToken();
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch("/api/reports/user-activity", { headers, credentials: "include" });
+      const res = await fetch(API_BASE + "/api/reports/user-activity", { headers, credentials: "include" });
       if (!res.ok) throw new Error("Failed to load user activity");
       const data = await res.json();
       setUsers(data);
@@ -286,7 +287,7 @@ export default function UserActivityPage() {
     try {
       const token = getToken();
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`/api/reports/user-activity/${id}`, { headers, credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/reports/user-activity/${id}`, { headers, credentials: "include" });
       if (!res.ok) throw new Error("Failed to load user detail");
       const data = await res.json();
       setDetail(data);

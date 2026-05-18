@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, Receipt, Download, Tag, Filter } from "lucide-rea
 import { format } from "date-fns";
 import { useListBranches } from "@workspace/api-client-react";
 import { generatePdf, fmtCurrency } from "@/lib/pdf";
+import { API_BASE } from "@/lib/api";
 
 interface ExpenseCategory { id: number; name: string; }
 interface Worker { id: number; fullName: string; categoryName: string; }
@@ -78,9 +79,9 @@ export default function ExpensesPage() {
       if (filterCat) params.set("categoryId", filterCat);
       if (filterBranch && isDirector) params.set("branchId", filterBranch);
       const [expRes, catRes, workerRes] = await Promise.all([
-        fetch(`/api/expenses?${params}`, { headers: apiHeaders() }),
-        fetch("/api/expense-categories", { headers: apiHeaders() }),
-        fetch("/api/workers", { headers: apiHeaders() }),
+        fetch(`${API_BASE}/api/expenses?${params}`, { headers: apiHeaders() }),
+        fetch(API_BASE + "/api/expense-categories", { headers: apiHeaders() }),
+        fetch(API_BASE + "/api/workers", { headers: apiHeaders() }),
       ]);
       setExpenses(expRes.ok ? await expRes.json() : []);
       setCategories(catRes.ok ? await catRes.json() : []);
@@ -131,7 +132,7 @@ export default function ExpensesPage() {
   };
 
   const deleteExpense = async (id: number) => {
-    await fetch(`/api/expenses/${id}`, { method: "DELETE", headers: apiHeaders() });
+    await fetch(`${API_BASE}/api/expenses/${id}`, { method: "DELETE", headers: apiHeaders() });
     toast({ title: "Expense deleted" });
     setDeleteId(null);
     await loadAll();
@@ -142,7 +143,7 @@ export default function ExpensesPage() {
     if (!newCatName.trim()) return;
     setCatSaving(true);
     try {
-      const res = await fetch("/api/expense-categories", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ name: newCatName }) });
+      const res = await fetch(API_BASE + "/api/expense-categories", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ name: newCatName }) });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast({ title: (data as any).error ?? "Failed to add category", variant: "destructive" });

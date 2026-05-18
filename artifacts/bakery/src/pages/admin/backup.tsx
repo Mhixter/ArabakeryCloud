@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AdminLayout from "@/components/admin-layout";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 function getAdminToken() { return localStorage.getItem("nmb_admin_token"); }
 
@@ -24,7 +25,7 @@ export default function AdminBackupPage() {
   useEffect(() => {
     const token = getAdminToken();
     if (!token) { setLocation("/admin/login"); return; }
-    fetch("/api/admin/companies", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/admin/companies", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (r.status === 401) { setLocation("/admin/login"); throw new Error(); } return r.json(); })
       .then(setCompanies)
       .catch(() => {})
@@ -37,7 +38,7 @@ export default function AdminBackupPage() {
     setDownloading(company.id);
     setMsg(null);
     try {
-      const res = await fetch(`/api/admin/backup/${company.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/api/admin/backup/${company.id}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Backup failed");
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });

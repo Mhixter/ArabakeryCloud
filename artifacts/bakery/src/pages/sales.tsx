@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 /** Per-user receipt storage — prevents receipts leaking between suppliers/users in the same company */
 function getSlipsKey(): string {
@@ -313,7 +314,7 @@ function useProducts() {
   return useQuery<{ id: number; name: string; pricePerUnit: number; isActive: boolean }[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const res = await fetch("/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(API_BASE + "/api/products", { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return [];
       return res.json();
     },

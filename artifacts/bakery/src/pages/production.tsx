@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Factory, TrendingDown, Download } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 function downloadCSV(rows: Record<string, string | number>[], filename: string) {
   if (!rows.length) return;
@@ -41,7 +42,7 @@ function useProducts() {
   return useQuery<{ id: number; name: string; isActive: boolean }[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const res = await fetch("/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(API_BASE + "/api/products", { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return [];
       return res.json();
     },

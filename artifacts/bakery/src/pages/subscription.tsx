@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CreditCard, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface Subscription {
   status: string;
@@ -32,7 +33,7 @@ export default function SubscriptionPage() {
     const load = async () => {
       try {
         const token = getToken();
-        const res = await fetch("/api/subscription", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(API_BASE + "/api/subscription", { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) setSub(await res.json());
       } finally { setLoading(false); }
     };
@@ -43,7 +44,7 @@ export default function SubscriptionPage() {
     setRenewing(true);
     try {
       const token = getToken();
-      const res = await fetch("/api/subscription/renew", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(API_BASE + "/api/subscription/renew", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         setSub(data);

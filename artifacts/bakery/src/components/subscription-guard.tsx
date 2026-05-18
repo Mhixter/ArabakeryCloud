@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, createContext, useContext } from "react";
 import { useLocation } from "wouter";
 import { getToken } from "@/lib/auth";
 import { AlertTriangle, Clock, Lock } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface SubStatus {
   status: string;
@@ -60,7 +61,7 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
     if (fetchingRef.current) return;
     fetchingRef.current = true;
 
-    fetch("/api/subscription", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/subscription", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {

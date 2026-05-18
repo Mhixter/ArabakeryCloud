@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
+import { API_BASE } from "@/lib/api";
 
 /* ── PWA Install Prompt ── */
 interface BeforeInstallPromptEvent extends Event {
@@ -138,10 +139,10 @@ function SellerDashboard() {
     const startOfDay = new Date(`${todayDate}T00:00:00`).toISOString();
     const endOfDay   = new Date(`${todayDate}T23:59:59`).toISOString();
     Promise.all([
-      fetch("/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/returns", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/returns", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([a, allS, todayS, ret]) => {
       setAllocations(a);
       setAllTimeSales(allS);
@@ -344,9 +345,9 @@ function ReceptionistDashboard() {
     setDailyLoading(true);
     setStockLoading(true);
     Promise.all([
-      fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
-      fetch("/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(API_BASE + "/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([dash, ret, ts]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setReturns(ret);
@@ -570,9 +571,9 @@ function ProductionDashboard() {
     const weekStartStr  = toLocalDateStr(weekStartDate);
     const weekStartUtc  = new Date(`${weekStartStr}T00:00:00`).toISOString();
     Promise.all([
-      fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
-      fetch(`/api/production?startDate=${encodeURIComponent(todayStart)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`/api/production?startDate=${encodeURIComponent(weekStartUtc)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/api/production?startDate=${encodeURIComponent(todayStart)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/production?startDate=${encodeURIComponent(weekStartUtc)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ]).then(([dash, today_prod, week_prod]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setTodayBatches(today_prod);
@@ -889,7 +890,7 @@ function ManagerDashboard() {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     if (isDirector) {
-      fetch("/api/branches", { headers, credentials: "include" })
+      fetch(API_BASE + "/api/branches", { headers, credentials: "include" })
         .then(r => r.ok ? r.json() : [])
         .then((bs: Branch[]) => setBranches(bs))
         .catch(() => {});

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AdminLayout from "@/components/admin-layout";
+import { API_BASE } from "@/lib/api";
 
 function getAdminToken() { return localStorage.getItem("nmb_admin_token"); }
 
@@ -43,7 +44,7 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     const token = getAdminToken();
     if (!token) { setLocation("/admin/login"); return; }
-    fetch("/api/admin/gateway", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/admin/gateway", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (r.status === 401) { setLocation("/admin/login"); throw new Error("Auth"); } return r.json(); })
       .then(data => { if (data) setConfig(data); })
       .catch(() => {})
@@ -56,7 +57,7 @@ export default function AdminSettingsPage() {
     if (!token) return;
     setSaving(true); setMsg(null);
     try {
-      const res = await fetch("/api/admin/gateway", {
+      const res = await fetch(API_BASE + "/api/admin/gateway", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(config),

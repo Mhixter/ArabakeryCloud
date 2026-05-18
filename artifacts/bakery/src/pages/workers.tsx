@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, Users, Tag, Phone, ChevronRight } from "lucide-react";
 import { useListBranches } from "@workspace/api-client-react";
+import { API_BASE } from "@/lib/api";
 
 interface WorkerCategory { id: number; name: string; }
 interface Worker { id: number; fullName: string; phone: string | null; isActive: boolean; workerCategoryId: number; categoryName: string; branchId: number | null; branchName: string | null; }
@@ -50,7 +51,7 @@ export default function WorkersPage() {
   const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/worker-categories", { headers: apiHeaders() });
+      const res = await fetch(API_BASE + "/api/worker-categories", { headers: apiHeaders() });
       const cats = res.ok ? await res.json() : [];
       setCategories(cats);
       if (cats.length && !selectedCat) setSelectedCat(cats[0]);
@@ -60,7 +61,7 @@ export default function WorkersPage() {
   const loadWorkers = useCallback(async (catId?: number) => {
     const id = catId ?? selectedCat?.id;
     if (!id) return;
-    const res = await fetch(`/api/workers?categoryId=${id}`, { headers: apiHeaders() });
+    const res = await fetch(`${API_BASE}/api/workers?categoryId=${id}`, { headers: apiHeaders() });
     setWorkers(res.ok ? await res.json() : []);
   }, [selectedCat?.id]);
 
@@ -94,7 +95,7 @@ export default function WorkersPage() {
   };
 
   const deleteCat = async (id: number) => {
-    const res = await fetch(`/api/worker-categories/${id}`, { method: "DELETE", headers: apiHeaders() });
+    const res = await fetch(`${API_BASE}/api/worker-categories/${id}`, { method: "DELETE", headers: apiHeaders() });
     const data = await res.json();
     if (!res.ok) { toast({ title: data.error ?? "Failed", variant: "destructive" }); return; }
     toast({ title: "Category deleted" });
@@ -134,7 +135,7 @@ export default function WorkersPage() {
   };
 
   const deleteWorker = async (id: number) => {
-    await fetch(`/api/workers/${id}`, { method: "DELETE", headers: apiHeaders() });
+    await fetch(`${API_BASE}/api/workers/${id}`, { method: "DELETE", headers: apiHeaders() });
     toast({ title: "Worker removed" });
     setDeleteConfirm(null);
     if (selectedCat) await loadWorkers(selectedCat.id);

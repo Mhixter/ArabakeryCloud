@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { API_BASE } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const [, setLocation] = useLocation();
@@ -18,7 +19,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await fetch("/api/admin/auth/login", {
+      const res = await fetch(API_BASE + "/api/admin/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),

@@ -13,6 +13,7 @@ import {
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE } from "@/lib/api";
 
 function formatDate(iso: string) {
   return format(new Date(iso), "dd MMM yyyy, HH:mm");
@@ -91,9 +92,9 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.all([
-      fetch("/api/allocations", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/sales", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/allocations", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/sales", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ])
       .then(([allocs, sales, returns]) => {
         setMyAllocations(allocs);
@@ -133,7 +134,7 @@ function ReturnForm({ onClose, onCreated }: { onClose: () => void; onCreated: (r
     setSubmitting(true);
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch("/api/returns", {
+      const res = await fetch(API_BASE + "/api/returns", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
@@ -242,8 +243,8 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
        and branch-filtered dashboard can show 0 when production was logged to a different branch. */
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch("/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
@@ -264,7 +265,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     setSubmitting(true);
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch("/api/allocations", {
+      const res = await fetch(API_BASE + "/api/allocations", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
@@ -387,7 +388,7 @@ export default function AllocationsPage() {
   const handleCancel = async (id: number) => {
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch(`/api/allocations/${id}`, {
+      const res = await fetch(`${API_BASE}/api/allocations/${id}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
@@ -408,7 +409,7 @@ export default function AllocationsPage() {
   const handleApproveReturn = async (id: number) => {
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch(`/api/returns/${id}/approve`, {
+      const res = await fetch(`${API_BASE}/api/returns/${id}/approve`, {
         method: "PATCH",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
@@ -428,7 +429,7 @@ export default function AllocationsPage() {
   const handleRejectReturn = async (id: number) => {
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch(`/api/returns/${id}/reject`, {
+      const res = await fetch(`${API_BASE}/api/returns/${id}/reject`, {
         method: "PATCH",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",

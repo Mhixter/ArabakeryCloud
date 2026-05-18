@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import AdminLayout from "@/components/admin-layout";
 import { Link } from "wouter";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 interface Analytics {
   totalCompanies: number;
@@ -34,7 +35,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const token = getAdminToken();
     if (!token) { setLocation("/admin/login"); return; }
-    fetch("/api/admin/analytics", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/admin/analytics", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (r.status === 401) { setLocation("/admin/login"); throw new Error("Unauthorized"); } return r.json(); })
       .then(setAnalytics)
       .catch(() => {})

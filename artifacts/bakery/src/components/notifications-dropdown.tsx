@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { getToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { API_BASE } from "@/lib/api";
 
 interface AppNotification {
   id: string;
@@ -62,7 +63,7 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/notifications", {
+      const res = await fetch(API_BASE + "/api/notifications", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setNotifications(await res.json());

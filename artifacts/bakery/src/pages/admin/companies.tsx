@@ -12,6 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AdminLayout from "@/components/admin-layout";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 interface Company {
   id: number;
@@ -65,7 +66,7 @@ export default function AdminCompaniesPage() {
   const loadCompanies = useCallback(() => {
     if (!token) { setLocation("/admin/login"); return; }
     setLoading(true);
-    fetch("/api/admin/companies", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/admin/companies", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (r.status === 401) { setLocation("/admin/login"); throw new Error("Auth"); } return r.json(); })
       .then(setCompanies)
       .catch(() => {})
@@ -89,7 +90,7 @@ export default function AdminCompaniesPage() {
     }
     setResetting(true); setResetMsg("");
     try {
-      const res = await fetch(`/api/admin/companies/${resetCompany.id}/reset-password`, {
+      const res = await fetch(`${API_BASE}/api/admin/companies/${resetCompany.id}/reset-password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ newPassword: resetPassword }),
@@ -111,7 +112,7 @@ export default function AdminCompaniesPage() {
     try {
       const body: any = { status: editStatus };
       if (editDays && parseInt(editDays) > 0) body.days = parseInt(editDays);
-      const res = await fetch(`/api/admin/companies/${selectedCompany.id}/subscription`, {
+      const res = await fetch(`${API_BASE}/api/admin/companies/${selectedCompany.id}/subscription`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),

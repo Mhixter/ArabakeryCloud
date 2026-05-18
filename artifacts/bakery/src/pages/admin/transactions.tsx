@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AdminLayout from "@/components/admin-layout";
 import { format } from "date-fns";
+import { API_BASE } from "@/lib/api";
 
 interface Transaction {
   id: number;
@@ -48,7 +49,7 @@ export default function AdminTransactionsPage() {
   const load = useCallback(() => {
     if (!token) { setLocation("/admin/login"); return; }
     setLoading(true);
-    fetch("/api/admin/transactions", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(API_BASE + "/api/admin/transactions", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (r.status === 401) { setLocation("/admin/login"); throw new Error("Auth"); } return r.json(); })
       .then(setTransactions)
       .catch(() => {})
@@ -61,7 +62,7 @@ export default function AdminTransactionsPage() {
     if (!token) return;
     setUpdatingId(id);
     try {
-      await fetch(`/api/admin/transactions/${id}/status`, {
+      await fetch(`${API_BASE}/api/admin/transactions/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status }),
