@@ -283,10 +283,10 @@ export default function WorkersPage() {
             {branches && branches.length > 0 && (
               <div className="space-y-1.5">
                 <Label>Branch (optional)</Label>
-                <Select value={workerForm.branchId} onValueChange={v => setWorkerForm(f => ({ ...f, branchId: v }))}>
+                <Select value={workerForm.branchId || "__none__"} onValueChange={v => setWorkerForm(f => ({ ...f, branchId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="All branches" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All branches</SelectItem>
+                    <SelectItem value="__none__">All branches</SelectItem>
                     {branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

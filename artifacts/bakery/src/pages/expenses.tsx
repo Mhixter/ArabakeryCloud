@@ -259,10 +259,10 @@ export default function ExpensesPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Category</Label>
-              <Select value={filterCat} onValueChange={setFilterCat}>
+              <Select value={filterCat || "__none__"} onValueChange={v => setFilterCat(v === "__none__" ? "" : v)}>
                 <SelectTrigger className="h-9 text-sm w-40"><SelectValue placeholder="All categories" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All categories</SelectItem>
+                  <SelectItem value="__none__">All categories</SelectItem>
                   {categories.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -270,10 +270,10 @@ export default function ExpensesPage() {
             {isDirector && branches && branches.length > 1 && (
               <div className="space-y-1">
                 <Label className="text-xs">Branch</Label>
-                <Select value={filterBranch} onValueChange={setFilterBranch}>
+                <Select value={filterBranch || "__none__"} onValueChange={v => setFilterBranch(v === "__none__" ? "" : v)}>
                   <SelectTrigger className="h-9 text-sm w-40"><SelectValue placeholder="All branches" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All branches</SelectItem>
+                    <SelectItem value="__none__">All branches</SelectItem>
                     {branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -366,20 +366,20 @@ export default function ExpensesPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Category (optional)</Label>
-              <Select value={form.expenseCategoryId} onValueChange={v => setForm(f => ({ ...f, expenseCategoryId: v }))}>
+              <Select value={form.expenseCategoryId || "__none__"} onValueChange={v => setForm(f => ({ ...f, expenseCategoryId: v === "__none__" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No category</SelectItem>
+                  <SelectItem value="__none__">No category</SelectItem>
                   {categories.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Worker (optional)</Label>
-              <Select value={form.workerId} onValueChange={v => setForm(f => ({ ...f, workerId: v }))}>
+              <Select value={form.workerId || "__none__"} onValueChange={v => setForm(f => ({ ...f, workerId: v === "__none__" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Link to a worker" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No worker</SelectItem>
+                  <SelectItem value="__none__">No worker</SelectItem>
                   {workers.map(w => <SelectItem key={w.id} value={w.id.toString()}>{w.fullName} ({w.categoryName})</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -387,10 +387,10 @@ export default function ExpensesPage() {
             {isDirector && branches && branches.length > 1 && (
               <div className="space-y-1.5">
                 <Label>Branch (optional)</Label>
-                <Select value={form.branchId} onValueChange={v => setForm(f => ({ ...f, branchId: v }))}>
+                <Select value={form.branchId || "__none__"} onValueChange={v => setForm(f => ({ ...f, branchId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Company-wide" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Company-wide</SelectItem>
+                    <SelectItem value="__none__">Company-wide</SelectItem>
                     {branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

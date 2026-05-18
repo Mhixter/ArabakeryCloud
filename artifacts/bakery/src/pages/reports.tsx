@@ -128,10 +128,10 @@ function WeeklyReportTab() {
         {isDirector && branches && branches.length > 1 && (
           <div className="space-y-1.5">
             <Label className="text-xs">Branch</Label>
-            <Select value={branchId} onValueChange={setBranchId}>
+            <Select value={branchId || "__none__"} onValueChange={v => setBranchId(v === "__none__" ? "" : v)}>
               <SelectTrigger className="w-40 h-9 text-sm"><SelectValue placeholder="All branches" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Branches</SelectItem>
+                <SelectItem value="__none__">All Branches</SelectItem>
                 {branches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
