@@ -42,7 +42,7 @@ export default function RegisterPage() {
       setStoredCompany(data.company);
       applyTheme(data.company.themeColor ?? "amber");
       toast({ title: `Welcome to ${data.company.name}! Your 7-day trial has started.` });
-      setLocation("/dashboard");
+      setLocation("/branch-select");
     } catch {
       toast({ title: "Registration failed. Please try again.", variant: "destructive" });
     } finally {

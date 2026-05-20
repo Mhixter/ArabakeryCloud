@@ -27,6 +27,7 @@ import AdminCompaniesPage from "@/pages/admin/companies";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminTransactionsPage from "@/pages/admin/transactions";
 import AdminBackupPage from "@/pages/admin/backup";
+import BranchSelectPage from "@/pages/branch-select";
 import LandingHome from "@/pages/landing/home";
 import LandingFeatures from "@/pages/landing/features";
 import LandingPricing from "@/pages/landing/pricing";
@@ -102,6 +103,7 @@ function Router() {
       {/* Public */}
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/branch-select"><AuthGuard><BranchSelectPage /></AuthGuard></Route>
 
       {/* Super Admin */}
       <Route path="/admin/login" component={AdminLoginPage} />

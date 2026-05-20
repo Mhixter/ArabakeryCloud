@@ -68,6 +68,14 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
   const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds));
 
+  const todayExpConds = [isNull(expensesTable.deletedAt), eq(expensesTable.companyId, companyId), gte(expensesTable.expenseDate, todayStart), lte(expensesTable.expenseDate, todayEnd)];
+  if (branchFilter) todayExpConds.push(eq(expensesTable.branchId, branchFilter));
+  const todayExpenses = await db.select({ amount: expensesTable.amount }).from(expensesTable).where(and(...todayExpConds));
+
+  const weekExpConds = [isNull(expensesTable.deletedAt), eq(expensesTable.companyId, companyId), gte(expensesTable.expenseDate, weekStart)];
+  if (branchFilter) weekExpConds.push(eq(expensesTable.branchId, branchFilter));
+  const weekExpenses = await db.select({ amount: expensesTable.amount }).from(expensesTable).where(and(...weekExpConds));
+
   const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
   const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
@@ -189,12 +197,14 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
       totalQuantity: todaySales.reduce((s, x) => s + x.sale.quantity, 0),
       salesCount: todaySales.length,
+      totalExpenses: todayExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(todaySales),
     },
     week: {
       totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
       totalQuantity: weekSales.reduce((s, x) => s + x.sale.quantity, 0),
       salesCount: weekSales.length,
+      totalExpenses: weekExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(weekSales),
     },
     allTime: {

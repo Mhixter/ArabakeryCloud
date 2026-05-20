@@ -844,8 +844,8 @@ function ProductionDashboard() {
    ══════════════════════════════════════════════ */
 interface ProductDashboard {
   activeProductCount: number;
-  today: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
-  week: { totalAmount: number; totalQuantity: number; salesCount: number; byProduct: { name: string; quantity: number; amount: number }[] };
+  today: { totalAmount: number; totalQuantity: number; salesCount: number; totalExpenses: number; byProduct: { name: string; quantity: number; amount: number }[] };
+  week: { totalAmount: number; totalQuantity: number; salesCount: number; totalExpenses: number; byProduct: { name: string; quantity: number; amount: number }[] };
   allTime: { totalAmount: number; totalQuantity: number; salesCount: number };
   remaining: { name: string; produced: number; sold: number; allocated: number; remaining: number }[];
 }
@@ -1007,6 +1007,14 @@ function ManagerDashboard() {
         <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} />
         <KpiCard title={`Units — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
       </div>
+
+      {/* Expenses & Net Profit for period */}
+      {periodData && (
+        <div className="grid grid-cols-2 gap-3">
+          <KpiCard title={`Expenses — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData.totalExpenses ?? 0)} sub="recorded expenses" icon={ArrowUpRight} loading={loading} accent="red" />
+          <KpiCard title={`Net — ${periodLabel}`} value={loading ? "—" : formatCurrency((periodData.totalAmount ?? 0) - (periodData.totalExpenses ?? 0))} sub="revenue minus expenses" icon={TrendingUp} loading={loading} accent={(periodData.totalAmount ?? 0) - (periodData.totalExpenses ?? 0) >= 0 ? "green" : "red"} />
+        </div>
+      )}
 
       {/* Sales by product */}
       <Card className="rounded-2xl border-0 shadow-sm">

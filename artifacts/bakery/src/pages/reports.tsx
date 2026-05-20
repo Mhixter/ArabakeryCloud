@@ -147,12 +147,20 @@ function WeeklyReportTab() {
       {summary && <p className="text-xs text-muted-foreground -mt-1">{weekDays}</p>}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Revenue"   value={formatCurrency(summary?.sales.total.revenue)} loading={loading} />
-        <StatCard label="Profit"    value={formatCurrency(summary?.sales.total.profit)}  loading={loading} />
-        <StatCard label="Produced"  value={`${summary?.production.total.produced ?? 0} units`} loading={loading} />
-        <StatCard label="Expenses"  value={formatCurrency(summary?.expenses.total)} loading={loading} />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label="Revenue"    value={formatCurrency(summary?.sales.total.revenue)} loading={loading} />
+        <StatCard label="Gross Profit" value={formatCurrency(summary?.sales.total.profit)} loading={loading} />
+        <StatCard label="Expenses"   value={formatCurrency(summary?.expenses.total)} loading={loading} />
+        <StatCard label="Net Profit" value={formatCurrency((summary?.sales.total.revenue ?? 0) - (summary?.expenses.total ?? 0))} loading={loading} />
+        <StatCard label="Produced"   value={`${summary?.production.total.produced ?? 0} units`} loading={loading} />
       </div>
+      {summary && (
+        <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium ${(summary.sales.total.revenue - summary.expenses.total) >= 0 ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+          <span className="font-semibold">Net Profit this week:</span>
+          <span>{formatCurrency(summary.sales.total.revenue - summary.expenses.total)}</span>
+          <span className="text-xs opacity-60">= Revenue {formatCurrency(summary.sales.total.revenue)} − Expenses {formatCurrency(summary.expenses.total)}</span>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4">
         {/* Sales by product */}

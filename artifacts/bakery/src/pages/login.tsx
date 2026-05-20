@@ -77,7 +77,12 @@ export default function LoginPage() {
             branchName: (user.branchName ?? (data as any).branch?.name ?? company?.name ?? ""),
             username,
           });
-          setLocation("/dashboard");
+          const role = (data.user as { role?: string }).role;
+          if (role === "managing_director") {
+            setLocation("/branch-select");
+          } else {
+            setLocation("/dashboard");
+          }
         },
         onError: (error) => {
           const msg = (error as { data?: { error?: string } })?.data?.error ?? "Invalid credentials";

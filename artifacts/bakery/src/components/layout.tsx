@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
   Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich, Download,
-  PackageCheck, Activity, Receipt, Users2,
+  PackageCheck, Activity, Receipt, Users2, DoorOpen,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -65,11 +65,17 @@ function useLayoutState() {
     queryClient.clear(); setLocation("/login");
   };
 
+  const handleExitBranch = () => {
+    setActiveBranch(null);
+    queryClient.clear();
+    setLocation("/branch-select");
+  };
+
   const serviceLabel = activeBranch
     ? activeBranch.name.toUpperCase()
     : theme === "slate" ? "BAKERY SYS" : "Bakery System";
 
-  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, activeBranch, serviceLabel, isBranchLocked };
+  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, handleExitBranch, activeBranch, serviceLabel, isBranchLocked };
 }
 
 /* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
@@ -214,7 +220,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
               </div>
             )}
 
-            {/* Install + Logout */}
+            {/* Install + Switch Branch + Logout */}
             <div className="px-3 py-3 space-y-1">
               {canInstall && (
                 <button
@@ -222,6 +228,14 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                   <Download size={18} className="text-amber-500" />
                   <span>Install App</span>
+                </button>
+              )}
+              {userRole === "managing_director" && (
+                <button
+                  onClick={() => { setMoreOpen(false); ls.handleExitBranch(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                  <DoorOpen size={18} className="text-amber-500" />
+                  <span>Switch Branch</span>
                 </button>
               )}
               <button
@@ -299,6 +313,12 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
             <p className="text-xs font-semibold text-sidebar-foreground leading-none">{user?.fullName ?? "User"}</p>
             <p className="text-[10px] text-sidebar-foreground/50 mt-0.5">{ROLE_LABELS[userRole] ?? userRole}</p>
           </div>
+          {userRole === "managing_director" && (
+            <button onClick={ls.handleExitBranch} title="Switch Branch"
+              className="p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/60 transition-colors">
+              <DoorOpen size={15} />
+            </button>
+          )}
           <button onClick={handleLogout} data-testid="button-logout"
             className="p-1.5 rounded hover:bg-destructive/20 hover:text-destructive text-sidebar-foreground/60 transition-colors">
             <LogOut size={15} />
@@ -401,6 +421,13 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors mb-0.5">
             <Download size={15} />
             <span>Install App</span>
+          </button>
+        )}
+        {userRole === "managing_director" && (
+          <button onClick={handleExitBranch}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors mb-0.5">
+            <DoorOpen size={15} />
+            <span>Switch Branch</span>
           </button>
         )}
         <button data-testid="button-logout" onClick={handleLogout}
