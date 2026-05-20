@@ -56,7 +56,7 @@ function useLayoutState() {
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
   const visibleNav = NAV_ITEMS.filter(i => i.roles.includes(userRole));
-  const { activeBranch, isBranchLocked } = useActiveBranch();
+  const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
 
   useEffect(() => { initTheme(); }, []);
 
