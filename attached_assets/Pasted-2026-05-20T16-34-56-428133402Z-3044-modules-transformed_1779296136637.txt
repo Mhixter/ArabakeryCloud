@@ -1,0 +1,50 @@
+2026-05-20T16:34:56.428133402Z ✓ 3044 modules transformed.
+2026-05-20T16:34:56.855576452Z rendering chunks...
+2026-05-20T16:34:57.441701692Z computing gzip size...
+2026-05-20T16:34:57.579457377Z dist/public/registerSW.js                           0.13 kB
+2026-05-20T16:34:57.579487548Z dist/public/manifest.webmanifest                    0.85 kB
+2026-05-20T16:34:57.579512198Z dist/public/index.html                              2.30 kB │ gzip:   0.88 kB
+2026-05-20T16:34:57.579530969Z dist/public/assets/index-Bk1qgKyi.css             149.29 kB │ gzip:  23.98 kB
+2026-05-20T16:34:57.5795764Z dist/public/assets/purify.es-Cw43jA4y.js           25.13 kB │ gzip:   9.50 kB
+2026-05-20T16:34:57.579593441Z dist/public/assets/index.es-B-cJTTfQ.js           158.79 kB │ gzip:  53.02 kB
+2026-05-20T16:34:57.579607601Z dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+2026-05-20T16:34:57.579622512Z dist/public/assets/index-DYKRRgYv.js            2,200.99 kB │ gzip: 536.38 kB
+2026-05-20T16:34:57.579705724Z 
+2026-05-20T16:34:57.579714544Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-05-20T16:34:57.579719174Z - Using dynamic import() to code-split the application
+2026-05-20T16:34:57.579725024Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-05-20T16:34:57.579729104Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-05-20T16:34:57.580071133Z ✓ built in 8.77s
+2026-05-20T16:35:00.26752865Z 
+2026-05-20T16:35:00.267592062Z PWA v1.2.0
+2026-05-20T16:35:00.267604392Z mode      generateSW
+2026-05-20T16:35:00.267609232Z precache  12 entries (2675.16 KiB)
+2026-05-20T16:35:00.267614182Z files generated
+2026-05-20T16:35:00.267629703Z   dist/public/sw.js
+2026-05-20T16:35:00.267632492Z   dist/public/workbox-0c9e7665.js
+2026-05-20T16:35:01.24857117Z ==> Uploading build...
+2026-05-20T16:35:32.182463902Z ==> Uploaded in 10.3s. Compression took 20.6s
+2026-05-20T16:35:32.257153832Z ==> Build successful 🎉
+2026-05-20T16:35:35.209812297Z ==> Deploying...
+2026-05-20T16:35:35.31187096Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-05-20T16:35:58.530230511Z ==> Running 'node ./dist/index.mjs'
+2026-05-20T16:35:58.560082266Z node:internal/modules/cjs/loader:1459
+2026-05-20T16:35:58.560108757Z   throw err;
+2026-05-20T16:35:58.560114287Z   ^
+2026-05-20T16:35:58.560117937Z 
+2026-05-20T16:35:58.560122687Z Error: Cannot find module '/opt/render/project/src/artifacts/api-server/dist/index.mjs'
+2026-05-20T16:35:58.560126607Z     at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+2026-05-20T16:35:58.560129387Z     at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+2026-05-20T16:35:58.560131797Z     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+2026-05-20T16:35:58.560134987Z     at Module._load (node:internal/modules/cjs/loader:1242:25)
+2026-05-20T16:35:58.560137377Z     at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+2026-05-20T16:35:58.560139888Z     at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+2026-05-20T16:35:58.560142288Z     at node:internal/main/run_main_module:33:47 {
+2026-05-20T16:35:58.560145117Z   code: 'MODULE_NOT_FOUND',
+2026-05-20T16:35:58.560148658Z   requireStack: []
+2026-05-20T16:35:58.560151228Z }
+2026-05-20T16:35:58.560153508Z 
+2026-05-20T16:35:58.560155868Z Node.js v24.14.1
+2026-05-20T16:36:06.196981848Z ==> Exited with status 1
+2026-05-20T16:36:06.199528191Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2026-05-20T16:36:06.532214401Z ==> Instance srv-d856o077f7vs73afm1f0-tw7d8 restarted
