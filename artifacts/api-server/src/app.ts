@@ -29,6 +29,10 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "Ara Bakery Cloud API", version: "1.0.0" });
+});
+
 app.use("/api", router);
 
 export default app;
