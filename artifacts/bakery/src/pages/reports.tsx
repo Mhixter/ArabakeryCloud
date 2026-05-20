@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";
 import { useActiveBranch } from "@/lib/branch-context";
 import { getToken, getStoredUser, getStoredCompany } from "@/lib/auth";
 import {
@@ -70,7 +71,7 @@ function WeeklyReportTab() {
     try {
       const params = new URLSearchParams({ weekStart });
       if (branchId) params.set("branchId", branchId);
-      const res = await fetch(`/api/reports/weekly-summary?${params}`, { headers: apiHeaders() });
+      const res = await fetch(`${API_BASE}/api/reports/weekly-summary?${params}`, { headers: apiHeaders() });
       setSummary(res.ok ? await res.json() : null);
     } finally { setLoading(false); }
   }, [weekStart, branchId]);

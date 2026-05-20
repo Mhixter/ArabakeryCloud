@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE } from "@/lib/api";
 import {
   useListBranches,
   useCreateBranch,
@@ -72,7 +73,7 @@ export default function SettingsPage() {
     setDeletingId(id);
     try {
       const token = localStorage.getItem("nmb_token");
-      const res = await fetch(`/api/branches/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/api/branches/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed");
       toast({ title: "Branch removed" });
       invalidate();

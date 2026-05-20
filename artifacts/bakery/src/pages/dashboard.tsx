@@ -877,7 +877,7 @@ function ManagerDashboard() {
     if (branchId) params.set("branchId", branchId.toString());
     if (date) params.set("date", date);
     const qs = params.toString();
-    const url = `/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
+    const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
     setLoading(true);
     fetch(url, { headers, credentials: "include" })
       .then(r => r.ok ? r.json() : null)

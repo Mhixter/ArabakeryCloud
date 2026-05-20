@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListUsers,
@@ -159,7 +160,7 @@ export default function UsersPage() {
     }
     setResetting(true);
     try {
-      const res = await fetch(`/api/users/${resetUser.id}/reset-password`, {
+      const res = await fetch(`${API_BASE}/api/users/${resetUser.id}/reset-password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ newPassword }),
