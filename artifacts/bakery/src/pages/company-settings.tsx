@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Upload, Building2, Palette, CheckCircle, X } from "lucide-react";
+import { Loader2, Upload, Building2, Palette, CheckCircle, X, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/api";
 
@@ -17,6 +17,8 @@ export default function CompanySettingsPage() {
   const [company, setCompany] = useState<StoredCompany | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", address: "", themeColor: "amber", logoUrl: "" });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
     const loadCompany = async () => {
@@ -69,6 +71,35 @@ export default function CompanySettingsPage() {
       toast({ title: "Failed to save settings", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
+      toast({ title: "All password fields are required", variant: "destructive" }); return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      toast({ title: "New passwords do not match", variant: "destructive" }); return;
+    }
+    if (pwForm.next.length < 6) {
+      toast({ title: "New password must be at least 6 characters", variant: "destructive" }); return;
+    }
+    setPwLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(API_BASE + "/api/auth/change-password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.error ?? "Failed to change password", variant: "destructive" }); return; }
+      toast({ title: "Password changed successfully!" });
+      setPwForm({ current: "", next: "", confirm: "" });
+    } catch {
+      toast({ title: "Failed to change password", variant: "destructive" });
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -154,6 +185,29 @@ export default function CompanySettingsPage() {
       <Button onClick={handleSave} disabled={loading} size="lg">
         {loading ? <><Loader2 size={16} className="mr-2 animate-spin" />Saving...</> : "Save Changes"}
       </Button>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound size={18} />Change Password</CardTitle><CardDescription>Update your account password.</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Current Password</Label>
+            <Input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} placeholder="Enter current password" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>New Password</Label>
+              <Input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} placeholder="Min. 6 characters" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Confirm New Password</Label>
+              <Input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="Repeat new password" />
+            </div>
+          </div>
+          <Button onClick={handleChangePassword} disabled={pwLoading} variant="outline">
+            {pwLoading ? <><Loader2 size={14} className="mr-2 animate-spin" />Updating...</> : "Update Password"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

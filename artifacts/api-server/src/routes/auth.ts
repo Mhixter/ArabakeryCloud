@@ -247,6 +247,27 @@ router.post("/auth/logout", authenticate, async (req: AuthenticatedRequest, res)
   res.json({ success: true, message: "Logged out" });
 });
 
+router.patch("/auth/change-password", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Current and new password are required" });
+    return;
+  }
+  if (newPassword.length < 6) {
+    res.status(400).json({ error: "New password must be at least 6 characters" });
+    return;
+  }
+  const user = req.user!;
+  const [dbUser] = await db.select().from(usersTable).where(and(eq(usersTable.id, user.userId), isNull(usersTable.deletedAt)));
+  if (!dbUser) { res.status(404).json({ error: "User not found" }); return; }
+  if (!verifyPassword(currentPassword, dbUser.passwordHash)) {
+    res.status(400).json({ error: "Current password is incorrect" });
+    return;
+  }
+  await db.update(usersTable).set({ passwordHash: hashPassword(newPassword) }).where(eq(usersTable.id, user.userId));
+  res.json({ success: true });
+});
+
 router.get("/auth/me", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const user = req.user!;
   const [dbUser] = await db

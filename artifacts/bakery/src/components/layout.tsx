@@ -55,8 +55,15 @@ function useLayoutState() {
   const userRole = user?.role ?? "";
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
-  const visibleNav = NAV_ITEMS.filter(i => i.roles.includes(userRole));
   const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
+  const COMPANY_ONLY_PATHS = ["/company-settings", "/subscription", "/settings"];
+  const visibleNav = NAV_ITEMS.filter(i => {
+    if (!i.roles.includes(userRole)) return false;
+    if (userRole === "managing_director" && !activeBranch) {
+      return COMPANY_ONLY_PATHS.includes(i.href);
+    }
+    return true;
+  });
 
   useEffect(() => { initTheme(); }, []);
 
@@ -491,37 +498,10 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
   );
 }
 
-/* ── Shared branch banner — rendered ONCE here, not inside sub-layouts ── */
-function BranchBanner({ activeBranch, isBranchLocked, userRole }: {
-  activeBranch: { id: number; name: string } | null;
-  isBranchLocked: boolean;
-  userRole: string;
-}) {
-  if (!activeBranch) return null;
-  const canSwitch = !isBranchLocked && userRole === "managing_director";
-  return (
-    <div className="bg-amber-400/10 border-b border-amber-400/30 px-4 py-1.5 flex items-center gap-2 text-amber-800 text-xs font-medium flex-shrink-0">
-      <Building2 size={12} className="flex-shrink-0 text-amber-600" />
-      <span>
-        {isBranchLocked ? "Your branch:" : "Viewing branch:"}{" "}
-        <strong>{activeBranch.name}</strong>
-        {" — all data is filtered to this branch."}
-      </span>
-      {canSwitch && (
-        <Link href="/dashboard">
-          <button className="ml-auto text-amber-700 underline underline-offset-2 hover:text-amber-900 text-xs font-semibold whitespace-nowrap">
-            Switch branch
-          </button>
-        </Link>
-      )}
-    </div>
-  );
-}
-
 /* ─────────────────────── Root Layout ──────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
   const ls = useLayoutState();
-  const banner = <BranchBanner activeBranch={ls.activeBranch} isBranchLocked={ls.isBranchLocked} userRole={ls.userRole} />;
+  const banner = null;
 
   if (ls.theme === "blue") {
     return (
