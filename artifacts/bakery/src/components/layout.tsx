@@ -353,7 +353,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
 
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
 function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
-  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, serviceLabel } = ls;
+  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, handleExitBranch, serviceLabel } = ls;
   const { canInstall, install } = usePwaInstall();
 
   const SidebarContent = () => (
