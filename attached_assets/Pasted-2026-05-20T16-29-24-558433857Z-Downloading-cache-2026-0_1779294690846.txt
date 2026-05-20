@@ -1,0 +1,56 @@
+2026-05-20T16:29:24.558433857Z ==> Downloading cache...
+2026-05-20T16:29:24.593605284Z ==> Cloning from https://github.com/Mhixter/ArabakeryCloud
+2026-05-20T16:29:43.993309484Z ==> Checking out commit a1eee21297d224e5994b59e6d9073ad21d7e3e47 in branch main
+2026-05-20T16:29:48.334217151Z ==> Downloaded 107MB in 3s. Extraction took 3s.
+2026-05-20T16:29:55.0865352Z ==> Using Node.js version 24.14.1 (default)
+2026-05-20T16:29:55.086557131Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-05-20T16:29:55.15684657Z ==> Running build command 'pnpm install && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/bakery run build'...
+2026-05-20T16:30:01.397084645Z 
+2026-05-20T16:30:01.397108307Z > @workspace/bakery@0.0.0 build /opt/render/project/src/artifacts/bakery
+2026-05-20T16:30:01.397115617Z > vite build --config vite.config.ts
+2026-05-20T16:30:01.397119497Z 
+2026-05-20T16:30:01.718408786Z vite v7.3.1 building client environment for production...
+2026-05-20T16:30:01.786564434Z transforming...
+2026-05-20T16:30:02.867175525Z src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-20T16:30:04.388420072Z src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-20T16:30:04.399618589Z src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-20T16:30:04.406879444Z src/components/ui/sheet.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-20T16:30:09.091586751Z ✓ 3043 modules transformed.
+2026-05-20T16:30:09.481449723Z rendering chunks...
+2026-05-20T16:30:10.020545275Z computing gzip size...
+2026-05-20T16:30:10.18666183Z dist/public/registerSW.js                           0.13 kB
+2026-05-20T16:30:10.186691541Z dist/public/manifest.webmanifest                    0.85 kB
+2026-05-20T16:30:10.186703062Z dist/public/index.html                              2.30 kB │ gzip:   0.88 kB
+2026-05-20T16:30:10.186707742Z dist/public/assets/index-Bk1qgKyi.css             149.29 kB │ gzip:  23.98 kB
+2026-05-20T16:30:10.186739574Z dist/public/assets/purify.es-Cw43jA4y.js           25.13 kB │ gzip:   9.50 kB
+2026-05-20T16:30:10.186759665Z dist/public/assets/index.es-CZ6CMDkZ.js           158.79 kB │ gzip:  53.02 kB
+2026-05-20T16:30:10.186808468Z dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+2026-05-20T16:30:10.186823409Z dist/public/assets/index-B6qC-bMr.js            2,200.49 kB │ gzip: 536.28 kB
+2026-05-20T16:30:10.186872752Z 
+2026-05-20T16:30:10.186888573Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-05-20T16:30:10.186894374Z - Using dynamic import() to code-split the application
+2026-05-20T16:30:10.186899874Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-05-20T16:30:10.186904304Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-05-20T16:30:10.187244025Z ✓ built in 8.44s
+2026-05-20T16:30:12.226778538Z error during build:
+2026-05-20T16:30:12.22680163Z Error: 
+2026-05-20T16:30:12.22680711Z   Configure "workbox.maximumFileSizeToCacheInBytes" to change the limit: the default value is 2 MiB.
+2026-05-20T16:30:12.226825461Z   Check https://vite-pwa-org.netlify.app/guide/faq.html#missing-assets-from-sw-precache-manifest for more information.
+2026-05-20T16:30:12.226829351Z   Assets exceeding the limit:
+2026-05-20T16:30:12.226833192Z   - assets/index-B6qC-bMr.js is 2.2 MB, and won't be precached.
+2026-05-20T16:30:12.226835782Z 
+2026-05-20T16:30:12.226839332Z     at logWorkboxResult (file:///opt/render/project/src/node_modules/.pnpm/vite-plugin-pwa@1.2.0_@types+babel__core@7.20.5_vite@7.3.1_@types+node@25.3.5_jiti@2.6._56e9348653ce437f7c4e3ff6d322e998/node_modules/vite-plugin-pwa/dist/chunk-G4TAN34B.js:44:13)
+2026-05-20T16:30:12.226844102Z     at generateServiceWorker (file:///opt/render/project/src/node_modules/.pnpm/vite-plugin-pwa@1.2.0_@types+babel__core@7.20.5_vite@7.3.1_@types+node@25.3.5_jiti@2.6._56e9348653ce437f7c4e3ff6d322e998/node_modules/vite-plugin-pwa/dist/index.js:209:3)
+2026-05-20T16:30:12.226847062Z     at async _generateSW (file:///opt/render/project/src/node_modules/.pnpm/vite-plugin-pwa@1.2.0_@types+babel__core@7.20.5_vite@7.3.1_@types+node@25.3.5_jiti@2.6._56e9348653ce437f7c4e3ff6d322e998/node_modules/vite-plugin-pwa/dist/index.js:234:5)
+2026-05-20T16:30:12.226849893Z     at async Object.handler (file:///opt/render/project/src/node_modules/.pnpm/vite-plugin-pwa@1.2.0_@types+babel__core@7.20.5_vite@7.3.1_@types+node@25.3.5_jiti@2.6._56e9348653ce437f7c4e3ff6d322e998/node_modules/vite-plugin-pwa/dist/index.js:427:13)
+2026-05-20T16:30:12.226853513Z     at async PluginDriver.hookParallel (file:///opt/render/project/src/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/es/shared/node-entry.js:22475:17)
+2026-05-20T16:30:12.226857233Z     at async Object.close (file:///opt/render/project/src/node_modules/.pnpm/rollup@4.59.0/node_modules/rollup/dist/es/shared/node-entry.js:23494:13)
+2026-05-20T16:30:12.226860793Z     at async buildEnvironment (file:///opt/render/project/src/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_terser@5.46.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:33555:15)
+2026-05-20T16:30:12.226863843Z     at async Object.build (file:///opt/render/project/src/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_terser@5.46.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:33900:19)
+2026-05-20T16:30:12.226866874Z     at async Object.buildApp (file:///opt/render/project/src/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_terser@5.46.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:33897:153)
+2026-05-20T16:30:12.226871104Z     at async CAC.<anonymous> (file:///opt/render/project/src/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_terser@5.46.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/cli.js:629:3)
+2026-05-20T16:30:12.311607659Z /opt/render/project/src/artifacts/bakery:
+2026-05-20T16:30:12.3116238Z  ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/bakery@0.0.0 build: `vite build --config vite.config.ts`
+2026-05-20T16:30:12.31162765Z Exit status 1
+2026-05-20T16:30:12.364034653Z ==> Build failed 😞
+2026-05-20T16:30:12.364078446Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
