@@ -1,0 +1,44 @@
+2026-05-21T19:04:25.154732352Z ==> Downloading cache...
+2026-05-21T19:04:25.22286602Z ==> Cloning from https://github.com/Mhixter/ArabakeryCloud
+2026-05-21T19:04:25.297621451Z ==> No cache found, continuing without cache
+2026-05-21T19:04:48.587260536Z ==> Checking out commit 4be512aba96e1aa9aa47869a3bf3e1f183b6c9c1 in branch main
+2026-05-21T19:04:51.451479249Z ==> Installing dependencies with pnpm...
+2026-05-21T19:04:51.609763035Z ==> Using Node.js version 24.14.1 (default)
+2026-05-21T19:04:51.609784906Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-05-21T19:05:11.063733754Z ==> Running build command 'pnpm install && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/bakery run build'...
+2026-05-21T19:05:14.910785778Z 
+2026-05-21T19:05:14.910828829Z > @workspace/bakery@0.0.0 build /opt/render/project/src/artifacts/bakery
+2026-05-21T19:05:14.910836519Z > vite build --config vite.config.ts
+2026-05-21T19:05:14.910841579Z 
+2026-05-21T19:05:15.536583545Z vite v7.3.1 building client environment for production...
+2026-05-21T19:05:15.665986881Z transforming...
+2026-05-21T19:05:18.024936135Z src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-21T19:05:18.945394315Z src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-21T19:05:19.280222322Z src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-21T19:05:19.283488682Z src/components/ui/sheet.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-05-21T19:05:28.189513922Z ✓ 3033 modules transformed.
+2026-05-21T19:05:28.826112558Z rendering chunks...
+2026-05-21T19:05:29.879953942Z computing gzip size...
+2026-05-21T19:05:29.955538776Z dist/public/registerSW.js                           0.13 kB
+2026-05-21T19:05:29.955579927Z dist/public/manifest.webmanifest                    0.85 kB
+2026-05-21T19:05:29.955588298Z dist/public/index.html                              2.30 kB │ gzip:   0.88 kB
+2026-05-21T19:05:29.955639299Z dist/public/assets/index-Bi7EuiB4.css             149.71 kB │ gzip:  24.01 kB
+2026-05-21T19:05:29.95567456Z dist/public/assets/purify.es-Cw43jA4y.js           25.13 kB │ gzip:   9.50 kB
+2026-05-21T19:05:29.95568856Z dist/public/assets/index.es-DSJCtSns.js           158.79 kB │ gzip:  53.02 kB
+2026-05-21T19:05:29.955694571Z dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+2026-05-21T19:05:29.955699721Z dist/public/assets/index-ChqUwjKU.js            1,596.30 kB │ gzip: 452.99 kB
+2026-05-21T19:05:29.955814424Z 
+2026-05-21T19:05:29.955826124Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-05-21T19:05:29.955832234Z - Using dynamic import() to code-split the application
+2026-05-21T19:05:29.955838364Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-05-21T19:05:29.955863865Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-05-21T19:05:29.956304107Z ✓ built in 14.36s
+2026-05-21T19:05:33.836449687Z 
+2026-05-21T19:05:33.836482978Z PWA v1.2.0
+2026-05-21T19:05:33.836490688Z mode      generateSW
+2026-05-21T19:05:33.836496529Z precache  12 entries (2085.05 KiB)
+2026-05-21T19:05:33.836502109Z files generated
+2026-05-21T19:05:33.836507019Z   dist/public/sw.js
+2026-05-21T19:05:33.836511959Z   dist/public/workbox-7d58179f.js
+2026-05-21T19:05:35.531482953Z ==> Uploading build...
+2026-05-21T19:05:35.899109827Z ==> Your site is live 🎉
