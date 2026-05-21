@@ -867,6 +867,7 @@ function ManagerDashboard() {
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(true);
   /* selectedBranchId mirrors context — updated when user picks from dropdown */
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(activeBranch?.id ?? null);
 
@@ -890,10 +891,14 @@ function ManagerDashboard() {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     if (isDirector) {
+      setBranchesLoading(true);
       fetch(API_BASE + "/api/branches", { headers, credentials: "include" })
         .then(r => r.ok ? r.json() : [])
         .then((bs: Branch[]) => setBranches(bs))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setBranchesLoading(false));
+    } else {
+      setBranchesLoading(false);
     }
     fetchDashboard(activeBranch?.id ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -948,7 +953,7 @@ function ManagerDashboard() {
       {isDirector && !isBranchLocked && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground font-medium">Viewing branch:</span>
-          {branches.length === 0 ? (
+          {branchesLoading ? (
             <span className="text-sm text-muted-foreground italic">Loading…</span>
           ) : (
             <div className="relative">
