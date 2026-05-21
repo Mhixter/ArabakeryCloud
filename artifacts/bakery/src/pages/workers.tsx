@@ -76,7 +76,7 @@ export default function WorkersPage() {
     if (!catName.trim()) return;
     setCatSaving(true);
     try {
-      const url = editCat ? `/api/worker-categories/${editCat.id}` : "/api/worker-categories";
+      const url = editCat ? `${API_BASE}/api/worker-categories/${editCat.id}` : `${API_BASE}/api/worker-categories`;
       const method = editCat ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: apiHeaders(), body: JSON.stringify({ name: catName }) });
       if (!res.ok) {
@@ -118,7 +118,7 @@ export default function WorkersPage() {
     setWorkerSaving(true);
     try {
       const payload = { ...workerForm, workerCategoryId: selectedCat.id, branchId: workerForm.branchId || null };
-      const url = editWorker ? `/api/workers/${editWorker.id}` : "/api/workers";
+      const url = editWorker ? `${API_BASE}/api/workers/${editWorker.id}` : `${API_BASE}/api/workers`;
       const method = editWorker ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: apiHeaders(), body: JSON.stringify(payload) });
       if (!res.ok) {

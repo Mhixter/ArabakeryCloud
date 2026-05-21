@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getToken, getStoredUser } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ interface Product {
 
 function api(path: string, options?: RequestInit) {
   const token = getToken();
-  return fetch(`/api${path}`, {
+  return fetch(`${API_BASE}/api${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options?.headers ?? {}) },
   });
