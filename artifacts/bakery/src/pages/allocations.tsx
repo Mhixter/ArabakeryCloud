@@ -238,7 +238,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const sellersUrl = activeBranch ? `/api/allocations/sellers?branchId=${activeBranch.id}` : "/api/allocations/sellers";
+    const sellersUrl = `${API_BASE}/api/allocations/sellers`;
     /* Always fetch company-wide stock (no branch filter) — the API validates per-company not per-branch,
        and branch-filtered dashboard can show 0 when production was logged to a different branch. */
     Promise.all([

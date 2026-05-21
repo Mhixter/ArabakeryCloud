@@ -32,19 +32,13 @@ const formatAllocation = (
 
 /* GET /allocations/sellers — list sellers for dropdown (must come before :id routes) */
 router.get("/allocations/sellers", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { companyId, branchId: userBranchId, role } = req.user!;
-  const { branchId: queryBranchId } = req.query as { branchId?: string };
-  const branchFilter = queryBranchId
-    ? parseInt(queryBranchId)
-    : role === "managing_director" ? null : userBranchId;
-
+  const { companyId } = req.user!;
   const conditions = [
     eq(usersTable.companyId, companyId),
     eq(usersTable.role, "supplier" as const),
     isNull(usersTable.deletedAt),
     eq(usersTable.isActive, true),
   ] as Parameters<typeof and>[0][];
-  if (branchFilter) conditions.push(eq(usersTable.branchId, branchFilter));
 
   const sellers = await db
     .select({ id: usersTable.id, fullName: usersTable.fullName, agentId: usersTable.agentId, branchId: usersTable.branchId })
