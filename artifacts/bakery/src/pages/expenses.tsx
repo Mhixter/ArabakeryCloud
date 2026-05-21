@@ -109,7 +109,7 @@ export default function ExpensesPage() {
     if (!form.note.trim() || !form.amount) return;
     setSaving(true);
     try {
-      const url  = editExp ? `/api/expenses/${editExp.id}` : "/api/expenses";
+      const url  = editExp ? `${API_BASE}/api/expenses/${editExp.id}` : `${API_BASE}/api/expenses`;
       const meth = editExp ? "PATCH" : "POST";
       const res  = await fetch(url, { method: meth, headers: apiHeaders(), body: JSON.stringify({
         note: form.note, amount: form.amount,

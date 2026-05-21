@@ -431,7 +431,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   if (effectiveBranchId) expConds.push(eq(expensesTable.branchId, effectiveBranchId));
 
   const [sales, production, expenses] = await Promise.all([
-    db.select({ revenue: salesTable.revenue, profit: salesTable.profit, quantitySold: salesTable.quantitySold, productId: salesTable.productId, saleDate: salesTable.saleDate, branchId: salesTable.branchId })
+    db.select({ totalAmount: salesTable.totalAmount, profitAmount: salesTable.profitAmount, quantity: salesTable.quantity, breadType: salesTable.breadType, saleDate: salesTable.saleDate, branchId: salesTable.branchId })
       .from(salesTable).where(and(...saleConds)),
     db.select({ breadType: productionBatchesTable.breadType, quantityProduced: productionBatchesTable.quantityProduced, wasteQuantity: productionBatchesTable.wasteQuantity, productionDate: productionBatchesTable.productionDate })
       .from(productionBatchesTable).where(and(...prodConds)),
@@ -441,19 +441,18 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
       .where(and(...expConds)),
   ]);
 
-  /* aggregate sales by product */
-  const salesByProduct: Record<number, { productId: number; revenue: number; profit: number; qty: number }> = {};
+  /* aggregate sales by bread type */
+  const salesByType: Record<string, { breadType: string; revenue: number; profit: number; qty: number }> = {};
   let totalRevenue = 0, totalProfit = 0, totalQty = 0;
   sales.forEach(s => {
-    totalRevenue += Number(s.revenue ?? 0);
-    totalProfit  += Number(s.profit ?? 0);
-    totalQty     += Number(s.quantitySold ?? 0);
-    if (s.productId) {
-      if (!salesByProduct[s.productId]) salesByProduct[s.productId] = { productId: s.productId, revenue: 0, profit: 0, qty: 0 };
-      salesByProduct[s.productId].revenue += Number(s.revenue ?? 0);
-      salesByProduct[s.productId].profit  += Number(s.profit ?? 0);
-      salesByProduct[s.productId].qty     += Number(s.quantitySold ?? 0);
-    }
+    totalRevenue += parseFloat(s.totalAmount as unknown as string ?? "0");
+    totalProfit  += parseFloat(s.profitAmount as unknown as string ?? "0");
+    totalQty     += Number(s.quantity ?? 0);
+    const k = s.breadType ?? "Unknown";
+    if (!salesByType[k]) salesByType[k] = { breadType: k, revenue: 0, profit: 0, qty: 0 };
+    salesByType[k].revenue += parseFloat(s.totalAmount as unknown as string ?? "0");
+    salesByType[k].profit  += parseFloat(s.profitAmount as unknown as string ?? "0");
+    salesByType[k].qty     += Number(s.quantity ?? 0);
   });
 
   /* aggregate production by bread type */
@@ -472,18 +471,10 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   const expByCat: Record<string, number> = {};
   let totalExpenses = 0;
   expenses.forEach(e => {
-    totalExpenses += Number(e.amount ?? 0);
+    totalExpenses += parseFloat(e.amount as unknown as string ?? "0");
     const k = e.categoryName ?? "Uncategorised";
-    expByCat[k] = (expByCat[k] ?? 0) + Number(e.amount ?? 0);
+    expByCat[k] = (expByCat[k] ?? 0) + parseFloat(e.amount as unknown as string ?? "0");
   });
-
-  /* fetch product names for sold products */
-  const productIds = Object.keys(salesByProduct).map(Number);
-  const productNames: Record<number, string> = {};
-  if (productIds.length > 0) {
-    const prods = await db.select({ id: productsTable.id, name: productsTable.name }).from(productsTable).where(eq(productsTable.companyId, companyId));
-    prods.forEach(p => { productNames[p.id] = p.name; });
-  }
 
   res.json({
     weekStart: weekStart.toISOString(),
@@ -491,7 +482,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
     branchId: effectiveBranchId,
     sales: {
       total: { revenue: totalRevenue, profit: totalProfit, qty: totalQty },
-      byProduct: Object.values(salesByProduct).map(s => ({ ...s, productName: productNames[s.productId] ?? `Product #${s.productId}` })),
+      byProduct: Object.values(salesByType),
     },
     production: {
       total: { produced: totalProduced, waste: totalWaste },
@@ -500,7 +491,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
     expenses: {
       total: totalExpenses,
       byCategory: Object.entries(expByCat).map(([category, amount]) => ({ category, amount })),
-      records: expenses.map(e => ({ note: e.note, amount: Number(e.amount), category: e.categoryName ?? "Uncategorised", date: e.expenseDate })),
+      records: expenses.map(e => ({ note: e.note, amount: parseFloat(e.amount as unknown as string ?? "0"), category: e.categoryName ?? "Uncategorised", date: e.expenseDate })),
     },
   });
 });
