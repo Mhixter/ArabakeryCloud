@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, ShoppingCart, Factory, Package, PackageCheck,
-  Plus, FileText, Clock, ArrowUpRight, Layers, ChevronDown, RotateCcw, Download,
+  Plus, FileText, Clock, ArrowUpRight, Layers, RotateCcw, Download,
   CheckCircle2, AlertTriangle, Smartphone, Share,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -850,32 +850,21 @@ interface ProductDashboard {
   remaining: { name: string; produced: number; sold: number; allocated: number; remaining: number }[];
 }
 
-interface Branch { id: number; name: string }
-
 function ManagerDashboard() {
   const [, setLocation] = useLocation();
-  const user = getStoredUser();
-  const isDirector = user?.role === "managing_director";
-  const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
+  const { activeBranch } = useActiveBranch();
   const { canInstall, install, showIosHint } = useInstallPrompt();
 
-  /* activeBranch already comes from localStorage (via BranchContext initBranch).
-     Use it directly as the single source of truth — avoids the bug where
-     user.branchId (the MD's own home branch) would shadow a persisted selection. */
   const [period, setPeriod] = useState<"today" | "week" | "date">("today");
   const [customDate, setCustomDate] = useState<string>("");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [branchesLoading, setBranchesLoading] = useState(true);
-  /* selectedBranchId mirrors context — updated when user picks from dropdown */
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(activeBranch?.id ?? null);
 
-  const fetchDashboard = useCallback((branchId: number | null, date?: string) => {
+  const fetchDashboard = useCallback((date?: string) => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const params = new URLSearchParams();
-    if (branchId) params.set("branchId", branchId.toString());
+    if (activeBranch?.id) params.set("branchId", activeBranch.id.toString());
     if (date) params.set("date", date);
     const qs = params.toString();
     const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
@@ -885,32 +874,15 @@ function ManagerDashboard() {
       .then(d => { if (d) setData(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeBranch?.id]);
 
   useEffect(() => {
-    const token = localStorage.getItem("nmb_token");
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    if (isDirector) {
-      setBranchesLoading(true);
-      fetch(API_BASE + "/api/branches", { headers, credentials: "include" })
-        .then(r => r.ok ? r.json() : [])
-        .then((bs: Branch[]) => setBranches(bs))
-        .catch(() => {})
-        .finally(() => setBranchesLoading(false));
-    } else {
-      setBranchesLoading(false);
-    }
-    fetchDashboard(activeBranch?.id ?? null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirector, fetchDashboard]);
-
-  useEffect(() => {
-    fetchDashboard(selectedBranchId, period === "date" && customDate ? customDate : undefined);
-  }, [selectedBranchId, fetchDashboard]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   /* When user picks a custom date, re-fetch */
   useEffect(() => {
-    if (period === "date" && customDate) fetchDashboard(selectedBranchId, customDate);
+    if (period === "date" && customDate) fetchDashboard(customDate);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customDate]);
 
@@ -950,30 +922,10 @@ function ManagerDashboard() {
         </div>
       )}
 
-      {isDirector && !isBranchLocked && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Viewing branch:</span>
-          {branchesLoading ? (
-            <span className="text-sm text-muted-foreground italic">Loading…</span>
-          ) : (
-            <div className="relative">
-              <select
-                value={selectedBranchId ?? ""}
-                onChange={e => {
-                  const id = e.target.value ? parseInt(e.target.value) : null;
-                  setSelectedBranchId(id);
-                  const branch = id ? branches.find(b => b.id === id) ?? null : null;
-                  setActiveBranch(branch);
-                }}
-                className="appearance-none pl-3 pr-8 py-1.5 text-sm font-semibold rounded-xl bg-muted border-0 text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400"
-              >
-                <option value="">All Branches</option>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            </div>
-          )}
-        </div>
+      {activeBranch && (
+        <p className="text-sm text-muted-foreground">
+          Branch: <span className="font-semibold text-foreground">{activeBranch.name}</span>
+        </p>
       )}
 
       <div className="flex flex-wrap gap-2 items-center">
