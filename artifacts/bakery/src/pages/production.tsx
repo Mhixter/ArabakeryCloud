@@ -20,6 +20,8 @@ import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
 import { API_BASE } from "@/lib/api";
+import { generatePdf } from "@/lib/pdf";
+import { getStoredCompany } from "@/lib/auth";
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
 
@@ -205,18 +207,33 @@ export default function ProductionPage() {
             </div>
             {visibleBatches.length > 0 && (
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
-                onClick={() => downloadCSV(visibleBatches.map(b => ({
-                  Date: format(new Date(b.productionDate), "dd/MM/yyyy HH:mm"),
-                  "Bread Type": b.breadType,
-                  Produced: b.quantityProduced,
-                  Waste: b.wasteQuantity,
-                  Net: b.netQuantity,
-                  "Efficiency (%)": b.quantityProduced > 0 ? ((b.netQuantity / b.quantityProduced) * 100).toFixed(1) : "100",
-                  Staff: b.staffName,
-                  Branch: b.branchName,
-                  Notes: b.notes ?? "",
-                })), `production-batches-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
-                <Download size={12} /> Download CSV
+                onClick={() => {
+                  const company = getStoredCompany();
+                  generatePdf({
+                    title: "Production Report",
+                    subtitle: filterLabel,
+                    companyName: company?.name ?? "Bakery",
+                    companyPhone: company?.phone ?? undefined,
+                    sections: [{
+                      title: `Batches (${visibleBatches.length} records)`,
+                      headers: ["Date", "Bread Type", "Produced", "Waste", "Net", "Efficiency", "Staff", "Branch", "Notes"],
+                      rows: visibleBatches.map(b => [
+                        format(new Date(b.productionDate), "dd/MM/yyyy HH:mm"),
+                        b.breadType,
+                        b.quantityProduced,
+                        b.wasteQuantity,
+                        b.netQuantity,
+                        b.quantityProduced > 0 ? ((b.netQuantity / b.quantityProduced) * 100).toFixed(1) + "%" : "100%",
+                        b.staffName,
+                        b.branchName,
+                        b.notes ?? "",
+                      ]),
+                      totals: ["", "", statProduced.toString(), statWaste.toString(), statNet.toString(), "", "", "", ""],
+                    }],
+                    filename: `production-${filterDate || format(new Date(), "yyyy-MM-dd")}.pdf`,
+                  });
+                }}>
+                <Download size={12} /> Download PDF
               </Button>
             )}
           </div>

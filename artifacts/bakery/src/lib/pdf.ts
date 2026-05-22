@@ -115,7 +115,7 @@ export function generatePdf(opts: PdfOptions): void {
       doc.setFontSize(7);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(160, 160, 160);
-      doc.text("Powered by Ara Tech  ·  aratech.ng", margin, pageH - 3.5);
+      doc.text("Powered by Ara Tech", margin, pageH - 3.5);
       doc.text(
         `Page ${i} of ${pages}  ·  Generated ${new Date().toLocaleString("en-NG")}`,
         pageW - margin,

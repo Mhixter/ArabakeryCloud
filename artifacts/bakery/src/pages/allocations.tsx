@@ -11,9 +11,10 @@ import {
   PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
 } from "lucide-react";
 import { format } from "date-fns";
-import { getStoredUser } from "@/lib/auth";
+import { getStoredUser, getStoredCompany } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE } from "@/lib/api";
+import { generatePdf } from "@/lib/pdf";
 
 function formatDate(iso: string) {
   return format(new Date(iso), "dd MMM yyyy, HH:mm");
@@ -529,16 +530,31 @@ export default function AllocationsPage() {
               </div>
               {allocations.length > 0 && (
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs flex-shrink-0"
-                  onClick={() => downloadCSV([...allocations].reverse().map(a => ({
-                    Date: formatDate(a.allocationDate),
-                    "Bread Type": a.breadType,
-                    Quantity: a.quantity,
-                    Supplier: a.sellerName,
-                    "Issued By": a.issuedByName,
-                    Branch: a.branchName,
-                    Notes: a.notes ?? "",
-                  })), `allocations-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
-                  <Download size={12} /> Download CSV
+                  onClick={() => {
+                    const company = getStoredCompany();
+                    const rows = [...allocations].reverse();
+                    generatePdf({
+                      title: "Allocation History",
+                      companyName: company?.name ?? "Bakery",
+                      companyPhone: company?.phone ?? undefined,
+                      sections: [{
+                        title: `Allocations (${rows.length} records)`,
+                        headers: ["Date", "Bread Type", "Qty", "Supplier", "Issued By", "Branch", "Notes"],
+                        rows: rows.map(a => [
+                          formatDate(a.allocationDate),
+                          a.breadType,
+                          a.quantity,
+                          a.sellerName,
+                          a.issuedByName,
+                          a.branchName,
+                          a.notes ?? "",
+                        ]),
+                        totals: ["", "", rows.reduce((s, a) => s + a.quantity, 0).toString(), "", "", "", ""],
+                      }],
+                      filename: `allocations-${format(new Date(), "yyyy-MM-dd")}.pdf`,
+                    });
+                  }}>
+                  <Download size={12} /> Download PDF
                 </Button>
               )}
             </div>
@@ -627,17 +643,32 @@ export default function AllocationsPage() {
               <div className="flex items-center gap-2 flex-shrink-0">
                 {returns.length > 0 && (
                   <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
-                    onClick={() => downloadCSV([...returns].reverse().map(r => ({
-                      Date: formatDate(r.returnDate),
-                      Supplier: r.sellerName,
-                      "Bread Type": r.breadType,
-                      Quantity: r.quantity,
-                      Reason: r.reasonLabel,
-                      Status: r.status,
-                      "Actioned By": r.approvedByName ?? "",
-                      Notes: r.notes ?? "",
-                    })), `returns-${format(new Date(), "yyyy-MM-dd")}.csv`)}>
-                    <Download size={12} /> Download CSV
+                    onClick={() => {
+                      const company = getStoredCompany();
+                      const rows = [...returns].reverse();
+                      generatePdf({
+                        title: "Returns History",
+                        companyName: company?.name ?? "Bakery",
+                        companyPhone: company?.phone ?? undefined,
+                        sections: [{
+                          title: `Returns (${rows.length} records)`,
+                          headers: ["Date", "Supplier", "Bread Type", "Qty", "Reason", "Status", "Actioned By", "Notes"],
+                          rows: rows.map(r => [
+                            formatDate(r.returnDate),
+                            r.sellerName,
+                            r.breadType,
+                            r.quantity,
+                            r.reasonLabel,
+                            r.status,
+                            r.approvedByName ?? "",
+                            r.notes ?? "",
+                          ]),
+                          totals: ["", "", "", rows.reduce((s, r) => s + r.quantity, 0).toString(), "", "", "", ""],
+                        }],
+                        filename: `returns-${format(new Date(), "yyyy-MM-dd")}.pdf`,
+                      });
+                    }}>
+                    <Download size={12} /> Download PDF
                   </Button>
                 )}
                 {isSeller && (
