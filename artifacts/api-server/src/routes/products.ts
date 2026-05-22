@@ -84,7 +84,7 @@ router.post("/products", authenticate, requireRole("managing_director", "manager
 /* UPDATE — managing_director or manager only */
 router.patch("/products/:id", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
-    const { companyId, branchId } = req.user!;
+    const { companyId, branchId, role } = req.user!;
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
@@ -97,9 +97,10 @@ router.patch("/products/:id", authenticate, requireRole("managing_director", "ma
     if (unit !== undefined) updates.unit = unit.trim();
     if (isActive !== undefined) updates.isActive = Boolean(isActive);
 
-    const ownerFilter = branchId
-      ? and(eq(productsTable.id, id), eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
-      : and(eq(productsTable.id, id), eq(productsTable.companyId, companyId));
+    /* MDs can edit any product in their company; managers are restricted to their branch */
+    const ownerFilter = (role === "managing_director" || !branchId)
+      ? and(eq(productsTable.id, id), eq(productsTable.companyId, companyId))
+      : and(eq(productsTable.id, id), eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId));
 
     const [existing] = await db.select().from(productsTable).where(ownerFilter);
     if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
@@ -126,13 +127,12 @@ router.patch("/products/:id", authenticate, requireRole("managing_director", "ma
 /* DELETE — managing_director only */
 router.delete("/products/:id", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
-    const { companyId, branchId } = req.user!;
+    const { companyId } = req.user!;
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
-    const ownerFilter = branchId
-      ? and(eq(productsTable.id, id), eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
-      : and(eq(productsTable.id, id), eq(productsTable.companyId, companyId));
+    /* MDs can delete any product in their company */
+    const ownerFilter = and(eq(productsTable.id, id), eq(productsTable.companyId, companyId));
 
     const [existing] = await db.select().from(productsTable).where(ownerFilter);
     if (!existing) { res.status(404).json({ error: "Product not found" }); return; }

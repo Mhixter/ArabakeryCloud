@@ -327,6 +327,7 @@ function ReceptionistDashboard() {
   const [, setLocation] = useLocation();
   const [stockData, setStockData]  = useState<{ name: string; produced: number; sold: number; remaining: number }[]>([]);
   const [stockLoading, setStockLoading] = useState(true);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
   const [returns, setReturns]      = useState<{ id: number; breadType: string; quantity: number; reasonLabel: string; returnDate: string; status: string }[]>([]);
   const [dailySummary, setDailySummary] = useState<{ totalSales: number; cashSales: number; totalUnits: number } | null>(null);
   const [dailyLoading, setDailyLoading] = useState(true);
@@ -348,7 +349,8 @@ function ReceptionistDashboard() {
       fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(API_BASE + "/api/returns", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/api/sales?startDate=${encodeURIComponent(startOfDay)}&endDate=${encodeURIComponent(endOfDay)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-    ]).then(([dash, ret, ts]) => {
+      fetch(API_BASE + "/api/inventory", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([dash, ret, ts, inv]) => {
       if (dash?.remaining) setStockData(dash.remaining);
       setReturns(ret);
       const salesArr = ts as Sale[];
@@ -356,6 +358,8 @@ function ReceptionistDashboard() {
       const totalUnits = salesArr.reduce((s: number, x: Sale) => s + x.quantity, 0);
       const cashSales  = salesArr.filter((x: Sale) => x.paymentMethod === "cash").reduce((s: number, x: Sale) => s + x.totalAmount, 0);
       setDailySummary({ totalSales: salesArr.length, cashSales, totalUnits });
+      const invItems = inv as { currentQuantity: number }[];
+      setInventoryTotal(Math.round(invItems.reduce((s, i) => s + (i.currentQuantity ?? 0), 0)));
     }).catch(() => {}).finally(() => { setStockLoading(false); setDailyLoading(false); });
   }, [todayDate]);
 
@@ -400,7 +404,7 @@ function ReceptionistDashboard() {
         <KpiCard title="Units Sold" value={`${todayUnits}`} sub="today" icon={Package} loading={dailyLoading} accent="amber" />
         <KpiCard title="Cash Collected" value={formatCurrency(dailySummary?.cashSales ?? 0)} sub="cash today" icon={TrendingUp} loading={dailyLoading} accent="green" />
         <KpiCard title="Pending Returns" value={`${todayPendingReturns.length}`} sub="from suppliers today" icon={RotateCcw} loading={stockLoading} accent={todayPendingReturns.length > 0 ? "red" : "default"} />
-        <KpiCard title="Total In Stock" value={stockLoading ? "—" : `${stockData.reduce((s, i) => s + i.remaining, 0)}`} sub="across all types" icon={Layers} loading={stockLoading} accent={stockData.some(i => i.remaining < 10) ? "red" : "default"} />
+        <KpiCard title="Total In Stock" value={stockLoading ? "—" : `${inventoryTotal}`} sub="from inventory" icon={Layers} loading={stockLoading} accent={inventoryTotal < 10 ? "red" : "default"} />
       </div>
 
       {/* Remaining stock by bread type */}
@@ -859,6 +863,7 @@ function ManagerDashboard() {
   const [customDate, setCustomDate] = useState<string>("");
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
 
   const fetchDashboard = useCallback((date?: string) => {
     const token = localStorage.getItem("nmb_token");
@@ -868,10 +873,17 @@ function ManagerDashboard() {
     if (date) params.set("date", date);
     const qs = params.toString();
     const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
+    const invUrl = `${API_BASE}/api/inventory${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`;
     setLoading(true);
-    fetch(url, { headers, credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setData(d); })
+    Promise.all([
+      fetch(url, { headers, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(invUrl, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ])
+      .then(([d, inv]) => {
+        if (d) setData(d);
+        const invItems = inv as { currentQuantity: number }[];
+        setInventoryTotal(Math.round(invItems.reduce((s, i) => s + (i.currentQuantity ?? 0), 0)));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [activeBranch?.id]);
@@ -949,7 +961,7 @@ function ManagerDashboard() {
       {/* Stock overview */}
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
-        <KpiCard title="Total In Stock" value={loading ? "—" : `${(data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0)}`} sub="across all types" icon={Package} loading={loading} accent={(data?.remaining ?? []).some(r => r.remaining < 10) ? "red" : "default"} />
+        <KpiCard title="Total In Stock" value={loading ? "—" : `${inventoryTotal}`} sub="from inventory" icon={Package} loading={loading} accent={inventoryTotal < 10 ? "red" : "default"} />
       </div>
 
       {/* All-time totals — always visible regardless of period */}

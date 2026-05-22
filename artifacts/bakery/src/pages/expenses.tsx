@@ -51,6 +51,10 @@ export default function ExpensesPage() {
   const [filterCat, setFilterCat] = useState("");
   const [filterBranch, setFilterBranch] = useState(activeBranch?.id?.toString() ?? "");
 
+  useEffect(() => {
+    setFilterBranch(activeBranch?.id?.toString() ?? "");
+  }, [activeBranch?.id]);
+
   const [expenses, setExpenses]     = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [workers, setWorkers]       = useState<Worker[]>([]);
@@ -68,6 +72,10 @@ export default function ExpensesPage() {
     note: "", amount: "", expenseCategoryId: "", workerId: "", branchId: activeBranch?.id?.toString() ?? "", expenseDate: toLocalDate(now),
   });
 
+  useEffect(() => {
+    setForm(f => ({ ...f, branchId: activeBranch?.id?.toString() ?? "" }));
+  }, [activeBranch?.id]);
+
   const { data: branches } = useListBranches();
 
   const loadAll = useCallback(async () => {
@@ -78,16 +86,17 @@ export default function ExpensesPage() {
       if (endDate)   params.set("endDate",   new Date(`${endDate}T23:59:59`).toISOString());
       if (filterCat) params.set("categoryId", filterCat);
       if (filterBranch && isDirector) params.set("branchId", filterBranch);
+      const workersBranchParam = activeBranch?.id ? `?branchId=${activeBranch.id}` : "";
       const [expRes, catRes, workerRes] = await Promise.all([
         fetch(`${API_BASE}/api/expenses?${params}`, { headers: apiHeaders() }),
         fetch(API_BASE + "/api/expense-categories", { headers: apiHeaders() }),
-        fetch(API_BASE + "/api/workers", { headers: apiHeaders() }),
+        fetch(`${API_BASE}/api/workers${workersBranchParam}`, { headers: apiHeaders() }),
       ]);
       setExpenses(expRes.ok ? await expRes.json() : []);
       setCategories(catRes.ok ? await catRes.json() : []);
       setWorkers(workerRes.ok ? await workerRes.json() : []);
     } finally { setLoading(false); }
-  }, [startDate, endDate, filterCat, filterBranch, isDirector]);
+  }, [startDate, endDate, filterCat, filterBranch, isDirector, activeBranch?.id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -106,7 +115,10 @@ export default function ExpensesPage() {
   };
 
   const saveExpense = async () => {
-    if (!form.note.trim() || !form.amount) return;
+    if (!form.note.trim()) { toast({ title: "Note is required", variant: "destructive" }); return; }
+    if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) {
+      toast({ title: "Please enter a valid amount", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
       const url  = editExp ? `${API_BASE}/api/expenses/${editExp.id}` : `${API_BASE}/api/expenses`;
