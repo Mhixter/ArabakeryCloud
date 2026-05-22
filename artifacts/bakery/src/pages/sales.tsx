@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   useListSales, useCreateSale, useListBranches,
-  getListSalesQueryKey,
+  getListSalesQueryKey, getGetDailySalesSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useActiveBranch } from "@/lib/branch-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,13 +22,14 @@ import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 import { API_BASE } from "@/lib/api";
 
-/** Per-user receipt storage — prevents receipts leaking between suppliers/users in the same company */
-function getSlipsKey(): string {
+/** Per-user, per-branch receipt storage — prevents receipts leaking between users or branches */
+function getSlipsKey(branchId?: number | null): string {
   try {
     const raw = localStorage.getItem("nmb_user");
     const user = raw ? JSON.parse(raw) : null;
-    if (user?.companyId && user?.id) return `nmb_slips_${user.companyId}_${user.id}`;
-    if (user?.companyId) return `nmb_slips_${user.companyId}`;
+    const branchSuffix = branchId ? `_b${branchId}` : "";
+    if (user?.companyId && user?.id) return `nmb_slips_${user.companyId}_${user.id}${branchSuffix}`;
+    if (user?.companyId) return `nmb_slips_${user.companyId}${branchSuffix}`;
     return "nmb_slips";
   } catch { return "nmb_slips"; }
 }
@@ -63,19 +64,19 @@ export interface ReceiptData {
 }
 
 /* ── localStorage helpers ── */
-function loadSlips(): ReceiptData[] {
+function loadSlips(branchId?: number | null): ReceiptData[] {
   try {
-    const raw = localStorage.getItem(getSlipsKey());
+    const raw = localStorage.getItem(getSlipsKey(branchId));
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function saveSlip(receipt: ReceiptData) {
-  const slips = loadSlips();
+function saveSlip(receipt: ReceiptData, branchId?: number | null) {
+  const slips = loadSlips(branchId);
   const exists = slips.some(s => s.receiptNumber === receipt.receiptNumber);
   if (!exists) {
     slips.unshift({ ...receipt, savedAt: new Date().toISOString() });
-    localStorage.setItem(getSlipsKey(), JSON.stringify(slips.slice(0, 200)));
+    localStorage.setItem(getSlipsKey(branchId), JSON.stringify(slips.slice(0, 200)));
   }
 }
 
@@ -236,11 +237,13 @@ function ReceiptModal({ sale, onClose }: { sale: ReceiptData; onClose: () => voi
 
 /* ── Saved Slips Section ── */
 function SavedSlipsSection() {
+  const { activeBranch } = useActiveBranch();
+  const branchId = activeBranch?.id ?? null;
   const [slips, setSlips] = useState<ReceiptData[]>([]);
   const [viewing, setViewing] = useState<ReceiptData | null>(null);
   const company = getStoredCompany();
 
-  useEffect(() => { setSlips(loadSlips()); }, []);
+  useEffect(() => { setSlips(loadSlips(branchId)); }, [branchId]);
 
   if (slips.length === 0) {
     return (
@@ -310,12 +313,15 @@ function SavedSlipsSection() {
 /* ══════════════════════════════════════════════
    MAIN SALES PAGE
    ══════════════════════════════════════════════ */
-function useProducts() {
+function useProducts(branchId?: number | null) {
   const token = getToken();
   return useQuery<{ id: number; name: string; pricePerUnit: number; isActive: boolean }[]>({
-    queryKey: ["products"],
+    queryKey: ["products", branchId ?? null],
     queryFn: async () => {
-      const res = await fetch(API_BASE + "/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      const url = branchId
+        ? `${API_BASE}/api/products?branchId=${branchId}`
+        : `${API_BASE}/api/products`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return [];
       return res.json();
     },
@@ -334,7 +340,11 @@ export default function SalesPage() {
   const { isExpired } = useSubscription();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: products } = useProducts();
+
+  const { activeBranch } = useActiveBranch();
+  const branchParam = activeBranch?.id ?? null;
+
+  const { data: products } = useProducts(branchParam);
   const activeProducts = products?.filter(p => p.isActive) ?? [];
 
   const [showNewSale, setShowNewSale] = useState(false);
@@ -353,9 +363,6 @@ export default function SalesPage() {
     notes: "",
   });
 
-  const { activeBranch } = useActiveBranch();
-  const branchParam = activeBranch?.id ?? null;
-
   useEffect(() => {
     if (activeBranch) {
       setForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
@@ -373,6 +380,7 @@ export default function SalesPage() {
   const { data: branches } = useListBranches();
 
   /* Stats computed from the already-fetched sales array — always in sync with the date filter */
+  const isToday       = filterDate === todayStr();
   const statsSales    = sales ?? [];
   const statsOrders   = statsSales.length;
   const statsRevenue  = statsSales.reduce((s, x) => s + x.totalAmount, 0);
@@ -419,7 +427,7 @@ export default function SalesPage() {
             branchAddress: (sale as any).branchAddress ?? null,
             saleDate:      sale.saleDate,
           };
-          saveSlip(receipt);
+          saveSlip(receipt, branchParam);
           setReceiptSale(receipt);
           setForm({ breadType: "", quantity: "", pricePerUnit: "", paymentMethod: "cash", branchId: user?.branchId?.toString() ?? "", notes: "" });
         },
@@ -446,7 +454,6 @@ export default function SalesPage() {
     saleDate:      sale.saleDate,
   });
 
-  const isToday = filterDate === todayStr();
   const dateLabel = filterDate
     ? isToday ? "Today" : format(new Date(filterDate + "T12:00:00"), "dd MMM yyyy")
     : "All Time";

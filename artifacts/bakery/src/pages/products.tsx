@@ -65,7 +65,8 @@ export default function ProductsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (body: typeof emptyForm) => {
-      const res = await api("/products", { method: "POST", body: JSON.stringify(body) });
+      const payload = { ...body, branchId: activeBranch?.id ?? null };
+      const res = await api("/products", { method: "POST", body: JSON.stringify(payload) });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d?.error ?? "Failed to create product"); }
       return res.json();
     },

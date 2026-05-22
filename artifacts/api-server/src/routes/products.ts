@@ -42,17 +42,21 @@ router.get("/products", authenticate, async (req: AuthenticatedRequest, res): Pr
 /* CREATE — managing_director or manager only */
 router.post("/products", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
-    const { companyId, branchId } = req.user!;
-    const { name, description, pricePerUnit, unit } = req.body;
+    const { companyId, branchId: jwtBranchId } = req.user!;
+    const { name, description, pricePerUnit, unit, branchId: bodyBranchId } = req.body;
 
     if (!name?.trim()) {
       res.status(400).json({ error: "Product name is required" });
       return;
     }
 
+    /* Prefer branchId from the request body (sent by the frontend for the active branch),
+       falling back to the JWT branchId for backwards compatibility */
+    const effectiveBranchId = bodyBranchId != null ? Number(bodyBranchId) || null : (jwtBranchId ?? null);
+
     const [product] = await db.insert(productsTable).values({
       companyId,
-      branchId: branchId ?? null,
+      branchId: effectiveBranchId,
       name: name.trim(),
       description: description?.trim() || null,
       pricePerUnit: (parseFloat(pricePerUnit) || 0).toFixed(2),
@@ -67,7 +71,7 @@ router.post("/products", authenticate, requireRole("managing_director", "manager
       action: "PRODUCT_CREATED",
       entityType: "product",
       entityId: product.id,
-      details: `Created product: ${product.name}${branchId ? ` (branch ${branchId})` : ""}`,
+      details: `Created product: ${product.name}${effectiveBranchId ? ` (branch ${effectiveBranchId})` : ""}`,
     });
 
     res.status(201).json(formatProduct(product));
