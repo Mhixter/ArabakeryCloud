@@ -19,16 +19,19 @@ const formatProduct = (p: typeof productsTable.$inferSelect) => ({
   updatedAt: p.updatedAt.toISOString(),
 });
 
-/* LIST — scoped to the user's branch when branchId is present */
+/* LIST — scoped to the active branch; accepts ?branchId query param for MDs switching branches */
 router.get("/products", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { companyId, branchId } = req.user!;
+  const { companyId, branchId: jwtBranchId } = req.user!;
+  const { branchId: queryBranchId } = req.query as { branchId?: string };
+
+  const effectiveBranchId = queryBranchId ? parseInt(queryBranchId) : (jwtBranchId ?? null);
 
   const products = await db
     .select()
     .from(productsTable)
     .where(
-      branchId
-        ? and(eq(productsTable.companyId, companyId), eq(productsTable.branchId, branchId))
+      effectiveBranchId
+        ? and(eq(productsTable.companyId, companyId), eq(productsTable.branchId, effectiveBranchId))
         : eq(productsTable.companyId, companyId),
     )
     .orderBy(productsTable.name);

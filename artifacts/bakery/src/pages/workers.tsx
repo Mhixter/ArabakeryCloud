@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, Users, Tag, Phone, ChevronRight } from "lucide-react";
 import { useListBranches } from "@workspace/api-client-react";
+import { useActiveBranch } from "@/lib/branch-context";
 import { API_BASE } from "@/lib/api";
 
 interface WorkerCategory { id: number; name: string; }
@@ -27,6 +28,7 @@ export default function WorkersPage() {
   const { toast } = useToast();
   const user = getStoredUser();
   const isDirector = user?.role === "managing_director";
+  const { activeBranch } = useActiveBranch();
 
   const [categories, setCategories] = useState<WorkerCategory[]>([]);
   const [workers, setWorkers]       = useState<Worker[]>([]);
@@ -61,9 +63,10 @@ export default function WorkersPage() {
   const loadWorkers = useCallback(async (catId?: number) => {
     const id = catId ?? selectedCat?.id;
     if (!id) return;
-    const res = await fetch(`${API_BASE}/api/workers?categoryId=${id}`, { headers: apiHeaders() });
+    const branchParam = activeBranch ? `&branchId=${activeBranch.id}` : "";
+    const res = await fetch(`${API_BASE}/api/workers?categoryId=${id}${branchParam}`, { headers: apiHeaders() });
     setWorkers(res.ok ? await res.json() : []);
-  }, [selectedCat?.id]);
+  }, [selectedCat?.id, activeBranch?.id]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => { if (selectedCat) loadWorkers(selectedCat.id); }, [selectedCat, loadWorkers]);

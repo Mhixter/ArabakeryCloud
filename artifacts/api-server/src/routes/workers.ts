@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, workerCategoriesTable, workersTable, branchesTable } from "@workspace/db";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, asc, or } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router = Router();
@@ -52,10 +52,16 @@ router.delete("/worker-categories/:id", authenticate, requireRole(...MANAGE_ROLE
 /* ── Workers ── */
 
 router.get("/workers", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { companyId } = req.user!;
-  const { categoryId } = req.query as { categoryId?: string };
+  const { companyId, branchId: jwtBranchId } = req.user!;
+  const { categoryId, branchId: queryBranchId } = req.query as { categoryId?: string; branchId?: string };
+
+  const effectiveBranchId = queryBranchId ? parseInt(queryBranchId) : (jwtBranchId ?? null);
+
   const conds: any[] = [eq(workersTable.companyId, companyId), isNull(workersTable.deletedAt)];
   if (categoryId) conds.push(eq(workersTable.workerCategoryId, parseInt(categoryId)));
+  if (effectiveBranchId) {
+    conds.push(or(eq(workersTable.branchId, effectiveBranchId), isNull(workersTable.branchId)));
+  }
 
   const rows = await db
     .select({

@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, branchesTable } from "@workspace/db";
 import { eq, isNull, and } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
@@ -39,12 +39,34 @@ const formatUser = (u: typeof usersTable.$inferSelect) => ({
 
 router.get("/users", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
-  const users = await db
-    .select()
+  const { branchId: queryBranchId } = req.query as { branchId?: string };
+
+  const conds: any[] = [eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)];
+  if (queryBranchId) conds.push(eq(usersTable.branchId, parseInt(queryBranchId)));
+
+  const rows = await db
+    .select({
+      id: usersTable.id,
+      username: usersTable.username,
+      agentId: usersTable.agentId,
+      fullName: usersTable.fullName,
+      email: usersTable.email,
+      role: usersTable.role,
+      branchId: usersTable.branchId,
+      branchName: branchesTable.name,
+      companyId: usersTable.companyId,
+      isActive: usersTable.isActive,
+      createdAt: usersTable.createdAt,
+      updatedAt: usersTable.updatedAt,
+      deletedAt: usersTable.deletedAt,
+      passwordHash: usersTable.passwordHash,
+    })
     .from(usersTable)
-    .where(and(eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)))
+    .leftJoin(branchesTable, eq(usersTable.branchId, branchesTable.id))
+    .where(and(...conds))
     .orderBy(usersTable.createdAt);
-  res.json(users.map(formatUser));
+
+  res.json(rows.map(u => ({ ...formatUser(u as typeof usersTable.$inferSelect), branchName: u.branchName ?? null })));
 });
 
 router.post("/users", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getToken, getStoredUser } from "@/lib/auth";
 import { API_BASE } from "@/lib/api";
+import { useActiveBranch } from "@/lib/branch-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,11 +31,12 @@ function api(path: string, options?: RequestInit) {
   });
 }
 
-function useProducts() {
+function useProducts(branchId?: number | null) {
   return useQuery<Product[]>({
-    queryKey: ["products"],
+    queryKey: ["products", branchId ?? null],
     queryFn: async () => {
-      const res = await api("/products");
+      const url = branchId ? `/products?branchId=${branchId}` : "/products";
+      const res = await api(url);
       if (!res.ok) throw new Error("Failed to load products");
       return res.json();
     },
@@ -48,15 +50,18 @@ export default function ProductsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getStoredUser();
+  const { activeBranch } = useActiveBranch();
   const canWrite = !isExpired && (user?.role === "managing_director" || user?.role === "manager");
   const canDelete = !isExpired && user?.role === "managing_director";
 
-  const { data: products, isLoading } = useProducts();
+  const { data: products, isLoading } = useProducts(activeBranch?.id);
 
   const [showNew, setShowNew] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
+
+  const invalidateProducts = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
   const createMutation = useMutation({
     mutationFn: async (body: typeof emptyForm) => {
@@ -65,7 +70,7 @@ export default function ProductsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      invalidateProducts();
       toast({ title: "Product added" });
       setShowNew(false);
       setForm(emptyForm);
@@ -80,7 +85,7 @@ export default function ProductsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      invalidateProducts();
       toast({ title: "Product updated" });
       setEditProduct(null);
     },
@@ -94,7 +99,7 @@ export default function ProductsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      invalidateProducts();
       toast({ title: "Product deleted" });
       setDeleteConfirm(null);
     },
