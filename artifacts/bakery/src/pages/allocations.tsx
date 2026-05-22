@@ -371,8 +371,8 @@ export default function AllocationsPage() {
   const load = useCallback(() => {
     const token = localStorage.getItem("nmb_token");
     setLoading(true);
-    const allUrl = activeBranch ? `/api/allocations?branchId=${activeBranch.id}` : "/api/allocations";
-    const retUrl = activeBranch ? `/api/returns?branchId=${activeBranch.id}` : "/api/returns";
+    const allUrl = activeBranch ? `${API_BASE}/api/allocations?branchId=${activeBranch.id}` : `${API_BASE}/api/allocations`;
+    const retUrl = activeBranch ? `${API_BASE}/api/returns?branchId=${activeBranch.id}` : `${API_BASE}/api/returns`;
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.all([
       fetch(allUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),

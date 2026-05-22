@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
-  useListSales, useCreateSale, useGetDailySalesSummary, useListBranches,
-  getListSalesQueryKey, getGetDailySalesSummaryQueryKey,
+  useListSales, useCreateSale, useListBranches,
+  getListSalesQueryKey,
 } from "@workspace/api-client-react";
 import { useActiveBranch } from "@/lib/branch-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } from "lucide-react";
+import { generatePdf, fmtCurrency as pdfFmt } from "@/lib/pdf";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 import { API_BASE } from "@/lib/api";
@@ -369,8 +370,17 @@ export default function SalesPage() {
   }
 
   const { data: sales, isLoading } = useListSales(listParams as any);
-  const { data: dailySummary } = useGetDailySalesSummary({ branchId: branchParam });
   const { data: branches } = useListBranches();
+
+  /* Stats computed from the already-fetched sales array — always in sync with the date filter */
+  const statsSales    = sales ?? [];
+  const statsOrders   = statsSales.length;
+  const statsRevenue  = statsSales.reduce((s, x) => s + x.totalAmount, 0);
+  const statsCash     = statsSales.filter(x => x.paymentMethod === "cash").reduce((s, x) => s + x.totalAmount, 0);
+  const statsTransfer = statsSales.filter(x => x.paymentMethod === "transfer").reduce((s, x) => s + x.totalAmount, 0);
+  const statsLabel    = filterDate
+    ? (isToday ? "Today's" : format(new Date(filterDate + "T12:00:00"), "d MMM yyyy"))
+    : "All-Time";
   const createSale = useCreateSale();
 
   const handleCreate = () => {
@@ -490,24 +500,22 @@ export default function SalesPage() {
         <Badge variant="secondary" className="text-xs">{dateLabel}</Badge>
       </div>
 
-      {/* Daily Summary — supplier/receptionist see only today's daily numbers */}
-      {dailySummary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {[
-            { label: "Today's Sales",    value: `${dailySummary.totalSales} orders`,        icon: ShoppingCart, show: true },
-            { label: "Today's Revenue",  value: formatCurrency(dailySummary.totalRevenue),   icon: TrendingUp,   show: !isLimitedRole },
-            { label: "Cash",             value: formatCurrency(dailySummary.cashSales),      icon: TrendingUp,   show: true },
-            { label: "Transfer",         value: formatCurrency(dailySummary.transferSales),  icon: TrendingUp,   show: true },
-          ].filter(i => i.show).map(item => (
-            <Card key={item.label}>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className="text-lg font-bold text-foreground mt-0.5">{item.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Summary cards — always in sync with the active date filter */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        {[
+          { label: `${statsLabel} Sales`,   value: `${statsOrders} orders`,         icon: ShoppingCart, show: true },
+          { label: `${statsLabel} Revenue`, value: formatCurrency(statsRevenue),     icon: TrendingUp,   show: !isLimitedRole },
+          { label: "Cash",                  value: formatCurrency(statsCash),         icon: TrendingUp,   show: true },
+          { label: "Transfer",              value: formatCurrency(statsTransfer),     icon: TrendingUp,   show: true },
+        ].filter(i => i.show).map(item => (
+          <Card key={item.label}>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{isLoading ? "…" : item.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Sales Table */}
       <Card>
@@ -520,29 +528,37 @@ export default function SalesPage() {
               {sales && sales.length > 0 && (
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
                   onClick={() => {
-                    const rows = [...sales].reverse().map(s => ({
-                      Receipt: s.receiptNumber ?? "",
-                      Date: format(new Date(s.saleDate), "dd/MM/yyyy HH:mm"),
-                      "Bread Type": s.breadType,
-                      Quantity: s.quantity,
-                      "Price/Unit (₦)": s.pricePerUnit,
-                      "Total (₦)": s.totalAmount,
-                      Payment: s.paymentMethod,
-                      Branch: s.branchName ?? "",
-                      "Served By": s.cashierName ?? "",
-                    }));
-                    const blob = new Blob([
-                      [Object.keys(rows[0]).join(","), ...rows.map(r => Object.values(r).map(v => {
-                        const sv = String(v ?? "").replace(/"/g, '""');
-                        return sv.includes(",") || sv.includes('"') ? `"${sv}"` : sv;
-                      }).join(","))].join("\n")
-                    ], { type: "text/csv;charset=utf-8;" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a"); a.href = url;
-                    a.download = `sales-${filterDate ?? format(new Date(), "yyyy-MM-dd")}.csv`;
-                    a.click(); URL.revokeObjectURL(url);
+                    const company = getStoredCompany();
+                    const sortedRows = [...sales].reverse();
+                    const totalRev  = sortedRows.reduce((s, x) => s + x.totalAmount, 0);
+                    generatePdf({
+                      title: "Sales Report",
+                      subtitle: filterDate ? `${statsLabel} · ${dateLabel}` : "All-Time Sales",
+                      companyName: company?.name ?? "Bakery",
+                      companyPhone: company?.phone ?? undefined,
+                      branchName: activeBranch?.name ?? undefined,
+                      dateRange: filterDate
+                        ? `${format(new Date(filterDate + "T12:00:00"), "d MMM yyyy")}`
+                        : `All time · ${sortedRows.length} records`,
+                      sections: [{
+                        title: `Sales (${sortedRows.length} records)`,
+                        headers: ["Date", "Receipt", "Bread Type", "Qty", "Price/Unit", "Total", "Payment", "Served By"],
+                        rows: sortedRows.map(s => [
+                          format(new Date(s.saleDate), "dd/MM/yyyy HH:mm"),
+                          s.receiptNumber ?? "",
+                          s.breadType,
+                          s.quantity,
+                          pdfFmt(s.pricePerUnit),
+                          pdfFmt(s.totalAmount),
+                          s.paymentMethod,
+                          s.cashierName ?? "",
+                        ]),
+                        totals: ["", "", "", sortedRows.reduce((s, x) => s + x.quantity, 0).toString(), "", pdfFmt(totalRev), "", ""],
+                      }],
+                      filename: `sales-${filterDate ?? format(new Date(), "yyyy-MM-dd")}.pdf`,
+                    });
                   }}>
-                  <Download size={12} /> Download CSV
+                  <Download size={12} /> Download PDF
                 </Button>
               )}
               <Badge variant="secondary" className="text-xs">{sales?.length ?? 0} records</Badge>

@@ -18,7 +18,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Factory, TrendingDown, Download } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
+
 import { API_BASE } from "@/lib/api";
+
+function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
 
 function downloadCSV(rows: Record<string, string | number>[], filename: string) {
   if (!rows.length) return;
@@ -74,6 +77,8 @@ export default function ProductionPage() {
     }
   }, [activeBranch]);
 
+  const [filterDate, setFilterDate] = useState(todayStr());
+
   const { data: batches, isLoading } = useListProduction({ branchId: branchParam });
   const { data: branches } = useListBranches();
   const createProduction = useCreateProduction();
@@ -108,12 +113,20 @@ export default function ProductionPage() {
 
   const sorted = [...(batches ?? [])].reverse();
 
-  /* Today's stats */
-  const today = new Date().toDateString();
-  const todayBatches = sorted.filter(b => new Date(b.productionDate).toDateString() === today);
-  const todayProduced = todayBatches.reduce((s, b) => s + b.quantityProduced, 0);
-  const todayWaste   = todayBatches.reduce((s, b) => s + b.wasteQuantity, 0);
-  const todayNet     = todayProduced - todayWaste;
+  /* Filter by selected date (client-side) */
+  const visibleBatches = filterDate
+    ? sorted.filter(b => b.productionDate.slice(0, 10) === filterDate)
+    : sorted;
+
+  /* Stats from visible (filtered) batches */
+  const statProduced = visibleBatches.reduce((s, b) => s + b.quantityProduced, 0);
+  const statWaste    = visibleBatches.reduce((s, b) => s + b.wasteQuantity, 0);
+  const statNet      = statProduced - statWaste;
+
+  const isFilterToday = filterDate === todayStr();
+  const filterLabel   = filterDate
+    ? (isFilterToday ? "Today" : format(new Date(filterDate + "T12:00:00"), "d MMM yyyy"))
+    : "All Time";
 
   return (
     <div className="space-y-6" data-testid="page-production">
@@ -128,12 +141,42 @@ export default function ProductionPage() {
         </Button>
       </div>
 
-      {/* Today's summary */}
+      {/* Date filter */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date:</Label>
+          <Input
+            type="date"
+            value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            className="w-40 h-8 text-sm"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={isFilterToday ? "default" : "outline"}
+            size="sm" className="h-8 text-xs"
+            onClick={() => setFilterDate(todayStr())}
+          >
+            Today
+          </Button>
+          <Button
+            variant={!filterDate ? "default" : "outline"}
+            size="sm" className="h-8 text-xs"
+            onClick={() => setFilterDate("")}
+          >
+            All Time
+          </Button>
+        </div>
+        <Badge variant="secondary" className="text-xs">{filterLabel}</Badge>
+      </div>
+
+      {/* Stats for selected date */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Produced Today", value: todayProduced, unit: "units", icon: Factory, accent: "bg-slate-950" },
-          { label: "Net Today",      value: todayNet,      unit: "units", icon: Factory, accent: "bg-emerald-600" },
-          { label: "Waste Today",    value: todayWaste,    unit: "units", icon: TrendingDown, accent: todayWaste > 0 ? "bg-red-500" : "bg-slate-400" },
+          { label: `Produced — ${filterLabel}`, value: statProduced, unit: "units", icon: Factory, accent: "bg-slate-950" },
+          { label: `Net — ${filterLabel}`,      value: statNet,      unit: "units", icon: Factory, accent: "bg-emerald-600" },
+          { label: `Waste — ${filterLabel}`,    value: statWaste,    unit: "units", icon: TrendingDown, accent: statWaste > 0 ? "bg-red-500" : "bg-slate-400" },
         ].map(s => {
           const Icon = s.icon;
           return (
@@ -160,9 +203,9 @@ export default function ProductionPage() {
               </div>
               <CardTitle className="text-sm font-bold tracking-tight">Production Batches</CardTitle>
             </div>
-            {sorted.length > 0 && (
+            {visibleBatches.length > 0 && (
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
-                onClick={() => downloadCSV(sorted.map(b => ({
+                onClick={() => downloadCSV(visibleBatches.map(b => ({
                   Date: format(new Date(b.productionDate), "dd/MM/yyyy HH:mm"),
                   "Bread Type": b.breadType,
                   Produced: b.quantityProduced,
@@ -181,14 +224,14 @@ export default function ProductionPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          ) : !sorted.length ? (
+          ) : !visibleBatches.length ? (
             <div className="text-center py-12 text-muted-foreground">
               <Factory size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No production batches recorded yet.</p>
+              <p className="text-sm">{filterDate && !isFilterToday ? `No production batches on ${filterLabel}.` : "No production batches recorded yet."}</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {sorted.map((batch) => {
+              {visibleBatches.map((batch) => {
                 const eff = batch.quantityProduced > 0
                   ? ((batch.quantityProduced - batch.wasteQuantity) / batch.quantityProduced * 100)
                   : 100;
