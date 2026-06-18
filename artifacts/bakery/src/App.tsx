@@ -1,7 +1,9 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { toast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import OfflineBanner from "@/components/offline-banner";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
@@ -38,7 +40,29 @@ import { BranchProvider, useActiveBranch } from "@/lib/branch-context";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
+  mutationCache: new MutationCache({
+    onError(error) {
+      if ((error as any)?.isOfflineQueued) {
+        toast({
+          title: "Saved offline",
+          description: "Your action was saved and will sync automatically when you reconnect.",
+        });
+        return;
+      }
+    },
+  }),
+  defaultOptions: {
+    queries: {
+      retry: (count, error) => {
+        if ((error as any)?.isOfflineQueued) return false;
+        return count < 1;
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  },
 });
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -141,6 +165,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BranchProvider>
+          <OfflineBanner />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <ThemeInit />
             <Router />

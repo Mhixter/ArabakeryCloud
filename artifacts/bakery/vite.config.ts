@@ -71,16 +71,35 @@ export default defineConfig({
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,svg,woff2}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ["**/*.{js,css,html,svg,woff2,ico,png,webp}"],
         runtimeCaching: [
+          {
+            urlPattern: /\/api\/(products|branches|users)\b/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "ara-api-static",
+              expiration: { maxEntries: 50, maxAgeSeconds: 7 * 86400 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /\/api\/(sales|production|inventory|allocations|returns|reports|dashboard)\b/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "ara-api-dynamic",
+              expiration: { maxEntries: 200, maxAgeSeconds: 24 * 3600 },
+              networkTimeoutSeconds: 6,
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^\/api\//,
             handler: "NetworkFirst",
             options: {
-              cacheName: "ara-api-cache",
+              cacheName: "ara-api-other",
               expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 8,
               cacheableResponse: { statuses: [0, 200] },
             },
           },
