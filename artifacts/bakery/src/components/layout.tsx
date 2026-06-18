@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import NotificationsDropdown from "@/components/notifications-dropdown";
+import InstallAppPrompt from "@/components/install-app-prompt";
 
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
@@ -263,6 +264,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
 /* ─────────────────────── BLUE: top-nav layout ─────────────── */
 function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
   const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { canInstall, install, isIos } = usePwaInstall();
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -320,6 +322,15 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
             <p className="text-xs font-semibold text-sidebar-foreground leading-none">{user?.fullName ?? "User"}</p>
             <p className="text-[10px] text-sidebar-foreground/50 mt-0.5">{ROLE_LABELS[userRole] ?? userRole}</p>
           </div>
+          {(canInstall || isIos) && (
+            <button
+              onClick={install}
+              title="Install App"
+              className="p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/60 transition-colors"
+            >
+              <Download size={15} />
+            </button>
+          )}
           {userRole === "managing_director" && (
             <button onClick={ls.handleExitBranch} title="Switch Branch"
               className="p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/60 transition-colors">
@@ -354,6 +365,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
 
       {/* Mobile bottom tabs */}
       <MobileBottomNav ls={ls} />
+      <InstallAppPrompt />
     </div>
   );
 }
@@ -494,6 +506,7 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
 
       {/* Mobile bottom tabs */}
       <MobileBottomNav ls={ls} />
+      <InstallAppPrompt />
     </div>
   );
 }

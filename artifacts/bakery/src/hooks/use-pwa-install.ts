@@ -25,8 +25,25 @@ if (typeof window !== "undefined") {
   });
 }
 
+function detectIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function detectStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true
+  );
+}
+
 export function usePwaInstall() {
   const [canInstall, setCanInstall] = useState(!!deferredPrompt);
+
+  // These are stable — computed once, never change
+  const isIos = detectIos();
+  const isStandalone = detectStandalone();
 
   useEffect(() => {
     const update = () => setCanInstall(!!deferredPrompt);
@@ -46,5 +63,5 @@ export function usePwaInstall() {
     return outcome === "accepted";
   };
 
-  return { canInstall, install };
+  return { canInstall, install, isIos, isStandalone };
 }
