@@ -3,6 +3,7 @@ import { db, productReturnsTable, usersTable, branchesTable } from "@workspace/d
 import { eq, and } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { notifyManagers } from "../lib/push";
 
 const router: IRouter = Router();
 
@@ -130,6 +131,13 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
   const [branchRow] = branchId
     ? await db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, branchId))
     : [{ name: "Unknown" }];
+
+  notifyManagers(companyId, {
+    title: "Return Submitted",
+    body: `${sellerRow?.fullName ?? "A supplier"} returned ${quantity}× ${breadType} (${reason.replace("_", " ")}) — awaiting approval`,
+    url: "/sales",
+    tag: `return-${ret.id}`,
+  }).catch(() => {});
 
   res.status(201).json(formatReturn(ret, sellerRow?.fullName ?? "Unknown", null, branchRow?.name ?? "Unknown"));
 });

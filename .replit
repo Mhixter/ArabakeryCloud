@@ -78,3 +78,10 @@ externalPort = 4200
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BB0GuW1AusBee-QZ9PTiRbHXyu591p99RdwwciXDq-7kTOFGS-nZjWYUxcOqyGnh8dxildXsERwCcSz6kWN31Pw"
+VAPID_PRIVATE_KEY = "Ta_sHkSqSu6chCberrh563qW1jamoGfRAnkHkmcg3bU"
+VITE_VAPID_PUBLIC_KEY = "BB0GuW1AusBee-QZ9PTiRbHXyu591p99RdwwciXDq-7kTOFGS-nZjWYUxcOqyGnh8dxildXsERwCcSz6kWN31Pw"

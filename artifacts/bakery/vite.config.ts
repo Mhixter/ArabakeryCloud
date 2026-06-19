@@ -36,7 +36,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      strategies: "generateSW",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       includeAssets: ["favicon.svg", "icons/icon.svg"],
       manifest: {
         name: "Ara Bakery Cloud",
@@ -70,49 +72,9 @@ export default defineConfig({
           { name: "Production Log", url: "/production",  icons: [{ src: "/icons/icon.svg", sizes: "any", type: "image/svg+xml" }] },
         ],
       },
-      workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,woff2,ico,png,webp}"],
-        runtimeCaching: [
-          {
-            urlPattern: /\/api\/(products|branches|users)\b/,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "ara-api-static",
-              expiration: { maxEntries: 50, maxAgeSeconds: 7 * 86400 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /\/api\/(sales|production|inventory|allocations|returns|reports|dashboard)\b/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "ara-api-dynamic",
-              expiration: { maxEntries: 200, maxAgeSeconds: 24 * 3600 },
-              networkTimeoutSeconds: 6,
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /^\/api\//,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "ara-api-other",
-              expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 8,
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /images\.unsplash\.com/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "ara-images-cache",
-              expiration: { maxEntries: 60, maxAgeSeconds: 604800 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: {
         enabled: false,

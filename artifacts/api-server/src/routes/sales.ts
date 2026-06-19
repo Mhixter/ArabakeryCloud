@@ -3,6 +3,7 @@ import { db, salesTable, usersTable, branchesTable, productsTable, productionBat
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { notifyManagers } from "../lib/push";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -170,6 +171,16 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   ]);
 
   await logAudit({ req, userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
+
+  if (role === "supplier") {
+    notifyManagers(companyId, {
+      title: "New Supplier Sale",
+      body: `${cashier?.fullName ?? "A supplier"} sold ${qty}× ${breadType} — ₦${totalAmount.toLocaleString()}`,
+      url: "/sales",
+      tag: `sale-${sale.id}`,
+    }).catch(() => {});
+  }
+
   res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown", undefined, branch?.phone, branch?.address));
 });
 

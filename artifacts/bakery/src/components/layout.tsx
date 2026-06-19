@@ -16,6 +16,7 @@ import { useGetLowStockItems } from "@workspace/api-client-react";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import NotificationsDropdown from "@/components/notifications-dropdown";
 import InstallAppPrompt from "@/components/install-app-prompt";
+import { NotificationToggle } from "@/components/notification-toggle";
 
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
@@ -331,6 +332,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
               <Download size={15} />
             </button>
           )}
+          <NotificationToggle iconSize={15} />
           {userRole === "managing_director" && (
             <button onClick={ls.handleExitBranch} title="Switch Branch"
               className="p-1.5 rounded hover:bg-sidebar-accent text-sidebar-foreground/60 transition-colors">
@@ -442,6 +444,11 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
             <span>Install App</span>
           </button>
         )}
+        <NotificationToggle
+          showLabel
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium mb-0.5 justify-start"
+          iconSize={15}
+        />
         {userRole === "managing_director" && (
           <button onClick={handleExitBranch}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors mb-0.5">

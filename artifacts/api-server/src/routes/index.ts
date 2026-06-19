@@ -15,6 +15,7 @@ import productsRouter from "./products";
 import allocationsRouter from "./allocations";
 import returnsRouter from "./returns";
 import notificationsRouter from "./notifications";
+import pushRouter from "./push";
 import workersRouter from "./workers";
 import expensesRouter from "./expenses";
 import { verifyToken } from "../lib/auth";
@@ -32,6 +33,7 @@ const EXEMPT_PREFIXES = [
   "/health",
   "/company",
   "/branches",
+  "/push",
 ];
 
 // Write methods that are blocked for expired subscriptions
@@ -113,6 +115,7 @@ router.use(productsRouter);
 router.use(allocationsRouter);
 router.use(returnsRouter);
 router.use(notificationsRouter);
+router.use(pushRouter);
 router.use(workersRouter);
 router.use(expensesRouter);
 router.use(adminRouter);

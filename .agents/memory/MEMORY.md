@@ -1,0 +1,1 @@
+- [PWA SW Strategy](pwa-sw-strategy.md) — switched from generateSW to injectManifest so push events can be handled in a custom src/sw.ts
