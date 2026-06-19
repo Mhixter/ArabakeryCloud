@@ -1,6 +1,7 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -45,11 +46,20 @@ app.use(
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
-app.get("/", (_req, res) => {
-  res.json({ status: "ok", service: "Ara Bakery Cloud API", version: "1.0.0" });
-});
-
 app.use("/api", router);
+
+/* ── In production serve the built React SPA ── */
+if (process.env.NODE_ENV === "production") {
+  const staticDir = path.resolve(process.cwd(), "artifacts/bakery/dist/public");
+  app.use(express.static(staticDir, { maxAge: "7d", immutable: true }));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(staticDir, "index.html"));
+  });
+} else {
+  app.get("/", (_req, res) => {
+    res.json({ status: "ok", service: "Ara Bakery Cloud API", version: "1.0.0" });
+  });
+}
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err?.status ?? err?.statusCode ?? 500;
