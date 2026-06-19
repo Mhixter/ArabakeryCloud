@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, LogOut, Shield, CreditCard, Receipt, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LiveClock } from "@/components/live-clock";
 
 const ADMIN_NAV = [
   { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard },
@@ -85,8 +86,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-        <header className="h-14 px-6 border-b border-slate-200 bg-white flex items-center">
+        <header className="h-14 px-6 border-b border-slate-200 bg-white flex items-center justify-between">
           <h1 className="text-slate-700 font-semibold text-sm">{pageLabel}</h1>
+          <LiveClock className="text-slate-500 text-xs" showDate={true} showSeconds={true} />
         </header>
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>

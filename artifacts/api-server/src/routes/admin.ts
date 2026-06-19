@@ -192,6 +192,64 @@ router.patch("/admin/companies/:id/reset-password", authenticateSuperAdmin, asyn
   res.json({ success: true, message: `Password reset for ${managingDirector.username}` });
 });
 
+/* ─ List all users in a company ─ */
+router.get("/admin/companies/:id/users", authenticateSuperAdmin, async (req, res) => {
+  const companyId = parseInt(req.params.id);
+  const users = await db
+    .select({
+      id: usersTable.id,
+      fullName: usersTable.fullName,
+      username: usersTable.username,
+      role: usersTable.role,
+      isActive: usersTable.isActive,
+      agentId: usersTable.agentId,
+      branchId: usersTable.branchId,
+      createdAt: usersTable.createdAt,
+    })
+    .from(usersTable)
+    .where(and(eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)))
+    .orderBy(usersTable.role, usersTable.fullName);
+  res.json(users);
+});
+
+/* ─ Change a user's role ─ */
+router.patch("/admin/companies/:id/users/:userId/role", authenticateSuperAdmin, async (req, res) => {
+  const companyId = parseInt(req.params.id);
+  const userId = parseInt(req.params.userId);
+  const { role } = req.body ?? {};
+  const validRoles = ["managing_director", "manager", "receptionist", "production_staff", "supplier"];
+  if (!role || !validRoles.includes(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+  const [user] = await db.select().from(usersTable)
+    .where(and(eq(usersTable.id, userId), eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)));
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const [updated] = await db.update(usersTable)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(usersTable.id, userId))
+    .returning({ id: usersTable.id, role: usersTable.role });
+  res.json(updated);
+});
+
+/* ─ Change a user's password ─ */
+router.patch("/admin/companies/:id/users/:userId/password", authenticateSuperAdmin, async (req, res) => {
+  const companyId = parseInt(req.params.id);
+  const userId = parseInt(req.params.userId);
+  const { newPassword } = req.body ?? {};
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: "Password must be at least 4 characters" });
+  }
+  const [user] = await db.select().from(usersTable)
+    .where(and(eq(usersTable.id, userId), eq(usersTable.companyId, companyId), isNull(usersTable.deletedAt)));
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  await db.update(usersTable)
+    .set({ passwordHash: hashPassword(newPassword), updatedAt: new Date() })
+    .where(eq(usersTable.id, userId));
+  res.json({ success: true, message: `Password updated for ${user.username}` });
+});
+
 /* ─ Transactions ─ */
 router.get("/admin/transactions", authenticateSuperAdmin, async (_req, res) => {
   const txs = await db

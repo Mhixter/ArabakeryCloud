@@ -19,6 +19,7 @@ import { usePwaInstall } from "@/hooks/use-pwa-install";
 import NotificationsDropdown from "@/components/notifications-dropdown";
 import InstallAppPrompt from "@/components/install-app-prompt";
 import { NotificationToggle } from "@/components/notification-toggle";
+import { LiveClock } from "@/components/live-clock";
 
 interface NavItem { href: string; label: string; icon: React.ElementType; roles: string[] }
 
@@ -344,6 +345,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
         </div>
 
         <div className="hidden lg:flex items-center gap-2 flex-shrink-0 border-l border-sidebar-border pl-4 ml-2">
+          <LiveClock className="text-sidebar-foreground/60 text-[11px] mr-1" showDate={true} showSeconds={false} />
           <NotificationsDropdown themeClass="sidebar" />
           <div className="text-right ml-1">
             <p className="text-xs font-semibold text-sidebar-foreground leading-none">{user?.fullName ?? "User"}</p>
@@ -465,6 +467,7 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
         <div className={cn("px-3 py-1.5 mb-1", theme === "slate" && "py-1")}>
           <p className={cn("text-sidebar-foreground font-medium text-sm truncate", theme === "slate" && "text-xs uppercase tracking-wider")}>{user?.fullName ?? "User"}</p>
           <p className="text-sidebar-foreground/45 text-xs">{ROLE_LABELS[userRole] ?? userRole}</p>
+          <LiveClock className="text-sidebar-foreground/40 text-[10px] mt-1" showDate={true} showSeconds={false} />
         </div>
         {canInstall && (
           <button onClick={install}
