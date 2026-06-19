@@ -39,6 +39,19 @@ const formatReturn = (
   createdAt: r.createdAt.toISOString(),
 });
 
+/* GET /returns/pending-count — badge counter for manager sidebar */
+router.get("/returns/pending-count", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { role, companyId } = req.user!;
+  if (!["managing_director", "manager", "receptionist"].includes(role)) {
+    res.json({ count: 0 }); return;
+  }
+  const rows = await db
+    .select({ id: productReturnsTable.id })
+    .from(productReturnsTable)
+    .where(and(eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.status as any, "pending")));
+  res.json({ count: rows.length });
+});
+
 /* GET /returns */
 router.get("/returns", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId, branchId: userBranchId } = req.user!;

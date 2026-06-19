@@ -13,6 +13,8 @@ import { useActiveBranch, clearPersistedBranch } from "@/lib/branch-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useGetLowStockItems } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { getToken } from "@/lib/auth";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import NotificationsDropdown from "@/components/notifications-dropdown";
 import InstallAppPrompt from "@/components/install-app-prompt";
@@ -57,6 +59,22 @@ function useLayoutState() {
   const userRole = user?.role ?? "";
   const { data: lowStockItems } = useGetLowStockItems();
   const lowStockCount = lowStockItems?.length ?? 0;
+
+  const canSeePendingReturns = ["managing_director", "manager", "receptionist"].includes(userRole);
+  const { data: pendingReturnsData } = useQuery({
+    queryKey: ["pending-returns-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/returns/pending-count", {
+        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+      });
+      if (!res.ok) return { count: 0 };
+      return res.json() as Promise<{ count: number }>;
+    },
+    enabled: canSeePendingReturns,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  });
+  const pendingReturnsCount = pendingReturnsData?.count ?? 0;
   const { activeBranch, setActiveBranch, isBranchLocked } = useActiveBranch();
   const COMPANY_ONLY_PATHS = ["/company-settings", "/subscription", "/settings"];
   const visibleNav = NAV_ITEMS.filter(i => {
@@ -84,12 +102,12 @@ function useLayoutState() {
     ? activeBranch.name.toUpperCase()
     : theme === "slate" ? "BAKERY SYS" : "Bakery System";
 
-  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, handleExitBranch, activeBranch, serviceLabel, isBranchLocked };
+  return { location, setLocation, moreOpen, setMoreOpen, user, company, theme, userRole, lowStockCount, pendingReturnsCount, visibleNav, handleLogout, handleExitBranch, activeBranch, serviceLabel, isBranchLocked };
 }
 
 /* ─────────────────────── Mobile Bottom Tab Bar ─────────────── */
 function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
-  const { location, visibleNav, lowStockCount, moreOpen, setMoreOpen, handleLogout, user, userRole } = ls;
+  const { location, visibleNav, lowStockCount, pendingReturnsCount, moreOpen, setMoreOpen, handleLogout, user, userRole } = ls;
   const { canInstall, install } = usePwaInstall();
 
   const primaryTabs = visibleNav.slice(0, 4);
@@ -120,6 +138,11 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
                   {item.href === "/inventory" && lowStockCount > 0 && (
                     <span className="absolute top-2 right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold z-10">
                       {lowStockCount > 9 ? "9+" : lowStockCount}
+                    </span>
+                  )}
+                  {item.href === "/allocations" && pendingReturnsCount > 0 && (
+                    <span className="absolute top-2 right-3 w-4 h-4 rounded-full bg-orange-500 text-white text-[9px] flex items-center justify-center font-bold z-10">
+                      {pendingReturnsCount > 9 ? "9+" : pendingReturnsCount}
                     </span>
                   )}
                   <Icon
@@ -264,7 +287,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
 
 /* ─────────────────────── BLUE: top-nav layout ─────────────── */
 function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
-  const { location, user, company, userRole, lowStockCount, visibleNav, handleLogout } = ls;
+  const { location, user, company, userRole, lowStockCount, pendingReturnsCount, visibleNav, handleLogout } = ls;
   const { canInstall, install, isIos } = usePwaInstall();
 
   return (
@@ -301,6 +324,9 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
                   <span>{item.label}</span>
                   {item.href === "/inventory" && lowStockCount > 0 && (
                     <Badge variant="destructive" className="text-[10px] px-1 py-0 min-w-4 h-4">{lowStockCount}</Badge>
+                  )}
+                  {item.href === "/allocations" && pendingReturnsCount > 0 && (
+                    <Badge className="text-[10px] px-1 py-0 min-w-4 h-4 bg-orange-500 hover:bg-orange-500 text-white">{pendingReturnsCount > 9 ? "9+" : pendingReturnsCount}</Badge>
                   )}
                 </button>
               </Link>
@@ -374,7 +400,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
 
 /* ─────────────────────── SIDEBAR layout (amber/orange/green/slate) ── */
 function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls: ReturnType<typeof useLayoutState>; banner: React.ReactNode }) {
-  const { location, user, company, theme, userRole, lowStockCount, visibleNav, handleLogout, handleExitBranch, serviceLabel } = ls;
+  const { location, user, company, theme, userRole, lowStockCount, pendingReturnsCount, visibleNav, handleLogout, handleExitBranch, serviceLabel } = ls;
   const { canInstall, install } = usePwaInstall();
 
   const SidebarContent = () => (
@@ -424,6 +450,9 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.href === "/inventory" && lowStockCount > 0 && (
                   <Badge variant="destructive" className="text-xs px-1.5 py-0.5 min-w-5 h-5">{lowStockCount}</Badge>
+                )}
+                {item.href === "/allocations" && pendingReturnsCount > 0 && (
+                  <Badge className="text-xs px-1.5 py-0.5 min-w-5 h-5 bg-orange-500 hover:bg-orange-500 text-white">{pendingReturnsCount > 9 ? "9+" : pendingReturnsCount}</Badge>
                 )}
               </button>
             </Link>
