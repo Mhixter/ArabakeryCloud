@@ -1,0 +1,286 @@
+You are a senior full-stack engineer.
+
+IMPORTANT:
+This project is already completed and deployed.
+Do NOT rebuild it from scratch.
+Do NOT change the UI, design, routes, database schema, API endpoints, authentication flow, or existing business logic unless absolutely necessary.
+
+Your task is to upgrade the existing application into a true Offline-First Progressive Web App.
+
+Current problem:
+
+When there is no internet:
+
+• Login fails
+• Dashboard does not load
+• Products cannot load
+• Customers cannot load
+• Sales page shows errors
+• Inventory cannot load
+• API requests fail
+• The application becomes unusable
+
+I want this fixed while preserving all existing functionality.
+
+==========================
+GOAL
+==========================
+
+The application must work almost exactly the same online and offline.
+
+After the first successful online login:
+
+✓ User can login offline
+✓ Dashboard opens instantly
+✓ Products load from local database
+✓ Customers load
+✓ Inventory loads
+✓ Sales continue working
+✓ Expenses work
+✓ Reports load from local data
+✓ Receipts print
+✓ Barcode scanning works
+✓ Cash register works
+
+When internet returns:
+
+Automatically synchronize
+
+• New sales
+• Inventory changes
+• Customers
+• Expenses
+• Payments
+• Production
+• Returns
+
+Never lose data.
+
+Never create duplicate records.
+
+==========================
+DO NOT BREAK
+==========================
+
+Do not remove
+
+Authentication
+
+Current APIs
+
+Current PostgreSQL
+
+Neon database
+
+Render deployment
+
+Existing React components
+
+Current UI
+
+Current styling
+
+Current routing
+
+Current permissions
+
+Current roles
+
+Current branch system
+
+==========================
+IMPLEMENT
+==========================
+
+1. Service Worker
+
+Implement Workbox.
+
+Cache static assets.
+
+Cache API responses.
+
+Offline fallback.
+
+Background Sync.
+
+Automatic updates.
+
+2. Local Database
+
+Use IndexedDB with Dexie.js.
+
+Mirror all important tables locally.
+
+Products
+
+Customers
+
+Inventory
+
+Sales
+
+Expenses
+
+Users
+
+Settings
+
+Branches
+
+Sync status
+
+3. Authentication
+
+After first successful login
+
+Store encrypted session locally.
+
+Allow offline login.
+
+Validate session expiration.
+
+When online refresh JWT automatically.
+
+4. API Layer
+
+Replace direct API dependency.
+
+Every request should
+
+Check online status.
+
+If online
+
+Fetch from server.
+
+Update local database.
+
+If offline
+
+Load from IndexedDB.
+
+5. Sync Engine
+
+Queue every Create Update Delete.
+
+Background synchronization.
+
+Retry automatically.
+
+Resume after browser restart.
+
+Conflict detection.
+
+Duplicate detection.
+
+Never lose queued actions.
+
+6. Dashboard
+
+Dashboard must open offline.
+
+Statistics should come from local data.
+
+7. POS
+
+Entire POS must work offline.
+
+Sales
+
+Customers
+
+Products
+
+Printing
+
+Inventory deduction
+
+Discounts
+
+Payments
+
+Everything.
+
+8. UI
+
+Show
+
+Offline badge
+
+Online badge
+
+Sync progress
+
+Pending uploads
+
+Last synchronization
+
+Queue count
+
+9. Performance
+
+Instant loading.
+
+No unnecessary API calls.
+
+Lazy loading.
+
+IndexedDB indexing.
+
+Virtual scrolling.
+
+10. Error Handling
+
+No blank pages.
+
+No crash.
+
+Graceful offline fallback.
+
+==========================
+CODE QUALITY
+==========================
+
+Use
+
+React
+
+TypeScript
+
+TanStack Query
+
+Dexie
+
+Workbox
+
+Repository Pattern
+
+Custom Hooks
+
+Clean Architecture
+
+Modular code
+
+Reusable services
+
+==========================
+VERY IMPORTANT
+
+Before modifying any file,
+
+understand the current architecture.
+
+Do not replace working code.
+
+Only extend it.
+
+Refactor only where necessary.
+
+Maintain backward compatibility.
+
+Every existing feature must continue working.
+
+Fix every page that currently throws errors when offline.
+
+Make the application production-ready with enterprise-grade offline support.
