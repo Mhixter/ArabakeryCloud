@@ -76,6 +76,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "dexie": "^4.4.4",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "workbox-cacheable-response": "^7.4.1",

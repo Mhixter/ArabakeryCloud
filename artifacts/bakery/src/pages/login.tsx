@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wheat, Loader2, User, X } from "lucide-react";
+import { Wheat, Loader2, User, X, WifiOff } from "lucide-react";
+import { storeOfflineSession, verifyOfflineLogin } from "@/lib/offline-auth";
 
 const ROLE_LABELS: Record<string, string> = {
   managing_director: "Managing Director",
@@ -45,12 +46,73 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [lastUser, setLastUser] = useState<LastUser | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [offlineLoading, setOfflineLoading] = useState(false);
 
   useEffect(() => {
     setLastUser(getLastUser());
+    const handleOnline  = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener("online",  handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online",  handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, []);
 
   const login = useLogin();
+
+  /** Restore a session that was verified offline */
+  function restoreOfflineSession(data: { token: string; user: unknown; company?: unknown }) {
+    setToken(data.token);
+    setStoredUser(data.user);
+    if (data.company) {
+      setStoredCompany(data.company);
+      const company = data.company as { themeColor?: string };
+      if (company.themeColor) applyTheme(company.themeColor);
+    }
+    const user = data.user as { fullName?: string; role?: string; branchName?: string };
+    saveLastUser({
+      fullName:   user.fullName ?? username,
+      role:       user.role ?? "",
+      branchName: user.branchName ?? "",
+      username,
+    });
+    const role = (data.user as { role?: string }).role;
+    if (role === "managing_director") {
+      setLocation("/branch-select");
+    } else {
+      setLocation("/dashboard");
+    }
+  }
+
+  /** Try to authenticate offline using cached credentials */
+  async function tryOfflineLogin() {
+    if (!username || !password) {
+      toast({ title: "Please enter your username and password", variant: "destructive" });
+      return;
+    }
+    setOfflineLoading(true);
+    try {
+      const session = await verifyOfflineLogin(username, password);
+      if (session) {
+        toast({
+          title: "Signed in offline",
+          description: "You are working offline. Data will sync when you reconnect.",
+        });
+        restoreOfflineSession(session as { token: string; user: unknown; company?: unknown });
+      } else {
+        toast({
+          title: "Offline login failed",
+          description: "No cached session found for this account, or the password is incorrect. Connect to the internet to sign in.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setOfflineLoading(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +121,16 @@ export default function LoginPage() {
       return;
     }
 
+    /* If offline, skip the network call and go straight to offline auth */
+    if (isOffline) {
+      await tryOfflineLogin();
+      return;
+    }
+
     login.mutate(
       { data: { username, password } },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           setToken(data.token);
           setStoredUser(data.user);
           const company = (data as { company?: { themeColor?: string; name?: string } }).company;
@@ -77,6 +145,14 @@ export default function LoginPage() {
             branchName: (user.branchName ?? (data as any).branch?.name ?? company?.name ?? ""),
             username,
           });
+
+          /* Cache credentials for future offline login */
+          await storeOfflineSession(username, password, {
+            token:   data.token,
+            user:    data.user,
+            company: (data as any).company,
+          });
+
           const role = (data.user as { role?: string }).role;
           if (role === "managing_director") {
             setLocation("/branch-select");
@@ -84,13 +160,21 @@ export default function LoginPage() {
             setLocation("/dashboard");
           }
         },
-        onError: (error) => {
+        onError: async (error) => {
+          /* If the error looks like a network failure, try offline auth */
+          const isNetworkError = !navigator.onLine || (error as any)?.isOfflineQueued;
+          if (isNetworkError) {
+            await tryOfflineLogin();
+            return;
+          }
           const msg = (error as { data?: { error?: string } })?.data?.error ?? "Invalid credentials";
           toast({ title: "Login failed", description: msg, variant: "destructive" });
         },
       }
     );
   };
+
+  const isPending = login.isPending || offlineLoading;
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4" data-testid="page-login">
@@ -103,6 +187,16 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold tracking-tight text-white">Ara Bakery Cloud</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your bakery dashboard</p>
         </div>
+
+        {/* Offline notice */}
+        {isOffline && (
+          <div className="mb-4 rounded-xl bg-slate-700 border border-slate-600 px-4 py-3 flex items-center gap-3">
+            <WifiOff size={16} className="text-slate-300 flex-shrink-0" />
+            <p className="text-slate-300 text-sm">
+              You are offline. Sign in with your saved credentials to continue working.
+            </p>
+          </div>
+        )}
 
         {/* Last user chip */}
         {lastUser && (
@@ -139,7 +233,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
-                disabled={login.isPending}
+                disabled={isPending}
                 className="h-10"
               />
               <p className="text-xs text-slate-400 mt-0.5">Enter your <span className="font-medium">username</span>, <span className="font-medium">Agent ID</span> (e.g. ADA96857), or <span className="font-medium">Company Login ID</span> — then enter your password below.</p>
@@ -154,18 +248,20 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                disabled={login.isPending}
+                disabled={isPending}
                 className="h-10"
               />
             </div>
             <Button
               type="submit"
               className="w-full h-10 bg-slate-950 hover:bg-slate-800 text-white font-semibold"
-              disabled={login.isPending}
+              disabled={isPending}
               data-testid="button-login"
             >
-              {login.isPending ? (
+              {isPending ? (
                 <><Loader2 size={16} className="mr-2 animate-spin" />Signing in…</>
+              ) : isOffline ? (
+                <><WifiOff size={16} className="mr-2" />Sign In Offline</>
               ) : (
                 "Sign In"
               )}

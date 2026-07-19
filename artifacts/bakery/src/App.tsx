@@ -1,5 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { toast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -40,6 +40,39 @@ import { BranchProvider, useActiveBranch } from "@/lib/branch-context";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onSuccess(data, query) {
+      /* Mirror successful query results into Dexie for offline access.
+         We detect the resource type from the query key. */
+      try {
+        const key = query.queryKey;
+        const keyStr = Array.isArray(key) ? key.join("/") : String(key);
+
+        import("@/lib/sync-service").then(({ populateFromApiResponse }) => {
+          // Map TanStack Query keys to pseudo-URL paths so the sync service
+          // can route to the right Dexie table.
+          let path = "";
+          if (/products/i.test(keyStr))    path = "/api/products";
+          else if (/inventory/i.test(keyStr)) path = "/api/inventory";
+          else if (/sales/i.test(keyStr))     path = "/api/sales";
+          else if (/expense/i.test(keyStr))   path = "/api/expenses";
+          else if (/allocation/i.test(keyStr)) path = "/api/allocations";
+          else if (/branch/i.test(keyStr))    path = "/api/branches";
+          else if (/user/i.test(keyStr))      path = "/api/users";
+          else if (/production/i.test(keyStr)) path = "/api/production";
+          else if (/return/i.test(keyStr))    path = "/api/returns";
+          else if (/dashboard/i.test(keyStr)) path = "/api/dashboard";
+          else if (/report/i.test(keyStr))    path = "/api/reports";
+
+          if (path && data) {
+            populateFromApiResponse(path, data).catch(() => {});
+          }
+        }).catch(() => {});
+      } catch {
+        // Never let this break the app
+      }
+    },
+  }),
   mutationCache: new MutationCache({
     onError(error) {
       if ((error as any)?.isOfflineQueued) {
