@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { toast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OfflineBanner from "@/components/offline-banner";
+import { ConflictResolutionDialog } from "@/components/conflict-resolution-dialog";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
@@ -199,6 +200,7 @@ function App() {
       <TooltipProvider>
         <BranchProvider>
           <OfflineBanner />
+          <ConflictResolutionDialog />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <ThemeInit />
             <Router />

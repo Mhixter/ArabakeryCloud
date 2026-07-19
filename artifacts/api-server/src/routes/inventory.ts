@@ -55,6 +55,25 @@ router.patch("/inventory/:id", authenticate, requireRole("managing_director", "m
   const companyId = req.user!.companyId;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  /* Conflict detection: if the client sent X-Offline-Queued-At, check whether
+     the record was modified after the mutation was queued. */
+  const queuedAtHeader = req.headers["x-offline-queued-at"];
+  if (queuedAtHeader) {
+    const queuedAt = new Date(parseInt(queuedAtHeader as string, 10));
+    const [existing] = await db.select().from(inventoryItemsTable)
+      .where(and(eq(inventoryItemsTable.id, id), eq(inventoryItemsTable.companyId, companyId), isNull(inventoryItemsTable.deletedAt)));
+    if (existing && existing.updatedAt > queuedAt) {
+      const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, existing.branchId));
+      res.status(409).json({
+        error: "Conflict",
+        message: "This inventory item was modified by someone else while you were offline.",
+        serverData: formatItem(existing, branch?.name ?? "Unknown"),
+      });
+      return;
+    }
+  }
+
   const { name, category, unit, minimumQuantity, costPerUnit } = req.body;
   const updates: Partial<typeof inventoryItemsTable.$inferInsert> = {};
   if (name != null) updates.name = name;
@@ -86,6 +105,19 @@ router.post("/inventory/:id/adjust", authenticate, requireRole("managing_directo
   if (adjustment == null || !reason) { res.status(400).json({ error: "adjustment and reason are required" }); return; }
   const [existing] = await db.select().from(inventoryItemsTable).where(and(eq(inventoryItemsTable.id, id), eq(inventoryItemsTable.companyId, companyId), isNull(inventoryItemsTable.deletedAt)));
   if (!existing) { res.status(404).json({ error: "Inventory item not found" }); return; }
+
+  /* Conflict detection for adjustments — same pattern as PATCH */
+  const adjustQueuedAt = req.headers["x-offline-queued-at"];
+  if (adjustQueuedAt && existing.updatedAt > new Date(parseInt(adjustQueuedAt as string, 10))) {
+    const [adjBranch] = await db.select().from(branchesTable).where(eq(branchesTable.id, existing.branchId));
+    res.status(409).json({
+      error: "Conflict",
+      message: "This inventory item was adjusted by someone else while you were offline.",
+      serverData: formatItem(existing, adjBranch?.name ?? "Unknown"),
+    });
+    return;
+  }
+
   const previousQuantity = parseFloat(existing.currentQuantity as unknown as string);
   const newQuantity = Math.max(0, previousQuantity + parseFloat(adjustment));
   const [item] = await db.update(inventoryItemsTable).set({ currentQuantity: newQuantity.toString() }).where(eq(inventoryItemsTable.id, id)).returning();

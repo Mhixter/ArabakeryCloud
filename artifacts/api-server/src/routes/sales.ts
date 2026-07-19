@@ -97,6 +97,29 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
     return;
   }
 
+  /* Conflict detection: if the client sent X-Offline-Queued-At, check whether
+     the product was changed (price, availability) after the mutation was queued.
+     This catches cases where a sale was recorded offline but the product price
+     changed on the server in the meantime. */
+  const queuedAtHeader = req.headers["x-offline-queued-at"];
+  if (queuedAtHeader) {
+    const queuedAt = new Date(parseInt(queuedAtHeader as string, 10));
+    if (product.updatedAt > queuedAt) {
+      res.status(409).json({
+        error: "Conflict",
+        message: `The product "${breadType}" was updated (price or availability changed) while you were offline. Please review the current price before recording this sale.`,
+        serverData: {
+          id:           product.id,
+          name:         product.name,
+          pricePerUnit: parseFloat(product.pricePerUnit as unknown as string),
+          isActive:     product.isActive,
+          updatedAt:    product.updatedAt.toISOString(),
+        },
+      });
+      return;
+    }
+  }
+
   /* 2. Stock check — logic differs for sellers vs. others */
   if (role === "supplier") {
     /* Seller can only sell what they've been allocated minus what they've sold */

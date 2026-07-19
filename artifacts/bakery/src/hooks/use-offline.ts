@@ -1,38 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { drainQueue, getPendingCount } from "@/lib/offline-queue";
+import { drainQueue, getPendingCount, getConflicts, type ConflictRecord } from "@/lib/offline-queue";
 import { getLastSyncTime } from "@/lib/local-db";
 
 export interface OfflineState {
-  isOnline: boolean;
+  isOnline:     boolean;
   pendingCount: number;
-  isSyncing: boolean;
-  lastSyncAt: number | null;
-  syncNow: () => Promise<void>;
+  isSyncing:    boolean;
+  lastSyncAt:   number | null;
+  conflicts:    ConflictRecord[];
+  syncNow:      () => Promise<void>;
 }
 
 export function useOffline(): OfflineState {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [isOnline,     setIsOnline]     = useState(() => navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [isSyncing,    setIsSyncing]    = useState(false);
+  const [lastSyncAt,   setLastSyncAt]   = useState<number | null>(null);
+  const [conflicts,    setConflicts]    = useState<ConflictRecord[]>([]);
   const syncingRef = useRef(false);
 
   const refreshCount = useCallback(async () => {
-    try {
-      const count = await getPendingCount();
-      setPendingCount(count);
-    } catch {
-      // ignore
-    }
+    try { setPendingCount(await getPendingCount()); } catch { /* ignore */ }
   }, []);
 
   const refreshLastSync = useCallback(async () => {
-    try {
-      const ts = await getLastSyncTime();
-      setLastSyncAt(ts);
-    } catch {
-      // ignore
-    }
+    try { setLastSyncAt(await getLastSyncTime()); } catch { /* ignore */ }
+  }, []);
+
+  const refreshConflicts = useCallback(async () => {
+    try { setConflicts(await getConflicts()); } catch { /* ignore */ }
   }, []);
 
   const syncNow = useCallback(async () => {
@@ -46,29 +42,30 @@ export function useOffline(): OfflineState {
       }
       await refreshCount();
       await refreshLastSync();
+      await refreshConflicts();
     } finally {
       syncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [refreshCount, refreshLastSync]);
+  }, [refreshCount, refreshLastSync, refreshConflicts]);
 
   useEffect(() => {
     refreshCount();
     refreshLastSync();
+    refreshConflicts();
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncNow();
-    };
-    const handleOffline = () => setIsOnline(false);
-    const handleQueued  = () => refreshCount();
-    const handleSynced  = () => refreshLastSync();
+    const handleOnline    = () => { setIsOnline(true);  syncNow(); };
+    const handleOffline   = () => setIsOnline(false);
+    const handleQueued    = () => refreshCount();
+    const handleSynced    = () => { refreshLastSync(); refreshConflicts(); };
+    const handleConflicts = () => refreshConflicts();
 
-    window.addEventListener("online",      handleOnline);
-    window.addEventListener("offline",     handleOffline);
-    window.addEventListener("nmb:queued",  handleQueued);
-    window.addEventListener("nmb:synced",  handleSynced);
-    window.addEventListener("nmb:data-saved", handleSynced);
+    window.addEventListener("online",                handleOnline);
+    window.addEventListener("offline",               handleOffline);
+    window.addEventListener("nmb:queued",            handleQueued);
+    window.addEventListener("nmb:synced",            handleSynced);
+    window.addEventListener("nmb:data-saved",        handleSynced);
+    window.addEventListener("nmb:conflicts-changed", handleConflicts);
 
     const interval = setInterval(() => {
       refreshCount();
@@ -76,14 +73,15 @@ export function useOffline(): OfflineState {
     }, 15_000);
 
     return () => {
-      window.removeEventListener("online",       handleOnline);
-      window.removeEventListener("offline",      handleOffline);
-      window.removeEventListener("nmb:queued",   handleQueued);
-      window.removeEventListener("nmb:synced",   handleSynced);
-      window.removeEventListener("nmb:data-saved", handleSynced);
+      window.removeEventListener("online",                handleOnline);
+      window.removeEventListener("offline",               handleOffline);
+      window.removeEventListener("nmb:queued",            handleQueued);
+      window.removeEventListener("nmb:synced",            handleSynced);
+      window.removeEventListener("nmb:data-saved",        handleSynced);
+      window.removeEventListener("nmb:conflicts-changed", handleConflicts);
       clearInterval(interval);
     };
-  }, [refreshCount, refreshLastSync, syncNow]);
+  }, [refreshCount, refreshLastSync, refreshConflicts, syncNow]);
 
-  return { isOnline, pendingCount, isSyncing, lastSyncAt, syncNow };
+  return { isOnline, pendingCount, isSyncing, lastSyncAt, conflicts, syncNow };
 }
