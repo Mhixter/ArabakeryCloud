@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, Receipt, Download, Tag, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, Receipt, Download, Tag, Filter, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { useListBranches } from "@workspace/api-client-react";
 import { generatePdf, fmtCurrency } from "@/lib/pdf";
@@ -340,6 +340,12 @@ export default function ExpensesPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">{e.note}</p>
                       {e.categoryName && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{e.categoryName}</Badge>}
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(e as any).syncStatus === "pending" && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-100 text-amber-700 rounded px-1 border border-amber-200">
+                          <Clock className="h-2.5 w-2.5" />pending
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <p className="text-xs text-muted-foreground">{format(new Date(e.expenseDate), "d MMM yyyy")}</p>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { drainQueue, getPendingCount, getConflicts, type ConflictRecord } from "@/lib/offline-queue";
-import { getLastSyncTime } from "@/lib/local-db";
+import { getLastSyncTime, getPendingLocalCount } from "@/lib/local-db";
+import { syncPendingRecords } from "@/lib/sync-service";
 
 export interface OfflineState {
   isOnline:     boolean;
@@ -20,7 +21,13 @@ export function useOffline(): OfflineState {
   const syncingRef = useRef(false);
 
   const refreshCount = useCallback(async () => {
-    try { setPendingCount(await getPendingCount()); } catch { /* ignore */ }
+    try {
+      const [local, queued] = await Promise.all([
+        getPendingLocalCount().catch(() => 0),
+        getPendingCount().catch(() => 0),
+      ]);
+      setPendingCount(local + queued);
+    } catch { /* ignore */ }
   }, []);
 
   const refreshLastSync = useCallback(async () => {
@@ -36,9 +43,15 @@ export function useOffline(): OfflineState {
     syncingRef.current = true;
     setIsSyncing(true);
     try {
-      const { success } = await drainQueue();
-      if (success > 0) {
-        window.dispatchEvent(new CustomEvent("nmb:synced", { detail: { count: success } }));
+      const [dexieResult, queueResult] = await Promise.allSettled([
+        syncPendingRecords(),
+        drainQueue(),
+      ]);
+      const dexieSuccess = dexieResult.status === "fulfilled" ? dexieResult.value.success : 0;
+      const queueSuccess = queueResult.status === "fulfilled" ? queueResult.value.success : 0;
+      const total = dexieSuccess + queueSuccess;
+      if (total > 0) {
+        window.dispatchEvent(new CustomEvent("nmb:synced", { detail: { count: total } }));
       }
       await refreshCount();
       await refreshLastSync();

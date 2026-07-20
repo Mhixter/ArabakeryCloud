@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText } from "lucide-react";
+import { Plus, Printer, ShoppingCart, TrendingUp, Download, Receipt, FileText, Clock } from "lucide-react";
 import { generatePdf, fmtCurrency as pdfFmt } from "@/lib/pdf";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
@@ -604,7 +604,15 @@ export default function SalesPage() {
                     const roleLabel = cashierRole ? ROLE_LABELS[cashierRole] ?? cashierRole : null;
                     return (
                       <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
-                        <TableCell className="font-mono text-xs">{sale.receiptNumber}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {sale.receiptNumber}
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          {(sale as any).syncStatus === "pending" && (
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] bg-amber-100 text-amber-700 rounded px-1 border border-amber-200 align-middle">
+                              <Clock className="h-2.5 w-2.5" />pending
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>{sale.breadType}</TableCell>
                         <TableCell>{sale.quantity}</TableCell>
                         <TableCell>{formatCurrency(sale.pricePerUnit)}</TableCell>

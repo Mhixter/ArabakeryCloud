@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wheat, Loader2, User, X, WifiOff } from "lucide-react";
-import { storeOfflineSession, verifyOfflineLogin } from "@/lib/offline-auth";
+import { storeOfflineSession, verifyOfflineLogin, getOfflineLoginInfo, type OfflineLoginResult } from "@/lib/offline-auth";
 
 const ROLE_LABELS: Record<string, string> = {
   managing_director: "Managing Director",
@@ -48,6 +48,7 @@ export default function LoginPage() {
   const [lastUser, setLastUser] = useState<LastUser | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [offlineLoading, setOfflineLoading] = useState(false);
+  const [offlineLoginsRemaining, setOfflineLoginsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     setLastUser(getLastUser());
@@ -60,6 +61,14 @@ export default function LoginPage() {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Show how many offline logins remain when the user is offline and has typed a username
+  useEffect(() => {
+    if (!isOffline || !username.trim()) { setOfflineLoginsRemaining(null); return; }
+    getOfflineLoginInfo(username).then(info => {
+      setOfflineLoginsRemaining(info?.offlineLoginsRemaining ?? null);
+    }).catch(() => {});
+  }, [isOffline, username]);
 
   const login = useLogin();
 
@@ -97,17 +106,20 @@ export default function LoginPage() {
     try {
       const session = await verifyOfflineLogin(username, password);
       if (session) {
+        setOfflineLoginsRemaining(session.offlineLoginsRemaining);
+        const rem = session.offlineLoginsRemaining;
         toast({
           title: "Signed in offline",
-          description: "You are working offline. Data will sync when you reconnect.",
+          description: `Working offline. ${rem} offline login${rem === 1 ? "" : "s"} remaining before reconnection required.`,
         });
-        restoreOfflineSession(session as { token: string; user: unknown; company?: unknown });
+        restoreOfflineSession(session as OfflineLoginResult);
       } else {
-        toast({
-          title: "Offline login failed",
-          description: "No cached session found for this account, or the password is incorrect. Connect to the internet to sign in.",
-          variant: "destructive",
-        });
+        const info = await getOfflineLoginInfo(username).catch(() => null);
+        if (info?.offlineLoginsRemaining === 0) {
+          toast({ title: "Offline login limit reached", description: "You've used all 7 offline logins. Connect to the internet to reset.", variant: "destructive" });
+        } else {
+          toast({ title: "Offline login failed", description: "No saved session for this account, or password is incorrect. Connect to the internet to sign in.", variant: "destructive" });
+        }
       }
     } finally {
       setOfflineLoading(false);
@@ -189,11 +201,20 @@ export default function LoginPage() {
 
         {/* Offline notice */}
         {isOffline && (
-          <div className="mb-4 rounded-xl bg-slate-700 border border-slate-600 px-4 py-3 flex items-center gap-3">
-            <WifiOff size={16} className="text-slate-300 flex-shrink-0" />
-            <p className="text-slate-300 text-sm">
-              You are offline. Sign in with your saved credentials to continue working.
-            </p>
+          <div className="mb-4 rounded-xl bg-slate-700 border border-slate-600 px-4 py-3 flex items-start gap-3">
+            <WifiOff size={16} className="text-slate-300 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-slate-300 text-sm">
+                You are offline. Sign in with your saved credentials to continue working.
+              </p>
+              {offlineLoginsRemaining !== null && (
+                <p className={`text-xs mt-1 ${offlineLoginsRemaining === 0 ? "text-red-400" : "text-slate-400"}`}>
+                  {offlineLoginsRemaining > 0
+                    ? `${offlineLoginsRemaining} offline login${offlineLoginsRemaining === 1 ? "" : "s"} remaining`
+                    : "Offline login limit reached — reconnect to reset"}
+                </p>
+              )}
+            </div>
           </div>
         )}
 

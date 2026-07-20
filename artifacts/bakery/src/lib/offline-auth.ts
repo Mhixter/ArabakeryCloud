@@ -2,11 +2,21 @@
  * offline-auth.ts
  * Stores and verifies user credentials locally so login works without network.
  * Uses PBKDF2 via Web Crypto API — the raw password is never stored.
+ * Includes a 7-session offline-login counter that resets on successful online login.
  */
 import { localDb } from "./local-db";
 
 const ITERATIONS = 100_000;
 const HASH_ALGO  = "SHA-256";
+const MAX_OFFLINE_LOGINS = 7;
+
+/* ── Types ── */
+export interface OfflineLoginResult {
+  token: string;
+  user: unknown;
+  company?: unknown;
+  offlineLoginsRemaining: number;
+}
 
 /* ── Crypto helpers ── */
 async function deriveKey(password: string, salt: Uint8Array): Promise<string> {
@@ -49,6 +59,7 @@ function saltToHex(salt: Uint8Array): string {
 /**
  * Call this after a successful online login.
  * Stores a hashed credential so the user can log in offline later.
+ * Resets the offline-login counter back to MAX_OFFLINE_LOGINS.
  */
 export async function storeOfflineSession(
   username: string,
@@ -60,8 +71,8 @@ export async function storeOfflineSession(
   },
 ): Promise<void> {
   try {
-    const salt       = randomSalt();
-    const saltHex    = saltToHex(salt);
+    const salt         = randomSalt();
+    const saltHex      = saltToHex(salt);
     const passwordHash = await deriveKey(password, salt);
 
     // Remove any existing session for this username
@@ -78,6 +89,7 @@ export async function storeOfflineSession(
       salt:      saltHex,
       userData:  JSON.stringify(sessionData),
       savedAt:   Date.now(),
+      offlineLoginsRemaining: MAX_OFFLINE_LOGINS,
     });
   } catch {
     // Silently fail — offline login is a bonus, not a blocker
@@ -86,12 +98,12 @@ export async function storeOfflineSession(
 
 /**
  * Attempt an offline login.
- * Returns parsed session data on success, or null on failure.
+ * Decrements the offline-login counter. Returns null when counter reaches 0.
  */
 export async function verifyOfflineLogin(
   username: string,
   password: string,
-): Promise<{ token: string; user: unknown; company?: unknown } | null> {
+): Promise<OfflineLoginResult | null> {
   try {
     const sessions = await localDb.offlineSessions
       .where("username").equalsIgnoreCase(username.trim().toLowerCase())
@@ -100,13 +112,43 @@ export async function verifyOfflineLogin(
     if (!sessions.length) return null;
 
     // Use the most recent session
-    const session = sessions.sort((a, b) => b.savedAt - a.savedAt)[0];
-    const salt    = saltFromHex(session.salt);
-    const hash    = await deriveKey(password, salt);
+    const session  = sessions.sort((a, b) => b.savedAt - a.savedAt)[0];
+    const remaining = session.offlineLoginsRemaining ?? MAX_OFFLINE_LOGINS;
+
+    // Counter exhausted
+    if (remaining <= 0) return null;
+
+    const salt = saltFromHex(session.salt);
+    const hash = await deriveKey(password, salt);
 
     if (hash !== session.passwordHash) return null;
 
-    return JSON.parse(session.userData);
+    // Decrement counter
+    const newRemaining = remaining - 1;
+    await localDb.offlineSessions.update(session.id!, {
+      offlineLoginsRemaining: newRemaining,
+    });
+
+    const parsed = JSON.parse(session.userData) as { token: string; user: unknown; company?: unknown };
+    return { ...parsed, offlineLoginsRemaining: newRemaining };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return the offline login counter for a username without consuming a login.
+ */
+export async function getOfflineLoginInfo(
+  username: string,
+): Promise<{ offlineLoginsRemaining: number } | null> {
+  try {
+    const sessions = await localDb.offlineSessions
+      .where("username").equalsIgnoreCase(username.trim().toLowerCase())
+      .toArray();
+    if (!sessions.length) return null;
+    const session = sessions.sort((a, b) => b.savedAt - a.savedAt)[0];
+    return { offlineLoginsRemaining: session.offlineLoginsRemaining ?? MAX_OFFLINE_LOGINS };
   } catch {
     return null;
   }

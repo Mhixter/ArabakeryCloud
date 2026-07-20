@@ -31,6 +31,8 @@ export interface LocalInventoryItem {
   _savedAt: number;
 }
 
+export type SyncStatus = "pending" | "synced" | "failed";
+
 export interface LocalSale {
   id: number;
   breadType: string;
@@ -41,6 +43,9 @@ export interface LocalSale {
   receiptNumber: string;
   branchId?: number | null;
   _savedAt: number;
+  syncStatus?: SyncStatus;
+  localId?: string;
+  serverId?: number;
 }
 
 export interface LocalExpense {
@@ -53,6 +58,9 @@ export interface LocalExpense {
   branchId: number | null;
   branchName: string | null;
   _savedAt: number;
+  syncStatus?: SyncStatus;
+  localId?: string;
+  serverId?: number;
 }
 
 export interface LocalAllocation {
@@ -90,12 +98,16 @@ export interface LocalProduction {
   breadType: string;
   quantityProduced: number;
   wasteQuantity: number;
+  netQuantity?: number;
   productionDate: string;
   staffName?: string;
   branchName?: string;
   notes?: string | null;
   branchId?: number | null;
   _savedAt: number;
+  syncStatus?: SyncStatus;
+  localId?: string;
+  serverId?: number;
 }
 
 export interface LocalReturn {
@@ -117,6 +129,7 @@ export interface OfflineSession {
   salt: string;
   userData: string; // JSON stringified user + company + token info
   savedAt: number;
+  offlineLoginsRemaining?: number; // starts at 7, decrements each offline login, resets on online login
 }
 
 export interface SyncMeta {
@@ -162,6 +175,20 @@ class LocalDatabase extends Dexie {
       offlineSessions: "++id, username, savedAt",
       syncMeta:        "key",
       apiCache:        "cacheKey, savedAt",
+    });
+
+    // v2: add syncStatus + localId indexes to mutable tables; mark existing records as synced
+    this.version(2).stores({
+      sales:           "id, saleDate, branchId, paymentMethod, syncStatus, localId, _savedAt",
+      expenses:        "id, expenseDate, branchId, syncStatus, localId, _savedAt",
+      production:      "id, productionDate, branchId, syncStatus, localId, _savedAt",
+      offlineSessions: "++id, username, savedAt",
+    }).upgrade(async tx => {
+      await Promise.all([
+        tx.table("sales").toCollection().modify((r: LocalSale) => { if (!r.syncStatus) r.syncStatus = "synced"; }),
+        tx.table("expenses").toCollection().modify((r: LocalExpense) => { if (!r.syncStatus) r.syncStatus = "synced"; }),
+        tx.table("production").toCollection().modify((r: LocalProduction) => { if (!r.syncStatus) r.syncStatus = "synced"; }),
+      ]);
     });
   }
 }
@@ -269,4 +296,18 @@ export async function saveReturns(items: Omit<LocalReturn, "_savedAt">[]): Promi
   try {
     await localDb.returns.bulkPut(items.map(i => ({ ...i, _savedAt: now() })));
   } catch { /* ignore */ }
+}
+
+/** Count records across sales/production/expenses that haven't been synced to the server yet. */
+export async function getPendingLocalCount(): Promise<number> {
+  try {
+    const [s, p, e] = await Promise.all([
+      localDb.sales.where("syncStatus").equals("pending").count(),
+      localDb.production.where("syncStatus").equals("pending").count(),
+      localDb.expenses.where("syncStatus").equals("pending").count(),
+    ]);
+    return s + p + e;
+  } catch {
+    return 0;
+  }
 }

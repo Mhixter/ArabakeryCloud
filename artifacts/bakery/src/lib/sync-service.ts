@@ -19,6 +19,7 @@ import {
   getCachedApiResponse,
   setLastSyncTime,
 } from "./local-db";
+import { getToken } from "./auth";
 
 /* ── helpers ── */
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -246,4 +247,116 @@ export async function getOfflineFallback(url: string): Promise<Response | null> 
   } catch {
     return null;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SYNC PATH — push pending Dexie records to the server
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Read all records with syncStatus='pending' from Dexie and POST them to the
+ * server. On success, replaces the local (negative-ID) record with the real
+ * server record and marks it 'synced'. On failure, marks it 'failed'.
+ */
+export async function syncPendingRecords(): Promise<{ success: number; failed: number }> {
+  let success = 0;
+  let failed  = 0;
+
+  try {
+    const token = getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const [pendingSales, pendingProduction, pendingExpenses] = await Promise.all([
+      localDb.sales.where("syncStatus").equals("pending").toArray(),
+      localDb.production.where("syncStatus").equals("pending").toArray(),
+      localDb.expenses.where("syncStatus").equals("pending").toArray(),
+    ]);
+
+    /* ── Sales ── */
+    for (const sale of pendingSales) {
+      try {
+        const qty = sale.quantity || 1;
+        const body = {
+          breadType:     sale.breadType,
+          quantity:      qty,
+          pricePerUnit:  sale.totalAmount / qty,
+          paymentMethod: sale.paymentMethod,
+          branchId:      sale.branchId,
+        };
+        const res = await fetch("/api/sales", { method: "POST", headers, body: JSON.stringify(body) });
+        if (res.ok) {
+          const serverRecord = await res.json() as Record<string, unknown>;
+          await localDb.sales.delete(sale.id);
+          await localDb.sales.put({ ...serverRecord, syncStatus: "synced", _savedAt: Date.now() } as Parameters<typeof localDb.sales.put>[0]);
+          success++;
+        } else {
+          await localDb.sales.update(sale.id, { syncStatus: "failed" });
+          failed++;
+        }
+      } catch {
+        try { await localDb.sales.update(sale.id, { syncStatus: "failed" }); } catch { /* ignore */ }
+        failed++;
+      }
+    }
+
+    /* ── Production ── */
+    for (const batch of pendingProduction) {
+      try {
+        const body = {
+          breadType:        batch.breadType,
+          quantityProduced: batch.quantityProduced,
+          wasteQuantity:    batch.wasteQuantity,
+          branchId:         batch.branchId,
+          notes:            batch.notes,
+        };
+        const res = await fetch("/api/production", { method: "POST", headers, body: JSON.stringify(body) });
+        if (res.ok) {
+          const serverRecord = await res.json() as Record<string, unknown>;
+          await localDb.production.delete(batch.id);
+          await localDb.production.put({ ...serverRecord, syncStatus: "synced", _savedAt: Date.now() } as Parameters<typeof localDb.production.put>[0]);
+          success++;
+        } else {
+          await localDb.production.update(batch.id, { syncStatus: "failed" });
+          failed++;
+        }
+      } catch {
+        try { await localDb.production.update(batch.id, { syncStatus: "failed" }); } catch { /* ignore */ }
+        failed++;
+      }
+    }
+
+    /* ── Expenses ── */
+    for (const expense of pendingExpenses) {
+      try {
+        const ext = expense as unknown as { expenseCategoryId?: number | null; workerId?: number | null };
+        const body: Record<string, unknown> = {
+          note:        expense.note,
+          amount:      expense.amount,
+          expenseDate: expense.expenseDate,
+          branchId:    expense.branchId,
+        };
+        if (ext.expenseCategoryId) body.expenseCategoryId = ext.expenseCategoryId;
+        if (ext.workerId)          body.workerId          = ext.workerId;
+
+        const res = await fetch("/api/expenses", { method: "POST", headers, body: JSON.stringify(body) });
+        if (res.ok) {
+          const serverRecord = await res.json() as Record<string, unknown>;
+          await localDb.expenses.delete(expense.id);
+          await localDb.expenses.put({ ...serverRecord, syncStatus: "synced", _savedAt: Date.now() } as Parameters<typeof localDb.expenses.put>[0]);
+          success++;
+        } else {
+          await localDb.expenses.update(expense.id, { syncStatus: "failed" });
+          failed++;
+        }
+      } catch {
+        try { await localDb.expenses.update(expense.id, { syncStatus: "failed" }); } catch { /* ignore */ }
+        failed++;
+      }
+    }
+
+    if (success > 0) await setLastSyncTime();
+  } catch { /* outer guard */ }
+
+  return { success, failed };
 }

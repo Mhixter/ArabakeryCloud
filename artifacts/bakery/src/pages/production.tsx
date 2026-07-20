@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Factory, TrendingDown, Download } from "lucide-react";
+import { Plus, Factory, TrendingDown, Download, Clock } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
@@ -259,7 +259,15 @@ export default function ProductionPage() {
                       <Factory size={15} className="text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground truncate">{batch.breadType}</p>
+                      <p className="font-semibold text-sm text-foreground truncate">
+                        {batch.breadType}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(batch as any).syncStatus === "pending" && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] bg-amber-100 text-amber-700 rounded px-1 border border-amber-200 align-middle">
+                            <Clock className="h-2.5 w-2.5" />pending
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {batch.staffName} · {batch.branchName} · {format(new Date(batch.productionDate), "dd MMM, HH:mm")}
                       </p>
