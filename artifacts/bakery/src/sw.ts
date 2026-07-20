@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
-import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
-import { registerRoute } from "workbox-routing";
+import { cleanupOutdatedCaches, precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
+import { registerRoute, NavigationRoute } from "workbox-routing";
 import { StaleWhileRevalidate, NetworkFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
@@ -10,6 +10,14 @@ declare const self: ServiceWorkerGlobalScope;
 self.skipWaiting();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
+
+/* ─── SPA Navigation fallback ───────────────────────────────────────
+   Without this, Chrome shows its own "You're offline" screen when the
+   user opens the app offline because the SW has no handler for HTML
+   navigation requests. This tells the SW to serve the cached index.html
+   for every page navigation — the React router then renders the right page.
+─────────────────────────────────────────────────────────────────────── */
+registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
 
 /* ─── Runtime caching (mirrors vite.config.ts workbox settings) ─── */
 registerRoute(

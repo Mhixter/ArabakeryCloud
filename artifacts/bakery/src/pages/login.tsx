@@ -162,8 +162,7 @@ export default function LoginPage() {
         },
         onError: async (error) => {
           /* If the error looks like a network failure, try offline auth */
-          const isNetworkError = !navigator.onLine || (error as any)?.isOfflineQueued;
-          if (isNetworkError) {
+          if (!navigator.onLine) {
             await tryOfflineLogin();
             return;
           }

@@ -51,9 +51,13 @@ export function installOfflineInterceptor() {
       }
 
       if (enqueued) {
-        const err = new Error("Offline: action saved — will sync when reconnected.");
-        (err as any).isOfflineQueued = true;
-        throw err;
+        // Return a synthetic 202 Accepted so the calling component's success
+        // path runs (modal closes, form resets) rather than its catch block.
+        // The nmb:queued event already updated the offline banner count.
+        return new Response(JSON.stringify({ queued: true }), {
+          status: 202,
+          headers: { "Content-Type": "application/json", "X-Offline-Queued": "true" },
+        });
       }
 
       // Enqueue failed — surface a real network error so callers can handle it
