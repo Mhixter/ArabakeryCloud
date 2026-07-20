@@ -50,6 +50,9 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
     : role !== "managing_director" ? userBranchId : null;
+  /* For the stock (remaining) calculation the MD always sees company-wide bread,
+     not just a single branch. Period KPIs (revenue, expenses) still respect branchFilter. */
+  const stockBranchFilter = role !== "managing_director" ? branchFilter : null;
   /* Support custom date for "view by date" filter — fallback to today */
   const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
   const now = new Date();
@@ -78,14 +81,16 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
   const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
+  /* Production, allocations & returns use stockBranchFilter so the MD always sees
+     company-wide bread stock regardless of which branch KPI tab they have open. */
   const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
-  if (branchFilter) prodConds.push(eq(productionBatchesTable.branchId, branchFilter));
+  if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
   /* Join sales with cashier role so we can split direct vs supplier sales.
      Supplier sales are WITHIN allocated bread — counting both would double-subtract. */
   const allSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
-  if (branchFilter) allSalesConds.push(eq(salesTable.branchId, branchFilter));
+  if (stockBranchFilter) allSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
   const allSalesEver = await db
     .select({ sale: salesTable, cashierRole: usersTable.role })
     .from(salesTable)
@@ -97,14 +102,14 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     eq(productReturnsTable.companyId, companyId),
     eq(productReturnsTable.status, "approved" as const),
   ];
-  if (branchFilter) returnsConds.push(eq(productReturnsTable.branchId, branchFilter));
+  if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
   const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
 
   /* Total allocations ever made (bread sent out to suppliers) */
   const allocConds = [eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt)];
-  if (branchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, branchFilter));
+  if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
 
   function aggregateByProduct(rows: { sale: typeof salesTable.$inferSelect }[]) {

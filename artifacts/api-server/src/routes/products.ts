@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
 import { db, productsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 
@@ -31,7 +31,9 @@ router.get("/products", authenticate, async (req: AuthenticatedRequest, res): Pr
     .from(productsTable)
     .where(
       effectiveBranchId
-        ? and(eq(productsTable.companyId, companyId), eq(productsTable.branchId, effectiveBranchId))
+        /* Include products tied to this branch AND company-wide products (branchId IS NULL)
+           so that products added by the MD without a branch always appear everywhere. */
+        ? and(eq(productsTable.companyId, companyId), or(eq(productsTable.branchId, effectiveBranchId), isNull(productsTable.branchId)))
         : eq(productsTable.companyId, companyId),
     )
     .orderBy(productsTable.name);
