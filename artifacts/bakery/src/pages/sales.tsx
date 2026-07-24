@@ -353,20 +353,58 @@ export default function SalesPage() {
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
 
   // Bulk sale: one row per active product
-  const [bulkLines, setBulkLines] = useState<{ breadType: string; quantity: string; pricePerUnit: string }[]>([]);
+  // `allocatedQty` = units currently out with suppliers; `remaining` = what's left (manager inputs this)
+  // Auto-calculated: soldQty = allocatedQty - remaining
+  const [bulkLines, setBulkLines] = useState<{
+    breadType: string;
+    allocatedQty: number;   // from dashboard — units currently allocated to suppliers
+    inStoreQty: number;     // from dashboard — units currently in store
+    remaining: string;      // manager types this: total still in stock (in store + unsold with suppliers)
+    pricePerUnit: string;
+  }[]>([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkStockLoading, setBulkStockLoading] = useState(false);
 
-  const openBulkSale = () => {
-    setBulkLines(
-      activeProducts.map(p => ({ breadType: p.name, quantity: "", pricePerUnit: p.pricePerUnit.toString() }))
-    );
+  const openBulkSale = async () => {
+    setBulkStockLoading(true);
     setShowBulkSale(true);
+    const token = getToken();
+    const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const qs = branchParam ? `?branchId=${branchParam}` : "";
+      const dash = await fetch(`${API_BASE}/api/reports/product-dashboard${qs}`, { headers: h, credentials: "include" })
+        .then(r => r.ok ? r.json() : null);
+      const stockMap = new Map<string, { allocated: number; remaining: number }>();
+      for (const item of (dash?.remaining ?? [])) {
+        stockMap.set(item.name, { allocated: item.allocated ?? 0, remaining: item.remaining ?? 0 });
+      }
+      setBulkLines(
+        activeProducts.map(p => ({
+          breadType: p.name,
+          allocatedQty: stockMap.get(p.name)?.allocated ?? 0,
+          inStoreQty:   stockMap.get(p.name)?.remaining ?? 0,
+          remaining: "",
+          pricePerUnit: p.pricePerUnit.toString(),
+        }))
+      );
+    } catch {
+      setBulkLines(
+        activeProducts.map(p => ({ breadType: p.name, allocatedQty: 0, inStoreQty: 0, remaining: "", pricePerUnit: p.pricePerUnit.toString() }))
+      );
+    } finally { setBulkStockLoading(false); }
   };
 
   const handleBulkCreate = async () => {
-    const lines = bulkLines.filter(l => l.quantity && parseInt(l.quantity) > 0 && l.pricePerUnit && parseFloat(l.pricePerUnit) > 0);
+    // For each line, soldQty = (allocatedQty + inStoreQty) - remaining
+    const lines = bulkLines.map(l => {
+      const totalStock = l.allocatedQty + l.inStoreQty;
+      const remainingQty = l.remaining !== "" ? Math.max(0, parseInt(l.remaining) || 0) : null;
+      const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : 0;
+      return { ...l, soldQty };
+    }).filter(l => l.soldQty > 0 && parseFloat(l.pricePerUnit) > 0);
+
     if (lines.length === 0) {
-      toast({ title: "Enter a quantity for at least one product", variant: "destructive" });
+      toast({ title: "No sales to record — enter the remaining stock for at least one product", variant: "destructive" });
       return;
     }
     const token = getToken();
@@ -377,14 +415,11 @@ export default function SalesPage() {
       try {
         const res = await fetch(`${API_BASE}/api/sales`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           credentials: "include",
           body: JSON.stringify({
             breadType: line.breadType,
-            quantity: parseInt(line.quantity),
+            quantity: line.soldQty,
             pricePerUnit: parseFloat(line.pricePerUnit),
             paymentMethod: form.paymentMethod,
             branchId: parseInt(form.branchId) || user?.branchId,
@@ -392,7 +427,7 @@ export default function SalesPage() {
         });
         if (res.ok) {
           const sale = await res.json();
-          const receipt: ReceiptData = {
+          saveSlip({
             receiptNumber: sale.receiptNumber,
             breadType: sale.breadType,
             quantity: sale.quantity,
@@ -405,21 +440,18 @@ export default function SalesPage() {
             branchPhone: sale.branchPhone ?? null,
             branchAddress: sale.branchAddress ?? null,
             saleDate: sale.saleDate,
-          };
-          saveSlip(receipt, branchParam);
+          }, branchParam);
           succeeded++;
-        } else {
-          failed++;
-        }
+        } else { failed++; }
       } catch { failed++; }
     }
     setBulkSubmitting(false);
     queryClient.invalidateQueries({ queryKey: getListSalesQueryKey({}) });
     queryClient.invalidateQueries({ queryKey: getGetDailySalesSummaryQueryKey({}) });
     if (succeeded > 0) {
-      toast({ title: `${succeeded} sale${succeeded > 1 ? "s" : ""} recorded`, description: failed > 0 ? `${failed} failed — check stock availability` : undefined });
+      toast({ title: `${succeeded} product${succeeded > 1 ? "s" : ""} recorded`, description: failed > 0 ? `${failed} failed — check stock` : undefined });
     } else {
-      toast({ title: "All entries failed", description: "Check stock availability for each product", variant: "destructive" });
+      toast({ title: "All entries failed", description: "Check stock availability", variant: "destructive" });
     }
     setShowBulkSale(false);
   };
@@ -835,29 +867,30 @@ export default function SalesPage() {
 
       {/* ── Bulk Daily Entry Dialog ── */}
       <Dialog open={showBulkSale} onOpenChange={setShowBulkSale}>
-        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col gap-0 p-0">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b border-border">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold mb-1">
               <ShoppingCart size={16} />
               Daily Sales Entry
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              Enter quantities sold for each product. Leave blank to skip.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Enter how many units remain for each product. The system calculates what was sold automatically.
             </p>
-          </DialogHeader>
+          </div>
 
-          {/* Payment method row */}
-          <div className="flex items-center gap-3 py-2 border-b border-border">
-            <Label className="text-sm font-medium whitespace-nowrap">Payment:</Label>
+          {/* Payment method */}
+          <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-muted/30">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Payment:</span>
             <div className="flex gap-2">
               {(["cash", "transfer"] as const).map(m => (
                 <button
                   key={m}
                   onClick={() => setForm(f => ({ ...f, paymentMethod: m }))}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors capitalize ${
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                     form.paymentMethod === m
                       ? "bg-amber-400 text-slate-950"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      : "bg-background text-muted-foreground border border-border hover:bg-muted"
                   }`}
                 >
                   {m === "cash" ? "Cash" : "Bank Transfer"}
@@ -866,86 +899,147 @@ export default function SalesPage() {
             </div>
           </div>
 
-          {/* Product rows — scrollable */}
-          <div className="flex-1 overflow-y-auto -mx-6 px-6">
-            <div className="space-y-0 divide-y divide-border">
-              {bulkLines.map((line, idx) => {
-                const qty = parseInt(line.quantity) || 0;
-                const price = parseFloat(line.pricePerUnit) || 0;
-                const lineTotal = qty * price;
-                return (
-                  <div key={line.breadType} className="py-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-semibold text-sm text-foreground">{line.breadType}</p>
-                      {lineTotal > 0 && (
-                        <p className="text-sm font-bold text-emerald-600">{formatCurrency(lineTotal)}</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Quantity</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={line.quantity}
-                          onChange={e => {
-                            const updated = [...bulkLines];
-                            updated[idx] = { ...updated[idx], quantity: e.target.value };
-                            setBulkLines(updated);
-                          }}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Price/Unit (₦)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={line.pricePerUnit}
-                          onChange={e => {
-                            const updated = [...bulkLines];
-                            updated[idx] = { ...updated[idx], pricePerUnit: e.target.value };
-                            setBulkLines(updated);
-                          }}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-6 py-2 border-b border-border/50 bg-muted/20">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Product</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-20">Allocated</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Remaining</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Sold / Total</p>
           </div>
 
-          {/* Grand total */}
+          {/* Product rows — scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            {bulkStockLoading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)}
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {bulkLines.map((line, idx) => {
+                  const totalStock = line.allocatedQty + line.inStoreQty;
+                  const remainingQty = line.remaining !== "" ? Math.max(0, parseInt(line.remaining) || 0) : null;
+                  const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : null;
+                  const price = parseFloat(line.pricePerUnit) || 0;
+                  const lineTotal = soldQty !== null ? soldQty * price : null;
+                  const isOverAllocated = remainingQty !== null && remainingQty > totalStock;
+
+                  return (
+                    <div key={line.breadType} className={`px-6 py-3 ${soldQty && soldQty > 0 ? "bg-emerald-50/40" : ""}`}>
+                      {/* Product name + price row */}
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-start">
+                        {/* Product */}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-foreground truncate">{line.breadType}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground">
+                              ₦{parseFloat(line.pricePerUnit).toLocaleString("en-NG", { minimumFractionDigits: 0 })}/unit
+                            </span>
+                            {line.inStoreQty > 0 && (
+                              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">
+                                {line.inStoreQty} in store
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Allocated */}
+                        <div className="w-20 text-right">
+                          <p className="text-sm font-bold text-foreground">{line.allocatedQty}</p>
+                          <p className="text-[10px] text-muted-foreground">allocated</p>
+                        </div>
+
+                        {/* Remaining input */}
+                        <div className="w-24">
+                          <Input
+                            type="number"
+                            min="0"
+                            max={totalStock}
+                            placeholder={`0–${totalStock}`}
+                            value={line.remaining}
+                            onChange={e => {
+                              const updated = [...bulkLines];
+                              updated[idx] = { ...updated[idx], remaining: e.target.value };
+                              setBulkLines(updated);
+                            }}
+                            className={`h-9 text-sm text-right ${isOverAllocated ? "border-red-400 bg-red-50 focus-visible:ring-red-400" : ""}`}
+                          />
+                          {isOverAllocated && (
+                            <p className="text-[10px] text-red-600 mt-0.5 text-right">Max {totalStock}</p>
+                          )}
+                        </div>
+
+                        {/* Calculated sold + total */}
+                        <div className="w-24 text-right">
+                          {soldQty !== null && soldQty > 0 ? (
+                            <>
+                              <p className="text-sm font-bold text-emerald-700">{soldQty} sold</p>
+                              <p className="text-xs font-semibold text-emerald-600">
+                                {lineTotal !== null ? formatCurrency(lineTotal) : "—"}
+                              </p>
+                            </>
+                          ) : soldQty === 0 && remainingQty !== null ? (
+                            <p className="text-xs text-muted-foreground">No sales</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground/40">—</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price per unit editable (collapsed by default, shown when product has a sale) */}
+                      {soldQty !== null && soldQty > 0 && (
+                        <div className="flex items-center gap-2 mt-2 ml-0">
+                          <span className="text-[10px] text-muted-foreground">Price/unit:</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.pricePerUnit}
+                            onChange={e => {
+                              const updated = [...bulkLines];
+                              updated[idx] = { ...updated[idx], pricePerUnit: e.target.value };
+                              setBulkLines(updated);
+                            }}
+                            className="h-7 text-xs w-28"
+                          />
+                          <span className="text-[10px] text-muted-foreground">₦</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Grand total summary */}
           {(() => {
-            const grandTotal = bulkLines.reduce((s, l) => {
-              const qty = parseInt(l.quantity) || 0;
+            const entries = bulkLines.map(l => {
+              const totalStock = l.allocatedQty + l.inStoreQty;
+              const remainingQty = l.remaining !== "" ? Math.max(0, parseInt(l.remaining) || 0) : null;
+              const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : 0;
               const price = parseFloat(l.pricePerUnit) || 0;
-              return s + qty * price;
-            }, 0);
-            const totalUnits = bulkLines.reduce((s, l) => s + (parseInt(l.quantity) || 0), 0);
-            if (grandTotal === 0) return null;
+              return { soldQty, total: soldQty * price };
+            });
+            const totalSold = entries.reduce((s, e) => s + e.soldQty, 0);
+            const grandTotal = entries.reduce((s, e) => s + e.total, 0);
+            if (totalSold === 0) return null;
             return (
-              <div className="border-t border-border pt-3 flex items-center justify-between">
+              <div className="px-6 py-3 border-t border-border bg-slate-950 text-white flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Grand Total</p>
-                  <p className="text-xs text-muted-foreground">{totalUnits} units · {form.paymentMethod}</p>
+                  <p className="text-xs text-slate-400">Total Sales Today</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{totalSold} units · {form.paymentMethod}</p>
                 </div>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(grandTotal)}</p>
+                <p className="text-xl font-bold text-amber-400">{formatCurrency(grandTotal)}</p>
               </div>
             );
           })()}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+          <div className="px-6 py-4 border-t border-border flex gap-2">
             <Button variant="outline" onClick={() => setShowBulkSale(false)} className="flex-1">Cancel</Button>
-            <Button onClick={handleBulkCreate} disabled={bulkSubmitting} className="flex-1">
-              {bulkSubmitting ? "Recording…" : "Record All Sales"}
+            <Button onClick={handleBulkCreate} disabled={bulkSubmitting || bulkStockLoading} className="flex-1">
+              {bulkSubmitting ? "Recording…" : "Record Sales"}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
