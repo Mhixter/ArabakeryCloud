@@ -7,8 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
+  ArrowLeft, Eye, Building2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser, getStoredCompany } from "@/lib/auth";
@@ -42,6 +44,7 @@ interface Allocation {
   breadType: string;
   quantity: number;
   sellerName: string;
+  sellerId?: number;
   issuedByName: string;
   branchName: string;
   notes: string | null;
@@ -367,6 +370,9 @@ export default function AllocationsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showReturnForm, setShowReturnForm] = useState(false);
+  // Supplier detail drill-down (manager/receptionist view)
+  const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
+  const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
   const { toast } = useToast();
 
   const load = useCallback(() => {
@@ -378,8 +384,17 @@ export default function AllocationsPage() {
     Promise.all([
       fetch(allUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(retUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ])
-      .then(([a, r]) => { setAllocations(a); setReturns(r); })
+      .then(([a, r, prods]) => {
+        setAllocations(a);
+        setReturns(r);
+        const pm = new Map<string, number>();
+        for (const p of (prods as { name: string; pricePerUnit: number }[])) {
+          pm.set(p.name, p.pricePerUnit);
+        }
+        setProductPrices(pm);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [activeBranch]);
@@ -573,7 +588,8 @@ export default function AllocationsPage() {
                   </Button>
                 )}
               </div>
-            ) : (
+            ) : isSeller ? (
+              /* ── Supplier's own allocation list (flat) ── */
               <div className="divide-y divide-border/50">
                 {[...allocations].reverse().map(alloc => (
                   <div key={alloc.id} className="px-4 py-3 hover:bg-muted/20 transition-colors">
@@ -586,39 +602,237 @@ export default function AllocationsPage() {
                           <p className="font-semibold text-sm text-foreground truncate">{alloc.breadType}</p>
                           <Badge variant="secondary" className="text-xs flex-shrink-0">{alloc.quantity} units</Badge>
                         </div>
-                        {!isSeller && (
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <Users size={11} className="text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{alloc.sellerName}</p>
-                            <span className="text-muted-foreground/40 text-xs">·</span>
-                            <p className="text-xs text-muted-foreground">{alloc.branchName}</p>
-                          </div>
-                        )}
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <Calendar size={11} className="text-muted-foreground" />
                           <p className="text-xs text-muted-foreground">{formatDate(alloc.allocationDate)}</p>
-                          {!isSeller && (
-                            <>
-                              <span className="text-muted-foreground/40 text-xs">·</span>
-                              <p className="text-xs text-muted-foreground">by {alloc.issuedByName}</p>
-                            </>
-                          )}
                         </div>
                         {alloc.notes && <p className="text-xs text-muted-foreground/70 mt-1 italic">{alloc.notes}</p>}
                       </div>
-                      {canDelete && (
-                        <button
-                          onClick={() => { if (confirm(`Cancel allocation of ${alloc.quantity} × ${alloc.breadType}?`)) handleCancel(alloc.id); }}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/50 hover:text-red-500 transition-colors flex-shrink-0"
-                          title="Cancel allocation"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}
               </div>
+            ) : selectedSeller ? (
+              /* ── Supplier detail drill-down ── */
+              (() => {
+                const sellerAllocs = allocations.filter(a => a.sellerName === selectedSeller);
+                // Group by breadType within this supplier
+                const byType = new Map<string, { qty: number; latestDate: string; ids: number[] }>();
+                for (const a of sellerAllocs) {
+                  const prev = byType.get(a.breadType);
+                  if (!prev) { byType.set(a.breadType, { qty: a.quantity, latestDate: a.allocationDate, ids: [a.id] }); }
+                  else {
+                    byType.set(a.breadType, {
+                      qty: prev.qty + a.quantity,
+                      latestDate: a.allocationDate > prev.latestDate ? a.allocationDate : prev.latestDate,
+                      ids: [...prev.ids, a.id],
+                    });
+                  }
+                }
+                const rows = Array.from(byType.entries()).map(([breadType, d]) => {
+                  const price = productPrices.get(breadType) ?? 0;
+                  const total = price * d.qty;
+                  return { breadType, qty: d.qty, price, total, latestDate: d.latestDate, ids: d.ids };
+                });
+                const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+                const totalUnits = rows.reduce((s, r) => s + r.qty, 0);
+                const branchName = sellerAllocs[0]?.branchName ?? "";
+
+                return (
+                  <div>
+                    {/* Detail header */}
+                    <div className="px-4 py-3 border-b border-border/50 flex items-center gap-3">
+                      <button
+                        onClick={() => setSelectedSeller(null)}
+                        className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                      >
+                        <ArrowLeft size={15} />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <Users size={13} className="text-amber-700" />
+                          </div>
+                          <p className="font-bold text-sm text-foreground">{selectedSeller}</p>
+                        </div>
+                        {branchName && (
+                          <div className="flex items-center gap-1.5 mt-0.5 ml-9">
+                            <Building2 size={10} className="text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{branchName}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-semibold text-foreground">{totalUnits} units</p>
+                        <p className="text-xs text-muted-foreground">{rows.length} product{rows.length !== 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+
+                    {/* Product table */}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product Type</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Unit Price</TableHead>
+                            <TableHead className="text-right">Total Value</TableHead>
+                            {canDelete && <TableHead className="w-10" />}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.map(row => (
+                            <TableRow key={row.breadType}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-semibold text-sm">{row.breadType}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Last: {format(new Date(row.latestDate), "dd MMM yyyy, HH:mm")}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{row.qty}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {row.price > 0 ? `₦${row.price.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-bold">
+                                {row.price > 0 ? `₦${row.total.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : "—"}
+                              </TableCell>
+                              {canDelete && (
+                                <TableCell>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Cancel all ${row.qty} × ${row.breadType} allocated to ${selectedSeller}?`)) {
+                                        Promise.all(row.ids.map(id => handleCancel(id)));
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/50 hover:text-red-500 transition-colors"
+                                    title="Cancel allocation"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Grand total footer */}
+                    <div className="px-4 py-3 border-t border-border bg-muted/30 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total allocation value</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{totalUnits} units across {rows.length} product{rows.length !== 1 ? "s" : ""}</p>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {grandTotal > 0 ? `₦${grandTotal.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` : `${totalUnits} units`}
+                      </p>
+                    </div>
+
+                    {/* Individual allocation history for this supplier */}
+                    <div className="border-t border-border/50">
+                      <p className="px-4 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Allocation History
+                      </p>
+                      {[...sellerAllocs].reverse().map(alloc => (
+                        <div key={alloc.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0">
+                          <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                            <PackageCheck size={13} className="text-amber-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground">{alloc.breadType}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(alloc.allocationDate), "dd MMM yyyy, HH:mm")} · by {alloc.issuedByName}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">{alloc.quantity} units</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              /* ── Manager: Supplier cards grouped view ── */
+              (() => {
+                // Group by sellerName
+                const sellerMap = new Map<string, { sellerName: string; branchName: string; allocations: Allocation[] }>();
+                for (const alloc of allocations) {
+                  const key = alloc.sellerName;
+                  if (!sellerMap.has(key)) sellerMap.set(key, { sellerName: alloc.sellerName, branchName: alloc.branchName, allocations: [] });
+                  sellerMap.get(key)!.allocations.push(alloc);
+                }
+                const supplierGroups = Array.from(sellerMap.values()).sort((a, b) => a.sellerName.localeCompare(b.sellerName));
+
+                return (
+                  <div className="divide-y divide-border/50">
+                    {supplierGroups.map(group => {
+                      const totalUnits = group.allocations.reduce((s, a) => s + a.quantity, 0);
+                      // Aggregate by bread type for this supplier
+                      const byType = new Map<string, number>();
+                      for (const a of group.allocations) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
+                      const productCount = byType.size;
+                      const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
+                        const price = productPrices.get(bt) ?? 0;
+                        return s + price * qty;
+                      }, 0);
+                      const latestDate = group.allocations.reduce((latest, a) =>
+                        a.allocationDate > latest ? a.allocationDate : latest, group.allocations[0]?.allocationDate ?? "");
+
+                      return (
+                        <div key={group.sellerName} className="px-4 py-4 hover:bg-muted/20 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
+                              <Users size={16} className="text-amber-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <Building2 size={10} className="text-muted-foreground" />
+                                    <p className="text-xs text-muted-foreground">{group.branchName}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="font-bold text-sm text-foreground">{totalUnits} units</p>
+                                  {totalValue > 0 && (
+                                    <p className="text-xs text-muted-foreground">₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}</p>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Product type chips */}
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {Array.from(byType.entries()).map(([bt, qty]) => (
+                                  <span key={bt} className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-800 border border-amber-200 rounded-full px-2 py-0.5">
+                                    <span className="font-semibold">{bt}</span>
+                                    <span className="text-amber-600">·{qty}</span>
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex items-center justify-between mt-2.5">
+                                <p className="text-xs text-muted-foreground">
+                                  {productCount} product{productCount !== 1 ? "s" : ""} · Last: {format(new Date(latestDate), "dd MMM, HH:mm")}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                  onClick={() => setSelectedSeller(group.sellerName)}
+                                >
+                                  <Eye size={12} />
+                                  View Details
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
             )}
           </CardContent>
         </Card>

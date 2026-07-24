@@ -348,8 +348,81 @@ export default function SalesPage() {
   const activeProducts = products?.filter(p => p.isActive) ?? [];
 
   const [showNewSale, setShowNewSale] = useState(false);
+  const [showBulkSale, setShowBulkSale] = useState(false);
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
+
+  // Bulk sale: one row per active product
+  const [bulkLines, setBulkLines] = useState<{ breadType: string; quantity: string; pricePerUnit: string }[]>([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
+  const openBulkSale = () => {
+    setBulkLines(
+      activeProducts.map(p => ({ breadType: p.name, quantity: "", pricePerUnit: p.pricePerUnit.toString() }))
+    );
+    setShowBulkSale(true);
+  };
+
+  const handleBulkCreate = async () => {
+    const lines = bulkLines.filter(l => l.quantity && parseInt(l.quantity) > 0 && l.pricePerUnit && parseFloat(l.pricePerUnit) > 0);
+    if (lines.length === 0) {
+      toast({ title: "Enter a quantity for at least one product", variant: "destructive" });
+      return;
+    }
+    const token = getToken();
+    setBulkSubmitting(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const line of lines) {
+      try {
+        const res = await fetch(`${API_BASE}/api/sales`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            breadType: line.breadType,
+            quantity: parseInt(line.quantity),
+            pricePerUnit: parseFloat(line.pricePerUnit),
+            paymentMethod: form.paymentMethod,
+            branchId: parseInt(form.branchId) || user?.branchId,
+          }),
+        });
+        if (res.ok) {
+          const sale = await res.json();
+          const receipt: ReceiptData = {
+            receiptNumber: sale.receiptNumber,
+            breadType: sale.breadType,
+            quantity: sale.quantity,
+            pricePerUnit: sale.pricePerUnit,
+            totalAmount: sale.totalAmount,
+            paymentMethod: sale.paymentMethod,
+            cashierName: sale.cashierName,
+            cashierRole: sale.cashierRole ?? null,
+            branchName: sale.branchName,
+            branchPhone: sale.branchPhone ?? null,
+            branchAddress: sale.branchAddress ?? null,
+            saleDate: sale.saleDate,
+          };
+          saveSlip(receipt, branchParam);
+          succeeded++;
+        } else {
+          failed++;
+        }
+      } catch { failed++; }
+    }
+    setBulkSubmitting(false);
+    queryClient.invalidateQueries({ queryKey: getListSalesQueryKey({}) });
+    queryClient.invalidateQueries({ queryKey: getGetDailySalesSummaryQueryKey({}) });
+    if (succeeded > 0) {
+      toast({ title: `${succeeded} sale${succeeded > 1 ? "s" : ""} recorded`, description: failed > 0 ? `${failed} failed — check stock availability` : undefined });
+    } else {
+      toast({ title: "All entries failed", description: "Check stock availability for each product", variant: "destructive" });
+    }
+    setShowBulkSale(false);
+  };
 
   /* Date filter — supplier/receptionist default to today, others default to "all" */
   const [filterDate, setFilterDate] = useState(isLimitedRole ? todayStr() : "");
@@ -467,10 +540,18 @@ export default function SalesPage() {
             {isLimitedRole ? "Your daily sales" : "Record and manage bread sales"}
           </p>
         </div>
-        <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
-          <Plus size={16} className="mr-2" />
-          New Sale
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isLimitedRole && (
+            <Button variant="outline" onClick={openBulkSale} disabled={isExpired || activeProducts.length === 0} data-testid="button-bulk-sale">
+              <Plus size={16} className="mr-2" />
+              Daily Entry
+            </Button>
+          )}
+          <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
+            <Plus size={16} className="mr-2" />
+            New Sale
+          </Button>
+        </div>
       </div>
 
       {/* Date filter */}
@@ -751,6 +832,122 @@ export default function SalesPage() {
 
       {receiptSale && <ReceiptModal sale={receiptSale} onClose={() => setReceiptSale(null)} />}
       {viewingReceipt && <ReceiptModal sale={viewingReceipt} onClose={() => setViewingReceipt(null)} />}
+
+      {/* ── Bulk Daily Entry Dialog ── */}
+      <Dialog open={showBulkSale} onOpenChange={setShowBulkSale}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart size={16} />
+              Daily Sales Entry
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Enter quantities sold for each product. Leave blank to skip.
+            </p>
+          </DialogHeader>
+
+          {/* Payment method row */}
+          <div className="flex items-center gap-3 py-2 border-b border-border">
+            <Label className="text-sm font-medium whitespace-nowrap">Payment:</Label>
+            <div className="flex gap-2">
+              {(["cash", "transfer"] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setForm(f => ({ ...f, paymentMethod: m }))}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors capitalize ${
+                    form.paymentMethod === m
+                      ? "bg-amber-400 text-slate-950"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {m === "cash" ? "Cash" : "Bank Transfer"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Product rows — scrollable */}
+          <div className="flex-1 overflow-y-auto -mx-6 px-6">
+            <div className="space-y-0 divide-y divide-border">
+              {bulkLines.map((line, idx) => {
+                const qty = parseInt(line.quantity) || 0;
+                const price = parseFloat(line.pricePerUnit) || 0;
+                const lineTotal = qty * price;
+                return (
+                  <div key={line.breadType} className="py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-sm text-foreground">{line.breadType}</p>
+                      {lineTotal > 0 && (
+                        <p className="text-sm font-bold text-emerald-600">{formatCurrency(lineTotal)}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Quantity</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={line.quantity}
+                          onChange={e => {
+                            const updated = [...bulkLines];
+                            updated[idx] = { ...updated[idx], quantity: e.target.value };
+                            setBulkLines(updated);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Price/Unit (₦)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={line.pricePerUnit}
+                          onChange={e => {
+                            const updated = [...bulkLines];
+                            updated[idx] = { ...updated[idx], pricePerUnit: e.target.value };
+                            setBulkLines(updated);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Grand total */}
+          {(() => {
+            const grandTotal = bulkLines.reduce((s, l) => {
+              const qty = parseInt(l.quantity) || 0;
+              const price = parseFloat(l.pricePerUnit) || 0;
+              return s + qty * price;
+            }, 0);
+            const totalUnits = bulkLines.reduce((s, l) => s + (parseInt(l.quantity) || 0), 0);
+            if (grandTotal === 0) return null;
+            return (
+              <div className="border-t border-border pt-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Grand Total</p>
+                  <p className="text-xs text-muted-foreground">{totalUnits} units · {form.paymentMethod}</p>
+                </div>
+                <p className="text-xl font-bold text-foreground">{formatCurrency(grandTotal)}</p>
+              </div>
+            );
+          })()}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowBulkSale(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleBulkCreate} disabled={bulkSubmitting} className="flex-1">
+              {bulkSubmitting ? "Recording…" : "Record All Sales"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

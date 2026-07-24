@@ -963,11 +963,19 @@ function ManagerDashboard() {
         )}
       </div>
 
-      {/* Stock overview */}
-      <div className="grid grid-cols-2 gap-3">
-        <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
-        <KpiCard title="Total In Stock" value={loading ? "—" : `${inventoryTotal}`} sub="bread units (in store + with suppliers)" icon={Package} loading={loading} accent={inventoryTotal < 10 ? "red" : "default"} />
-      </div>
+      {/* Stock at a glance — 4 KPIs */}
+      {(() => {
+        const totalInStore    = (data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0);
+        const totalAllocated  = (data?.remaining ?? []).reduce((s, r) => s + (r.allocated ?? 0), 0);
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            <KpiCard title="In Store (Available)" value={loading ? "—" : `${totalInStore}`} sub="units ready to sell/allocate" icon={Package} loading={loading} accent={totalInStore < 10 ? "red" : "default"} />
+            <KpiCard title="With Suppliers" value={loading ? "—" : `${totalAllocated}`} sub="units currently allocated" icon={PackageCheck} loading={loading} accent="amber" />
+            <KpiCard title="Total In Stock" value={loading ? "—" : `${inventoryTotal}`} sub="in store + with suppliers" icon={Layers} loading={loading} />
+            <KpiCard title="Active Products" value={loading ? "—" : `${data?.remaining?.filter(r => r.remaining > 0 || r.allocated > 0).length ?? 0}`} sub="with stock" icon={Layers} loading={loading} accent="amber" />
+          </div>
+        );
+      })()}
 
       {/* All-time totals — always visible regardless of period */}
       <div className="grid grid-cols-3 gap-3">
@@ -978,8 +986,8 @@ function ManagerDashboard() {
 
       {/* Period-filtered totals */}
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} />
-        <KpiCard title={`Units — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units" icon={ShoppingCart} loading={loading} />
+        <KpiCard title={`Revenue — ${periodLabel}`} value={loading ? "—" : formatCurrency(periodData?.totalAmount ?? 0)} sub={`${periodData?.salesCount ?? 0} orders`} icon={TrendingUp} loading={loading} accent="green" />
+        <KpiCard title={`Units Sold — ${periodLabel}`} value={loading ? "—" : `${periodData?.totalQuantity ?? 0}`} sub="total units sold" icon={ShoppingCart} loading={loading} />
       </div>
 
       {/* Expenses & Net Profit for period */}
