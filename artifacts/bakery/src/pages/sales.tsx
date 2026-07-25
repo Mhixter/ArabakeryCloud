@@ -347,10 +347,20 @@ export default function SalesPage() {
   const { data: products } = useProducts(branchParam);
   const activeProducts = products?.filter(p => p.isActive) ?? [];
 
+  const isManager = role === "manager" || role === "managing_director";
+
   const [showNewSale, setShowNewSale] = useState(false);
   const [showBulkSale, setShowBulkSale] = useState(false);
+  const [showQuickSale, setShowQuickSale] = useState(false);
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
+  const [quickForm, setQuickForm] = useState({
+    amount: "",
+    paymentMethod: "cash" as "cash" | "transfer",
+    branchId: user?.branchId?.toString() ?? "",
+    notes: "",
+  });
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
 
   // Bulk sale: one row per active product
   // `allocatedQty` = units currently out with suppliers; `remaining` = what's left (manager inputs this)
@@ -471,6 +481,7 @@ export default function SalesPage() {
   useEffect(() => {
     if (activeBranch) {
       setForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
+      setQuickForm(f => ({ ...f, branchId: activeBranch.id.toString() }));
     }
   }, [activeBranch]);
 
@@ -544,6 +555,65 @@ export default function SalesPage() {
     );
   };
 
+  const handleQuickSale = async () => {
+    const amount = parseFloat(quickForm.amount);
+    if (!quickForm.amount || isNaN(amount) || amount <= 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (!quickForm.branchId) {
+      toast({ title: "Branch is required", variant: "destructive" });
+      return;
+    }
+    const token = getToken();
+    setQuickSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/sales/quick`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          amount,
+          paymentMethod: quickForm.paymentMethod,
+          branchId: parseInt(quickForm.branchId),
+          notes: quickForm.notes || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Error", description: err?.error ?? "Failed to record sale", variant: "destructive" });
+        return;
+      }
+      const sale = await res.json();
+      toast({ title: "Quick sale recorded" });
+      queryClient.invalidateQueries({ queryKey: getListSalesQueryKey({}) });
+      queryClient.invalidateQueries({ queryKey: getGetDailySalesSummaryQueryKey({}) });
+      const receipt: ReceiptData = {
+        receiptNumber: sale.receiptNumber,
+        breadType:     sale.breadType,
+        quantity:      sale.quantity,
+        pricePerUnit:  sale.pricePerUnit,
+        totalAmount:   sale.totalAmount,
+        paymentMethod: sale.paymentMethod,
+        cashierName:   sale.cashierName,
+        cashierRole:   sale.cashierRole ?? null,
+        branchName:    sale.branchName,
+        branchPhone:   sale.branchPhone ?? null,
+        branchAddress: sale.branchAddress ?? null,
+        saleDate:      sale.saleDate,
+      };
+      saveSlip(receipt, branchParam);
+      setReceiptSale(receipt);
+      setShowQuickSale(false);
+      setQuickForm({ amount: "", paymentMethod: "cash", branchId: activeBranch?.id.toString() ?? user?.branchId?.toString() ?? "", notes: "" });
+    } finally {
+      setQuickSubmitting(false);
+    }
+  };
+
   const toReceipt = (sale: NonNullable<typeof sales>[0]): ReceiptData => ({
     receiptNumber: sale.receiptNumber,
     breadType:     sale.breadType,
@@ -573,6 +643,12 @@ export default function SalesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isManager && (
+            <Button variant="outline" onClick={() => setShowQuickSale(true)} disabled={isExpired} data-testid="button-quick-sale">
+              <Plus size={16} className="mr-2" />
+              Quick Sale
+            </Button>
+          )}
           {!isLimitedRole && (
             <Button variant="outline" onClick={openBulkSale} disabled={isExpired || activeProducts.length === 0} data-testid="button-bulk-sale">
               <Plus size={16} className="mr-2" />
@@ -864,6 +940,88 @@ export default function SalesPage() {
 
       {receiptSale && <ReceiptModal sale={receiptSale} onClose={() => setReceiptSale(null)} />}
       {viewingReceipt && <ReceiptModal sale={viewingReceipt} onClose={() => setViewingReceipt(null)} />}
+
+      {/* Quick Sale Dialog — manager / managing_director only */}
+      {isManager && (
+        <Dialog open={showQuickSale} onOpenChange={setShowQuickSale}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShoppingCart size={16} />
+                Quick Sale
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground -mt-1">
+              Record a sale by amount only — no product selection required.
+            </p>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>Amount (₦)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="e.g. 5000"
+                  value={quickForm.amount}
+                  onChange={e => setQuickForm(f => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-quick-amount"
+                  autoFocus
+                />
+                {quickForm.amount && parseFloat(quickForm.amount) > 0 && (
+                  <p className="text-sm font-semibold text-foreground pt-0.5">
+                    {formatCurrency(parseFloat(quickForm.amount))}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment Method</Label>
+                <Select
+                  value={quickForm.paymentMethod}
+                  onValueChange={(v: "cash" | "transfer") => setQuickForm(f => ({ ...f, paymentMethod: v }))}
+                >
+                  <SelectTrigger data-testid="select-quick-payment">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {branches && branches.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label>Branch</Label>
+                  <Select value={quickForm.branchId} onValueChange={v => setQuickForm(f => ({ ...f, branchId: v }))}>
+                    <SelectTrigger data-testid="select-quick-branch">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map(b => (
+                        <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label>Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  placeholder="e.g. Roadside sale, custom order…"
+                  value={quickForm.notes}
+                  onChange={e => setQuickForm(f => ({ ...f, notes: e.target.value }))}
+                  data-testid="input-quick-notes"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowQuickSale(false)}>Cancel</Button>
+              <Button onClick={handleQuickSale} disabled={quickSubmitting} data-testid="button-confirm-quick-sale">
+                {quickSubmitting ? "Recording…" : "Record Sale"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* ── Bulk Daily Entry Dialog ── */}
       <Dialog open={showBulkSale} onOpenChange={setShowBulkSale}>
