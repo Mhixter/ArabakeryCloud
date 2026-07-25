@@ -166,7 +166,7 @@ function Router() {
       <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/users"><ProtectedRole roles={["managing_director","manager"]}><UsersPage /></ProtectedRole></Route>
       <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
-      <Route path="/user-activity"><ProtectedRole roles={["managing_director","manager"]}><UserActivityPage /></ProtectedRole></Route>
+      <Route path="/user-activity"><ProtectedRole roles={["managing_director"]}><UserActivityPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/expenses"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><ExpensesPage /></BranchedPage></ProtectedRole></Route>

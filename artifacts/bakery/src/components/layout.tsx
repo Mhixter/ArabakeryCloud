@@ -35,7 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/reports",          label: "Reports",       icon: BarChart3,       roles: ["managing_director","manager"] },
   { href: "/workers",          label: "Workers",       icon: Users2,          roles: ["managing_director"] },
   { href: "/users",            label: "Users",         icon: Users,           roles: ["managing_director"] },
-  { href: "/user-activity",    label: "User Activity", icon: Activity,        roles: ["managing_director","manager"] },
+  { href: "/user-activity",    label: "User Activity", icon: Activity,        roles: ["managing_director"] },
   { href: "/audit-logs",       label: "Audit Logs",    icon: ScrollText,      roles: ["managing_director"] },
   { href: "/settings",         label: "Settings",      icon: Settings,        roles: ["managing_director"] },
   { href: "/company-settings", label: "Company",       icon: Building2,       roles: ["managing_director"] },
