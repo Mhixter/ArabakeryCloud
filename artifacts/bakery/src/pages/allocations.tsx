@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
-  ArrowLeft, Eye, Building2,
+  ArrowLeft, Building2, ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser, getStoredCompany } from "@/lib/auth";
@@ -754,7 +754,7 @@ export default function AllocationsPage() {
                 );
               })()
             ) : (
-              /* ── Manager: Supplier cards grouped view ── */
+              /* ── Manager: Supplier list (click to drill down) ── */
               (() => {
                 // Group by sellerName
                 const sellerMap = new Map<string, { sellerName: string; branchName: string; allocations: Allocation[] }>();
@@ -769,7 +769,6 @@ export default function AllocationsPage() {
                   <div className="divide-y divide-border/50">
                     {supplierGroups.map(group => {
                       const totalUnits = group.allocations.reduce((s, a) => s + a.quantity, 0);
-                      // Aggregate by bread type for this supplier
                       const byType = new Map<string, number>();
                       for (const a of group.allocations) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
                       const productCount = byType.size;
@@ -781,53 +780,51 @@ export default function AllocationsPage() {
                         a.allocationDate > latest ? a.allocationDate : latest, group.allocations[0]?.allocationDate ?? "");
 
                       return (
-                        <div key={group.sellerName} className="px-4 py-4 hover:bg-muted/20 transition-colors">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
-                              <Users size={16} className="text-amber-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <Building2 size={10} className="text-muted-foreground" />
-                                    <p className="text-xs text-muted-foreground">{group.branchName}</p>
-                                  </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="font-bold text-sm text-foreground">{totalUnits} units</p>
-                                  {totalValue > 0 && (
-                                    <p className="text-xs text-muted-foreground">₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}</p>
-                                  )}
-                                </div>
-                              </div>
-                              {/* Product type chips */}
-                              <div className="flex flex-wrap gap-1.5 mt-2">
-                                {Array.from(byType.entries()).map(([bt, qty]) => (
-                                  <span key={bt} className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-800 border border-amber-200 rounded-full px-2 py-0.5">
-                                    <span className="font-semibold">{bt}</span>
-                                    <span className="text-amber-600">·{qty}</span>
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="flex items-center justify-between mt-2.5">
-                                <p className="text-xs text-muted-foreground">
-                                  {productCount} product{productCount !== 1 ? "s" : ""} · Last: {format(new Date(latestDate), "dd MMM, HH:mm")}
-                                </p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
-                                  onClick={() => setSelectedSeller(group.sellerName)}
-                                >
-                                  <Eye size={12} />
-                                  View Details
-                                </Button>
-                              </div>
+                        <button
+                          key={group.sellerName}
+                          className="w-full px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors text-left flex items-center gap-3"
+                          onClick={() => setSelectedSeller(group.sellerName)}
+                        >
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
+                            <Users size={16} className="text-amber-400" />
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {group.branchName && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Building2 size={10} />
+                                  {group.branchName}
+                                </span>
+                              )}
+                              <span className="text-muted-foreground/40 text-xs">·</span>
+                              <span className="text-xs text-muted-foreground">
+                                {productCount} product{productCount !== 1 ? "s" : ""}
+                              </span>
+                              <span className="text-muted-foreground/40 text-xs">·</span>
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar size={10} />
+                                {format(new Date(latestDate), "dd MMM, HH:mm")}
+                              </span>
                             </div>
                           </div>
-                        </div>
+
+                          {/* Right: totals + chevron */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="font-bold text-sm text-foreground">{totalUnits} units</p>
+                              {totalValue > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
+                                </p>
+                              )}
+                            </div>
+                            <ChevronRight size={16} className="text-muted-foreground/50" />
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
