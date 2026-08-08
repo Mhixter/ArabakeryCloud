@@ -4,7 +4,7 @@ import {
   salesTable, productionBatchesTable, productsTable,
 } from "@workspace/db";
 import { eq, and, isNull } from "drizzle-orm";
-import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { authenticate, requireRole, AuthenticatedRequest, rateLimitByUser } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 
@@ -193,7 +193,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
 });
 
 /* PATCH /allocations/:id/clear|settle — settle allocation with supplier */
-router.patch(["/allocations/:id/clear", "/allocations/:id/settle"], authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+router.patch(["/allocations/:id/clear", "/allocations/:id/settle"], authenticate, rateLimitByUser(), requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId } = req.user!;
     const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -247,7 +247,7 @@ router.patch(["/allocations/:id/clear", "/allocations/:id/settle"], authenticate
 });
 
 /* POST /allocations/clear-supplier|settle-supplier — settle all allocations for a supplier */
-router.post(["/allocations/clear-supplier", "/allocations/settle-supplier"], authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post(["/allocations/clear-supplier", "/allocations/settle-supplier"], authenticate, rateLimitByUser(), requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId } = req.user!;
     const { sellerId } = req.body;

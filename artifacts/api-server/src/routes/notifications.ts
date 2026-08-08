@@ -1,9 +1,16 @@
 import { Router, IRouter } from "express";
 import { db, inventoryItemsTable, notificationsTable, sellerAllocationsTable, subscriptionsTable, usersTable, branchesTable } from "@workspace/db";
 import { eq, and, isNull, gte, desc } from "drizzle-orm";
-import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { authenticate, AuthenticatedRequest, rateLimitByUser } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
+const ENTITY_LINKS: Record<string, string> = {
+  allocation: "/allocations",
+  sale: "/sales",
+  production: "/production",
+  expense: "/expenses",
+  inventory: "/inventory",
+};
 
 interface Notification {
   id: string;
@@ -38,7 +45,7 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
       category: "activity" as const,
       title: n.title,
       message: n.message,
-      link: n.entityType === "allocation" ? "/allocations" : n.entityType === "sale" ? "/sales" : n.entityType === "production" ? "/production" : n.entityType === "expense" ? "/expenses" : n.entityType === "inventory" ? "/inventory" : undefined,
+      link: n.entityType ? ENTITY_LINKS[n.entityType] : undefined,
       createdAt: n.createdAt.toISOString(),
       isRead: n.isRead,
     })));
@@ -151,43 +158,51 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
   }
 });
 
-router.patch("/notifications/:id/read", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { companyId, userId } = req.user!;
-  const id = parseInt(String(req.params.id), 10);
-  if (Number.isNaN(id)) {
-    res.status(400).json({ error: "Invalid notification id" });
-    return;
+router.patch("/notifications/:id/read", authenticate, rateLimitByUser(), async (req: AuthenticatedRequest, res): Promise<void> => {
+  try {
+    const { companyId, userId } = req.user!;
+    const id = parseInt(String(req.params.id), 10);
+    if (Number.isNaN(id)) {
+      res.status(400).json({ error: "Invalid notification id" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(notificationsTable)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(notificationsTable.id, id),
+        eq(notificationsTable.companyId, companyId),
+        eq(notificationsTable.recipientUserId, userId),
+      ))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Notification not found" });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to mark notification as read" });
   }
-
-  const [updated] = await db
-    .update(notificationsTable)
-    .set({ isRead: true, readAt: new Date() })
-    .where(and(
-      eq(notificationsTable.id, id),
-      eq(notificationsTable.companyId, companyId),
-      eq(notificationsTable.recipientUserId, userId),
-    ))
-    .returning();
-
-  if (!updated) {
-    res.status(404).json({ error: "Notification not found" });
-    return;
-  }
-
-  res.json({ success: true });
 });
 
-router.post("/notifications/read-all", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const { companyId, userId } = req.user!;
-  await db
-    .update(notificationsTable)
-    .set({ isRead: true, readAt: new Date() })
-    .where(and(
-      eq(notificationsTable.companyId, companyId),
-      eq(notificationsTable.recipientUserId, userId),
-      eq(notificationsTable.isRead, false),
-    ));
-  res.json({ success: true });
+router.post("/notifications/read-all", authenticate, rateLimitByUser(), async (req: AuthenticatedRequest, res): Promise<void> => {
+  try {
+    const { companyId, userId } = req.user!;
+    await db
+      .update(notificationsTable)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(notificationsTable.companyId, companyId),
+        eq(notificationsTable.recipientUserId, userId),
+        eq(notificationsTable.isRead, false),
+      ));
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to mark notifications as read" });
+  }
 });
 
 export default router;

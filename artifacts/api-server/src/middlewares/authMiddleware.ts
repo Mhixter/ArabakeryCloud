@@ -42,3 +42,29 @@ export function requireRole(...roles: string[]) {
     next();
   };
 }
+
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export function rateLimitByUser(windowMs = 60_000, maxRequests = 60) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    const keyBase = req.user?.userId ? `user:${req.user.userId}` : `ip:${req.ip}`;
+    const key = `${keyBase}:${req.path}`;
+    const now = Date.now();
+    const existing = rateLimitBuckets.get(key);
+
+    if (!existing || existing.resetAt <= now) {
+      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    if (existing.count >= maxRequests) {
+      res.status(429).json({ error: "Too many requests. Please try again shortly." });
+      return;
+    }
+
+    existing.count += 1;
+    rateLimitBuckets.set(key, existing);
+    next();
+  };
+}

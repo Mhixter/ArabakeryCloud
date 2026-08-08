@@ -140,7 +140,9 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
     setOpen(o => !o);
     if (!open) {
       markSeen(notifications.map(n => n.id));
-      markAllRead();
+      if (notifications.some(n => n.id.startsWith("db-") && !n.isRead)) {
+        markAllRead();
+      }
     }
   };
 
