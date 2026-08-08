@@ -1,0 +1,564 @@
+Skip to content
+
+AI
+
+97%
+
+
+
+
+
+
+
+Library
+Commands
+Search files
+
+Packager files
+
+
+
+
+
+
+
+
+
+
+~/workspace
+: 
+bash
+
+
+
+Enable "Accessible Terminal" in Workspace Settings to use a screen reader with the shell.
+
+
+
+https://arabakerycloud-1.onrender.com/production the product page is not loading the product added for the managing director also in the director dashaboard Total In Stock
+
+899
+
+from inventory is not counting the real in database becase if sale or allocate still not minusing also Revenue
+
+₦0
+
+Gross Profit
+
+₦0
+
+Expenses
+
+₦44,592
+
+Net Profit
+
+₦-44,592
+
+Produced
+
+0 units
+
+Net Profit this week: ₦-44,592 = Revenue ₦0 − Expenses ₦44,592 Sales by Product No sales this week Expenses ₦44,592 total is not fetching the real data from the net profit an produced an unit etc also do not show other branch Remaining Bread by Type In-store stock vs with suppliers super
+
+Low 0 in store 0 with suppliers nokia
+
+Low 0 in store 0 with suppliers in the director dashbaord for other branch
+
+8 hours ago
+Diagnosing dashboard and production failures
+
+Diagnosing dashboard and production failures
+Let me explore the production page, dashboard API, and inventory logic simultaneously.
+
+
+11 actions
+Now let me read the dashboard frontend page and look for the production page to understand what's fetched:
+
+
+3 actions
+Now I need to read the reports page and the inventory route to fully understand all bugs:
+
+
+4 actions
+Now I have a clear picture. Let me read the sales route and products page:
+
+
+3 actions
+Now I have full clarity on all bugs. Let me fix all three in parallel:
+
+products.ts GET — null-branchId products excluded when branch filter applied
+reports.ts product-dashboard — MD always sees company-wide stock
+dashboard.tsx — "Total In Stock" reads static ingredient inventory instead of dynamic bread units
+
+4 actions
+Now I have everything needed. Making all fixes simultaneously:
+
+
+6 actions
+Now fix the ManagerDashboard's Total In Stock (same pattern — inventory → bread units):
+
+
+4 actions
+Now update the KPI card labels to be accurate, then check logs:
+
+
+4 actions
+Let me find and fix the Receptionist dashboard's remaining "from inventory" label, and check for any TypeScript errors in the API server:
+
+
+3 actions
+The TypeScript errors are all pre-existing (admin.ts, lib/db/dist build) — none from my changed files. Let me fix the remaining label and verify:
+
+
+3 actions
+All errors shown are pre-existing (lib/db/dist build issue affects the whole monorepo; the products.ts line 90/133 are pre-existing req.params type issues). No new errors from my changes. Let me do a final log check and verify the key code changes are correct:
+
+
+3 actions
+All three fixes are in and clean. Here's what was wrong and what was changed:
+
+Bug 1 — Products added by MD not showing on Production page
+
+GET /api/products?branchId=X was filtering with WHERE branchId = X, which silently excluded products the MD added company-wide (branchId IS NULL). Fixed to WHERE (branchId = X OR branchId IS NULL) so company-wide products always appear in every branch's dropdown.
+
+Bug 2 — "Total In Stock" (899) not updating after sales/allocations
+
+Both the Manager and Receptionist dashboards were fetching GET /api/inventory and summing currentQuantity from the raw-ingredient inventory table (flour, sugar, etc.) — a static field that only changes on manual adjustments. That's why it never reflected bread sales.
+
+Fixed to compute total bread units directly from the product-dashboard response's remaining array (inStore + withSuppliers per bread type), which is dynamically calculated from production/sales/allocation records. The inventory endpoint call is removed from both dashboards.
+
+Bug 3 — "Remaining Bread by Type" showing 0 for other branch in MD dashboard
+
+When the MD selected branch B to view its KPIs, the product-dashboard endpoint was applying the same branch filter to the stock calculation (production, allocations, returns). If all bread was produced in branch A, branch B's view showed 0 for everything.
+
+Fixed by introducing stockBranchFilter: for the MD role it is always null (company-wide), so the Remaining Bread by Type section always shows total company stock regardless of which branch tab is active. Period KPIs (revenue, expenses, sales by product) still respect the selected branch filter.
+
+Deploy to Render to make these live — the API server changes (products.ts, reports.ts) require a server restart.
+
+Restarting API server
+
+Restarting API server
+The API server needs a restart to pick up the products.ts and reports.ts changes:
+
+
+4 actions
+API server built and started cleanly — the super_admins warning is pre-existing (no local database in Replit). All three fixes are live locally. Deploy to Render to apply them in production.
+
+
+Checkpoint made
+8 hours ago
+
+Worked for 11 minutes
+Publish
+Domain
+Available
+arabakery-cloud--raxsublimited
+.replit.app
+Who can access your app
+
+Public
+Anyone on the internet with the URL
+
+Pasted-Objective-Redesign-the-entire-offline-mode-to-work-like_1784534988138.txt
+26 minutes ago
+
+3 actions
+This is a major architectural redesign. Let me explore the full codebase first before planning.
+
+
+Show less
+
+Explored codebase structure
+
+Subagent: Explore the bakery PWA codebase at artifacts/bakery/src and artifacts/api-server/src. I need a complete picture of: 1. The current offline infrastructure files (local-db.ts, offline-queue.ts, offline-intercept.ts, offline-auth.ts, sync-service.ts, sw.ts). Read each one fully and report their complete contents. 2. All page components that need offline support: src/pages/sales.tsx, production.tsx, inventory.tsx, expenses.tsx, products.tsx, workers.tsx, dashboard.tsx — for each, summarize: what API calls they make (GET/POST/PATCH/DELETE), what data they display in lists/history, and roughly how many lines they are. 3. The API server routes: src/routes/sales.ts, production.ts (or production-batches.ts), inventory.ts, expenses.ts, products.ts, workers.ts — for each, list the endpoints (method + path) and the DB tables they write to. 4. The Dexie local-db schema: what tables/stores are defined, with all fields. 5. The offline-auth: what is stored, how login counter works currently. 6. The sync-service: how it currently syncs. Produce a structured report with the actual file contents for the 5 offline infrastructure files, and summaries for the rest.
+Understanding current infrastructure
+
+Understanding current infrastructure
+Now I have a clear picture of the current state. Let me read the actual source files for the offline infrastructure to understand them fully before redesigning.
+
+The key insight from the spec is:
+
+Current problem: Mutations go into a queue, but the local DB (Dexie) doesn't show the queued data in list views. So when offline, lists appear empty.
+Required: Every mutation must be saved to Dexie immediately with syncStatus: 'pending', and all list views must read from Dexie (not just the server). When online, sync to server and mark as synced.
+This is a fundamental architectural shift from "intercept-and-queue" to "local-first with background sync." Let me examine the actual implementation to see what's currently in place.
+
+Now let me read all the current offline infrastructure files and key pages in parallel:
+
+
+6 actions
+Now let me read the pages that will need the most rework, and the offline banner and App.tsx in parallel:
+
+
+Show less
+
+Opened sales.tsx
+
+Opened production.tsx
+
+Opened offline-banner.tsx
+
+Opened login.tsx
+Planning the redesign
+
+Planning the redesign
+Now I have a full picture of what needs to be done. Let me plan the redesign carefully before diving in.
+
+Current Architecture (the problem)
+Offline mutations → go into offline-queue.ts pending-mutations store
+Pages fetch data from the API; Dexie is only populated from successful API GET responses
+When offline and you POST a sale → it goes to queue → page still reads from empty/stale Dexie cache → sale doesn't appear in history
+Required Architecture (local-first)
+Every mutation saves to Dexie FIRST with syncStatus: 'pending'
+All list views read from Dexie (not directly from API) — merging server-synced + pending records
+Sync queue just holds jobs pointing to Dexie records (by localId)
+When online → sync pending Dexie records → get server ID → mark syncStatus: 'synced'
+7-offline-login counter in offlineSessions
+Sync status badges on records
+Key Design Decisions
+The data flow is: user action saves to Dexie with pending status, updates the UI immediately, then enqueues a sync job. When back online, the sync job runs, POSTs to the server, gets the server ID back, and updates Dexie to mark it synced. Page loads read from Dexie to show both pending and synced records together.
+
+For the schema, I need to add syncStatus and localId (UUID) to each record type, plus a new syncJobs table to track what needs syncing.
+
+The implementation changes are spread across three files: local-db.ts gets the new fields and table with a version bump, offline-auth.ts adds the 7-login counter with device fingerprinting and resets it on successful online login, and offline-intercept.ts gets a complete rewrite to intercept POST mutations by writing to Dexie first and returning a synthetic response with the local record instead of queuing raw HTTP requests.
+
+The trickier part is handling the pages themselves. They currently use typed hooks from the API client like useListSales and useCreateSale, then invalidate TanStack queries. To make them local-first, I could either rewrite those hooks to read and write directly from Dexie, or have the interceptor serve Dexie data for GETs. The most practical approach is keeping TanStack Query for online mode while writing new records to Dexie with a pending status when offline.
+
+Actually, the minimum viable fix is simpler: when the interceptor catches an offline mutation, it should save the data to Dexie with syncStatus: 'pending' instead of just queuing it. Then the GET fallback includes those pending records, and the sync service reads from Dexie to replay mutations to the server before clearing the pending flag.
+
+The challenge is that the interceptor doesn't know the schema for each endpoint, so I need to map URL patterns to Dexie table operations. I'll add syncStatus, localId, and serverId fields to all mutable tables, bump the DB version, and then update the interceptor to parse the request body and URL to determine which table to write to.
+
+For the sync service, I'll read pending records from Dexie, POST them to the server, and update their serverId and syncStatus on success. But there's a conflict: pages fetch directly from the server when online, so pending records saved to Dexie won't appear in the UI until they're synced. I'm considering making Dexie the single source of truth instead.
+
+Actually, the simplest fix is to enhance the offline interceptor to also save mutations to Dexie when offline, then merge pending records with server data in the response. This keeps the architecture intact without rewriting every page.
+
+When online, mutations hit the server immediately and queries refresh with fresh data. When offline, the interceptor saves to Dexie with pending status, returns a synthetic response so the mutation succeeds, then when the GET fires through invalidation, the Dexie fallback includes those pending records and they appear in the list. The chain works because the mutation's onSuccess triggers invalidation, which triggers a GET, which hits the offline Dexie fallback that now contains the pending record.
+
+The key is making that synthetic response look like a real server response so the onSuccess handler gets properly formatted data for confirmations. I'm planning the implementation in phases: upgrading the Dexie schema with sync status fields, building the offline interceptor to save mutations and generate synthetic responses, leveraging the existing GET fallback since pending records will already be in Dexie, and then rewriting the sync service to handle reconciliation when the connection returns.
+
+For offline auth, I'm adding a 7-login counter that decrements with each offline session and resets on successful online login. The UI will show pending sync counts with status badges for each record—yellow for pending, green for synced, red for failed.
+
+Now I'm mapping out which files need changes, starting with the local database schema to add the new fields. When we're online, the API calls won't include pending records from Dexie until they sync, so I need to create a hook that live-queries Dexie for unsynced records and merges them with the server data on each page. This means the sales page and similar views will combine their API results with any local pending changes to show a complete picture.
+
+For the pages that create records—sales, production, and expenses—I'll add a status column or badge to indicate whether each row is pending or synced. The products and workers pages are less critical since they're not as time-sensitive for offline operations.
+
+When the app is offline and creates a record, the interceptor needs to return a synthetic response with a temporary negative ID and a generated receipt number so the UI can display it immediately.
+
+Defining the response shape for each endpoint...
+
+Now I'm mapping out the implementation plan: upgrading the database schema to track sync status, rewriting the offline interceptor to handle local writes, updating the sync service to drain pending records from the database, adding a login counter for offline authentication, and adjusting the offline hook to read from the local store.
+
+Updating the UI components to show sync badges and merge pending records with synced data, then starting with the database schema changes to add sync tracking fields to each mutable record type.
+
+Now let me read the remaining files I need before writing:
+
+
+Show less
+
+Opened use-offline.ts
+
+Opened expenses.tsx
+
+Opened App.tsx
+Planning implementation details
+
+Planning implementation details
+Let me quickly check the API base and a few more things before writing:
+
+
+Show less
+
+Opened api.ts
+
+Opened sales.tsx
+
+Opened expenses.tsx
+Implementing file content redesign
+
+Implementing file content redesign
+Now I have everything I need. Let me implement the complete redesign. I'll write all the files in parallel batches.
+
+Let me plan the exact contents of each file:
+
+1. local-db.ts — v2 schema
+Key changes:
+
+LocalSale: add syncStatus, localId, serverId?, cashierName, cashierRole?, branchName, branchPhone?, branchAddress?, pricePerUnit, notes?
+LocalProduction: add syncStatus, localId, serverId?, netQuantity? (already has staffName, branchName)
+LocalExpense: add syncStatus, localId, serverId?, createdByName?, workerCategoryName?
+OfflineSession: add offlineLoginsRemaining: number, deviceId: string
+Schema v2: add localId, syncStatus indexes to sales, production, expenses
+Migration: set existing records to syncStatus='synced'
+2. offline-auth.ts — 7-login counter
+I'm building the offline authentication system with device tracking and a login counter that starts at 7 and decrements with each offline login attempt.
+
+3. offline-intercept.ts — local-first
+Building the request interceptor that creates local records from POST requests, stores them in Dexie, and merges pending records into GET responses. When offline, POST requests create synthetic responses while GET requests attempt to fetch from the server and fall back to local data.
+
+4. sync-service.ts — Dexie-based sync
+The sync service handles pushing pending records back to the server once connectivity returns, while keeping the existing fallback logic for populating from API responses.
+
+5. use-offline.ts — Dexie-based pending count
+Switching the pending count hook to pull from Dexie instead of the old queue system, with the queue drain as a backup.
+
+6. offline-banner.tsx — Update labels
+Updating the banner to show "Pending Sync (N)" instead of "Queue (N)" and adding a syncing indicator.
+
+7. `login
+.tsx` — Counter display
+
+Showing how many offline logins are still waiting to sync.
+
+8. sales.tsx — Sync badge
+Adding a sync status badge to table rows with Clock and AlertCircle icons to indicate pending or syncing records.
+
+9. production.tsx — Sync badge
+Adding the same sync badge to batch rows.
+
+10. expenses.tsx — Minimal badge
+Just adding the sync badge to the expense list.
+
+Now I'm ready to write the code. I'll start with the core infrastructure pieces in parallel, then move to the page components. Before I dive in, I need to think through the GET response injection logic more carefully — when the server returns a list of sales, I need to merge in any pending Dexie records that haven't synced yet by checking their syncStatus.
+
+The key insight is that server records don't come with a syncStatus field, so I should enrich them in the interceptor. All server records get marked as 'synced', while pending Dexie records keep their original status. This way every record in the response has a consistent syncStatus property that the pages can use to determine which ones need the sync badge.
+
+The tradeoff is that pages will need to cast to any when accessing syncStatus since the types don't include it, but that's acceptable. For this to work cleanly, LocalSale needs to match the server response shape exactly, so I need to ensure all the required fields are present.
+
+Now I'm mapping out what each local model needs to contain to match their corresponding API responses—LocalSale needs receipt number, bread type, quantity, pricing, payment method, cashier details, branch info, and date fields; LocalProduction needs production quantities, waste tracking, staff and branch info; and LocalExpense needs the full expense details including category and worker information.
+
+I'm starting to write out the implementation files, beginning with how the offline intercept will construct a receipt number.
+
+For the receipt number format, I'll use OFF-TIMESTAMP to ensure uniqueness. I need to pull the cashier name from localStorage under nmb_user and the branch name from either nmb_active_branch or fall back to the user data. Let me verify what localStorage keys are actually available for branch information before I start writing everything out.
+
+I have everything I need. Now I'll implement the full redesign — 10 files in batches. Starting with all the core infrastructure files simultaneously:
+
+
+Show less
+
+Created local-db.ts
+
+Created offline-auth.ts
+
+Created offline-intercept.ts
+Parallelizing file updates
+
+Parallelizing file updates
+Let me continue with the remaining files. I need to write:
+
+sync-service.ts (rewrite with syncPendingRecords + keep populateFromApiResponse)
+use-offline.ts (update pendingCount)
+offline-banner.tsx (update labels)
+login.tsx (add counter display)
+sales.tsx (add sync badges)
+production.tsx (add sync badges)
+expenses.tsx (add sync badges)
+Let me write them all in parallel. For sync-service.ts, I'm keeping populateFromApiResponse and getOfflineFallback, then adding a syncPendingRecords function that reads pending records from Dexie and POSTs them to the server. For use-offline.ts, I'm swapping out getPendingCount() from the old queue system with getPendingLocalCount() from the local database, and replacing drainQueue() with syncPendingRecords() from the sync service. On the pages, I need to add sync status badges since the interceptor now injects syncStatus into all responses.
+
+The sync function will iterate through pending sales, production, and expense records, POSTing each one and either deleting the temp record and saving the server response as synced, or marking it as failed. I'll need to import the API base URL into sync-service. For the pages themselves, I'm adding a sync status indicator component that displays a badge when a record's syncStatus is 'pending' or 'failed'.
+
+I'll keep the badge logic simple and inline it directly in each page rather than creating a separate component. For the sales page, I'll add a subtle badge next to the receipt number instead of a new column to keep mobile layouts clean. The production and expenses pages will get similar badges in their respective list rows.
+
+For the login page, I need to handle the offline login counter—when offline, display the remaining logins count, disable the form when it reaches zero, and show the limit message. The verifyOfflineLogin function now returns an OfflineLoginResult type that I'll use to manage this state.
+
+I should also handle backward compatibility in use-offline.ts by keeping the old drainQueue as a fallback in case there are lingering items from the previous queue implementation.
+
+Now writing the remaining 7 files in parallel — sync service, hooks, banner, login, and the three pages:
+
+
+Show less
+
+Created sync-service.ts
+
+Created use-offline.ts
+
+Created offline-banner.tsx
+Updating UI components
+
+Updating UI components
+Let me continue writing the remaining files. I need to update:
+
+login.tsx - Add offline login counter display
+sales.tsx - Add sync status badges
+production.tsx - Add sync status badges
+expenses.tsx - Add sync status badges
+Let me write them in parallel.
+
+For login.tsx, I need to:
+
+Import verifyOfflineLogin, getOfflineLoginInfo from offline-auth (instead of old API)
+Show remaining counter when offline
+Handle OfflineLoginResult type
+For sales.tsx, I need to add sync status badge. The simplest approach:
+
+In the table row, after the receipt column, show a small 🟡 Pending badge if (sale as any).syncStatus === 'pending'
+Or integrate it into the receipt column
+For production.tsx, similar approach in the batch list rows.
+
+For expenses.tsx, add a badge in the expense list rows.
+
+For login.tsx, the key change is:
+
+Use getOfflineLoginInfo to get remaining count on load
+Use the new verifyOfflineLogin return type
+Show counter in offline UI
+For the pages, I need to add SyncStatus import from local-db and add badge rendering.
+
+Writing the updated files... Adding sync status indicators to production and expenses pages, then updating login.tsx to handle the new offline authentication result type and display the remaining attempt counter.
+
+Continuing with the final 4 files — updating login, sales, production, and expenses in parallel:
+
+
+Show less
+
+Edited login.tsx
+
+Edited sales.tsx
+
+Edited production.tsx
+Continuing edits
+
+Continuing edits
+Continuing with the remaining changes — login counter state, sales/production/expenses sync badges, all in parallel:
+
+
+Show less
+
+Edited login.tsx
+
+Edited login.tsx
+Performing parallel edits
+
+Performing parallel edits
+Let me continue with the remaining edits. I need to update the tryOfflineLogin function in login.tsx to handle the new OfflineLoginResult type, and add the counter display in the UI. Also need to add sync badges to sales.tsx, production.tsx, and expenses.tsx.
+
+Let me do all these edits in parallel.
+
+
+Edited login.tsx
+
+Edited login.tsx
+Applying sync badges
+
+Applying sync badges
+Continuing with the remaining edits. I need to:
+
+Add sync badges to sales.tsx table rows
+Add sync badges to production.tsx batch rows
+Add sync badges to expenses.tsx expense rows
+These are all independent edits, so let me do them in parallel.
+
+For sales.tsx, I'll add a badge to the receipt column when syncStatus === 'pending' or 'failed'.
+
+For production.tsx, I'll add a badge in the batch row.
+
+For expenses.tsx, I need to read the expense list section first to know where to add the badge, then edit.
+
+Now adding sync status badges to the three pages in parallel:
+
+
+Show less
+
+Edited sales.tsx
+
+Edit cancelled: production.tsx
+Resolving indentation issues
+
+Resolving indentation issues
+Let me check the production.tsx indentation issue and then make all remaining edits in parallel.
+
+
+Opened production.tsx
+
+Opened expenses.tsx
+Parallel editing and logging
+
+Parallel editing and logging
+Let me continue with the remaining edits in parallel. I need to:
+
+Fix the production.tsx sync badge (edit failed due to whitespace)
+Add sync badge to expenses.tsx
+Check logs for any errors
+Let me do all these in parallel.
+
+
+Edited production.tsx
+
+Opened expenses.tsx
+
+Refreshed logs
+Checking exports and adding badge
+
+Checking exports and adding badge
+Good — Vite is hot-reloading everything cleanly, no console errors. Let me add the expenses sync badge and verify the auth imports are correct in parallel:
+
+
+Show less
+
+Edited expenses.tsx
+
+Searched for "export.*getStoredCompan…"
+Debugging and verifying imports
+
+Debugging and verifying imports
+Good, getStoredUser and getStoredCompany are both exported from auth.ts. Let me check the latest console logs and verify the Vite build is clean:
+
+
+Show less
+
+Refreshed logs
+
+Checked for code errors
+Verifying functionality and appearance
+
+Verifying functionality and appearance
+All the code has been written and Vite is hot-reloading without errors. Let me do a final check to make sure there are no TypeScript errors in the key files I wrote, then update memory and summarize.
+
+Let me also verify the offline-intercept.ts imports getStoredUser and getStoredCompany correctly from ./auth.
+
+Also let me take a screenshot to verify the app looks correct.
+
+All files are hot-reloading cleanly with no browser errors. Let me do a final verification screenshot and update memory:
+
+
+Show less
+
+Took a screenshot
+Screenshot of http://127.0.0.1:3000/
+
+Checked for code errors
+Fixing TypeScript errors
+
+Fixing TypeScript errors
+Three real errors from my new files — fixing them all in parallel:
+
+LocalSale migration wrongly has netQuantity (belongs to production)
+Type cast in interceptor needs unknown bridge
+handleOfflineMutation return needs null guard
+
+Show less
+
+Edited local-db.ts
+
+Edited offline-auth.ts
+
+Edited offline-intercept.ts
+Fixing offline intercept
+
+Fixing offline intercept
+Now fix the last error — the handleOfflineMutation null-return issue in the interceptor:
+
+
+Opened offline-intercept.ts
+You've reached your monthly free quota limit. It will reset on August 18, 2026.
+
+
+Worked for 13 minutes
+
+Scroll to latest
+
+Message Agent...
+
+
+
+
+

@@ -1,0 +1,42 @@
+kind = "web"
+previewPath = "/"
+title = "New Model Bread"
+version = "1.0.0"
+id = "artifacts/bakery"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 3000
+
+[services.development]
+run = "pnpm --filter @workspace/bakery run dev"
+
+[services.production]
+
+[services.production.build]
+args = [ "pnpm", "--filter", "@workspace/bakery", "run", "build" ]
+
+[services.production.build.env]
+PORT = "3000"
+BASE_PATH = "/"
+NODE_ENV = "production"
+
+[services.production.run]
+args = [ "node", "artifacts/bakery/serve.mjs" ]
+
+[services.production.run.env]
+PORT = "3000"
+API_PORT = "8080"
+
+[services.production.health.startup]
+path = "/"
+
+[services.env]
+PORT = "3000"
+BASE_PATH = "/"

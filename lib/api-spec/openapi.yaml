@@ -1,0 +1,1337 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: New Model Bread - Bakery Management System API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: branches
+    description: Branch management
+  - name: production
+    description: Production batch management
+  - name: inventory
+    description: Inventory management
+  - name: sales
+    description: Sales management
+  - name: reports
+    description: Reports and dashboard
+  - name: audit
+    description: Audit logs
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # Users
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Soft delete user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # Branches
+  /branches:
+    get:
+      operationId: listBranches
+      tags: [branches]
+      summary: List branches
+      responses:
+        "200":
+          description: List of branches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Branch"
+    post:
+      operationId: createBranch
+      tags: [branches]
+      summary: Create a branch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBranchBody"
+      responses:
+        "201":
+          description: Created branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+
+  /branches/{id}:
+    patch:
+      operationId: updateBranch
+      tags: [branches]
+      summary: Update branch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBranchBody"
+      responses:
+        "200":
+          description: Updated branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+
+  # Production
+  /production:
+    get:
+      operationId: listProduction
+      tags: [production]
+      summary: List production batches
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of production batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductionBatch"
+    post:
+      operationId: createProduction
+      tags: [production]
+      summary: Record a production batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductionBody"
+      responses:
+        "201":
+          description: Created production batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionBatch"
+
+  /production/{id}:
+    get:
+      operationId: getProduction
+      tags: [production]
+      summary: Get production batch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Production batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionBatch"
+    patch:
+      operationId: updateProduction
+      tags: [production]
+      summary: Update production batch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductionBody"
+      responses:
+        "200":
+          description: Updated production batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionBatch"
+
+  # Inventory
+  /inventory:
+    get:
+      operationId: listInventory
+      tags: [inventory]
+      summary: List inventory items
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of inventory items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryItem"
+    post:
+      operationId: createInventoryItem
+      tags: [inventory]
+      summary: Create inventory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInventoryItemBody"
+      responses:
+        "201":
+          description: Created inventory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+
+  /inventory/{id}:
+    get:
+      operationId: getInventoryItem
+      tags: [inventory]
+      summary: Get inventory item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Inventory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+    patch:
+      operationId: updateInventoryItem
+      tags: [inventory]
+      summary: Update inventory item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInventoryItemBody"
+      responses:
+        "200":
+          description: Updated inventory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+    delete:
+      operationId: deleteInventoryItem
+      tags: [inventory]
+      summary: Delete inventory item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /inventory/{id}/adjust:
+    post:
+      operationId: adjustInventory
+      tags: [inventory]
+      summary: Adjust inventory quantity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustInventoryBody"
+      responses:
+        "200":
+          description: Adjusted inventory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+
+  /inventory/low-stock:
+    get:
+      operationId: getLowStockItems
+      tags: [inventory]
+      summary: Get low stock items
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Low stock inventory items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryItem"
+
+  # Sales
+  /sales:
+    get:
+      operationId: listSales
+      tags: [sales]
+      summary: List sales
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of sales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+    post:
+      operationId: createSale
+      tags: [sales]
+      summary: Record a sale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSaleBody"
+      responses:
+        "201":
+          description: Created sale with receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "400":
+          description: Insufficient stock or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sales/{id}:
+    get:
+      operationId: getSale
+      tags: [sales]
+      summary: Get sale details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sale details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+
+  /sales/daily-summary:
+    get:
+      operationId: getDailySalesSummary
+      tags: [sales]
+      summary: Get daily sales summary
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Daily sales summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailySalesSummary"
+
+  # Reports/Dashboard
+  /reports/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [reports]
+      summary: Get dashboard metrics
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardMetrics"
+
+  /reports/sales-trend:
+    get:
+      operationId: getSalesTrend
+      tags: [reports]
+      summary: Get sales trend data for charts
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Sales trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesTrendPoint"
+
+  /reports/production-summary:
+    get:
+      operationId: getProductionSummary
+      tags: [reports]
+      summary: Get production summary
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Production summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionSummary"
+
+  # Audit logs
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogList"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    # Auth schemas
+    LoginBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    # User schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [managing_director, manager, receptionist, production_staff]
+        branchId:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - username
+        - fullName
+        - role
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [managing_director, manager, receptionist, production_staff]
+        branchId:
+          type: ["integer", "null"]
+      required:
+        - username
+        - password
+        - fullName
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        fullName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+        branchId:
+          type: ["integer", "null"]
+        isActive:
+          type: ["boolean", "null"]
+        password:
+          type: ["string", "null"]
+
+    # Branch schemas
+    Branch:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        location:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateBranchBody:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: ["string", "null"]
+      required:
+        - name
+
+    UpdateBranchBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    # Production schemas
+    ProductionBatch:
+      type: object
+      properties:
+        id:
+          type: integer
+        breadType:
+          type: string
+        quantityProduced:
+          type: integer
+        wasteQuantity:
+          type: integer
+        netQuantity:
+          type: integer
+        staffId:
+          type: integer
+        staffName:
+          type: string
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        notes:
+          type: ["string", "null"]
+        productionDate:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - breadType
+        - quantityProduced
+        - wasteQuantity
+        - netQuantity
+        - staffId
+        - staffName
+        - branchId
+        - branchName
+        - productionDate
+        - createdAt
+        - updatedAt
+
+    CreateProductionBody:
+      type: object
+      properties:
+        breadType:
+          type: string
+        quantityProduced:
+          type: integer
+        wasteQuantity:
+          type: integer
+        branchId:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        productionDate:
+          type: ["string", "null"]
+      required:
+        - breadType
+        - quantityProduced
+        - wasteQuantity
+        - branchId
+
+    UpdateProductionBody:
+      type: object
+      properties:
+        breadType:
+          type: ["string", "null"]
+        quantityProduced:
+          type: ["integer", "null"]
+        wasteQuantity:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+
+    # Inventory schemas
+    InventoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        currentQuantity:
+          type: number
+        minimumQuantity:
+          type: number
+        costPerUnit:
+          type: number
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        isLowStock:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - category
+        - unit
+        - currentQuantity
+        - minimumQuantity
+        - costPerUnit
+        - branchId
+        - branchName
+        - isLowStock
+        - createdAt
+        - updatedAt
+
+    CreateInventoryItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        currentQuantity:
+          type: number
+        minimumQuantity:
+          type: number
+        costPerUnit:
+          type: number
+        branchId:
+          type: integer
+      required:
+        - name
+        - category
+        - unit
+        - currentQuantity
+        - minimumQuantity
+        - costPerUnit
+        - branchId
+
+    UpdateInventoryItemBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        currentQuantity:
+          type: ["number", "null"]
+        minimumQuantity:
+          type: ["number", "null"]
+        costPerUnit:
+          type: ["number", "null"]
+
+    AdjustInventoryBody:
+      type: object
+      properties:
+        adjustment:
+          type: number
+        reason:
+          type: string
+      required:
+        - adjustment
+        - reason
+
+    # Sales schemas
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+        receiptNumber:
+          type: string
+        breadType:
+          type: string
+        quantity:
+          type: integer
+        pricePerUnit:
+          type: number
+        totalAmount:
+          type: number
+        costAmount:
+          type: number
+        profitAmount:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [cash, transfer]
+        cashierId:
+          type: integer
+        cashierName:
+          type: string
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        notes:
+          type: ["string", "null"]
+        saleDate:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - receiptNumber
+        - breadType
+        - quantity
+        - pricePerUnit
+        - totalAmount
+        - costAmount
+        - profitAmount
+        - paymentMethod
+        - cashierId
+        - cashierName
+        - branchId
+        - branchName
+        - saleDate
+        - createdAt
+
+    CreateSaleBody:
+      type: object
+      properties:
+        breadType:
+          type: string
+        quantity:
+          type: integer
+        pricePerUnit:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [cash, transfer]
+        branchId:
+          type: integer
+        notes:
+          type: ["string", "null"]
+      required:
+        - breadType
+        - quantity
+        - pricePerUnit
+        - paymentMethod
+        - branchId
+
+    DailySalesSummary:
+      type: object
+      properties:
+        date:
+          type: string
+        totalSales:
+          type: integer
+        totalRevenue:
+          type: number
+        totalProfit:
+          type: number
+        totalCost:
+          type: number
+        cashSales:
+          type: number
+        transferSales:
+          type: number
+        breadTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreadTypeSummary"
+      required:
+        - date
+        - totalSales
+        - totalRevenue
+        - totalProfit
+        - totalCost
+        - cashSales
+        - transferSales
+        - breadTypes
+
+    BreadTypeSummary:
+      type: object
+      properties:
+        breadType:
+          type: string
+        quantity:
+          type: integer
+        revenue:
+          type: number
+      required:
+        - breadType
+        - quantity
+        - revenue
+
+    # Dashboard schemas
+    DashboardMetrics:
+      type: object
+      properties:
+        todayRevenue:
+          type: number
+        todayProfit:
+          type: number
+        todaySalesCount:
+          type: integer
+        todayProduction:
+          type: integer
+        weekRevenue:
+          type: number
+        weekProfit:
+          type: number
+        weekSalesCount:
+          type: integer
+        weekProduction:
+          type: integer
+        totalInventoryItems:
+          type: integer
+        lowStockCount:
+          type: integer
+        totalLoavesInStock:
+          type: integer
+        profitMargin:
+          type: number
+      required:
+        - todayRevenue
+        - todayProfit
+        - todaySalesCount
+        - todayProduction
+        - weekRevenue
+        - weekProfit
+        - weekSalesCount
+        - weekProduction
+        - totalInventoryItems
+        - lowStockCount
+        - totalLoavesInStock
+        - profitMargin
+
+    SalesTrendPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        revenue:
+          type: number
+        profit:
+          type: number
+        salesCount:
+          type: integer
+      required:
+        - date
+        - revenue
+        - profit
+        - salesCount
+
+    ProductionSummary:
+      type: object
+      properties:
+        totalProduced:
+          type: integer
+        totalWaste:
+          type: integer
+        wastePercentage:
+          type: number
+        efficiency:
+          type: number
+        byBreadType:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreadTypeProduction"
+      required:
+        - totalProduced
+        - totalWaste
+        - wastePercentage
+        - efficiency
+        - byBreadType
+
+    BreadTypeProduction:
+      type: object
+      properties:
+        breadType:
+          type: string
+        totalProduced:
+          type: integer
+        totalWaste:
+          type: integer
+      required:
+        - breadType
+        - totalProduced
+        - totalWaste
+
+    # Audit log schemas
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userName:
+          type: ["string", "null"]
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        details:
+          type: ["string", "null"]
+        ipAddress:
+          type: ["string", "null"]
+        branchId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - action
+        - entityType
+        - createdAt
+
+    AuditLogList:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - logs
+        - total
+        - limit
+        - offset

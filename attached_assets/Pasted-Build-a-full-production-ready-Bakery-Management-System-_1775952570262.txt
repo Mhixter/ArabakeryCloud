@@ -1,0 +1,281 @@
+Build a full production-ready Bakery Management System named "New Model Bread" that focuses strictly on bread production and sales.
+
+The system must be a full-stack web application with PWA (Progressive Web App) support, optimized for:
+
+- Desktop (Reception use)
+- Android mobile devices (MD remote access)
+- Offline-first operation with sync capability
+
+---
+
+1. CORE REQUIREMENTS
+
+Create a secure, scalable system with:
+
+- Role-Based Access Control (RBAC)
+- Real-time dashboard
+- Offline-first architecture with background sync
+- Clean, modern UI (professional business design)
+- Audit logs for all activities
+
+---
+
+2. USER ROLES
+
+Implement the following roles:
+
+1. Managing Director (MD)
+   
+   - Full system access
+   - View all reports remotely
+   - Modify prices, inventory, users
+   - View activity logs
+
+2. Manager
+   
+   - Oversee production & inventory
+   - View reports
+   - Cannot access system settings
+
+3. Receptionist
+   
+   - Handle sales only
+   - Print/view receipts
+   - No access to production or settings
+
+4. Production Staff
+   
+   - Record bread production only
+   - No access to sales or reports
+
+---
+
+3. MODULES
+
+A. Authentication & Security
+
+- JWT authentication
+- Secure password hashing
+- Role-based middleware
+- Session management
+- Activity logging (who did what and when)
+
+---
+
+B. Production Management
+
+- Create production batches:
+  - Bread type (standard loaf)
+  - Quantity produced
+  - Date & time
+  - Staff responsible
+- Record waste/defective units
+- Auto-update inventory usage
+
+---
+
+C. Inventory Management
+
+Track raw materials:
+
+- Flour
+- Yeast
+- Sugar
+- Salt
+- Others (extensible)
+
+Features:
+
+- Add/Edit/Delete inventory items
+- Auto deduction when production occurs
+- Low stock alerts
+- Inventory history logs
+
+---
+
+D. Sales System (Reception Desktop)
+
+- Record bread sales:
+  - Quantity
+  - Price
+  - Payment method (cash/transfer)
+- Generate receipt (printable)
+- Daily sales summary
+- Prevent selling beyond available stock
+
+---
+
+E. Dashboard & Reports (MD View)
+
+- Real-time metrics:
+  - Total production (daily/weekly)
+  - Total sales
+  - Revenue
+  - Inventory levels
+- Charts/graphs
+- Filter by date range
+- Export reports (PDF/CSV)
+
+---
+
+F. User Management
+
+- Create/edit/delete users
+- Assign roles
+- Activate/deactivate accounts
+
+---
+
+G. Activity Logs (Audit System)
+
+- Log all actions:
+  - Sales
+  - Production
+  - Inventory changes
+  - Login activity
+- MD can view all logs
+
+---
+
+4. OFFLINE-FIRST ARCHITECTURE
+
+- Use IndexedDB or local storage for offline data
+- Queue actions when offline
+- Auto-sync with backend when internet is restored
+- Conflict resolution strategy (last-write-wins)
+
+---
+
+5. TECH STACK
+
+Frontend:
+
+- React (with Vite)
+- Tailwind CSS (modern UI)
+- PWA support (service worker, installable)
+
+Backend:
+
+- Node.js with Express
+- REST API structure
+
+Database:
+
+- PostgreSQL (production)
+- Prisma ORM
+
+Optional:
+
+- Redis (for caching/session)
+
+---
+
+6. API DESIGN
+
+Implement clean REST endpoints:
+
+Auth:
+
+- POST /auth/login
+- POST /auth/register
+
+Production:
+
+- POST /production
+- GET /production
+
+Sales:
+
+- POST /sales
+- GET /sales
+
+Inventory:
+
+- GET /inventory
+- POST /inventory
+- PUT /inventory/:id
+
+Reports:
+
+- GET /reports/dashboard
+
+Users:
+
+- CRUD endpoints
+
+---
+
+7. UI/UX REQUIREMENTS
+
+- Professional dashboard layout
+- Sidebar navigation
+- Mobile responsive design
+- Dark/light mode optional
+- Clean typography
+
+Pages:
+
+- Login
+- Dashboard
+- Sales
+- Production
+- Inventory
+- Reports
+- Users
+- Settings
+
+---
+
+8. REAL-TIME & SYNC
+
+- Use WebSockets or polling for live updates
+- Sync mobile and desktop instantly
+- Ensure MD sees updates in near real-time
+
+---
+
+9. SECURITY BEST PRACTICES
+
+- Input validation
+- Rate limiting
+- HTTPS-ready
+- Environment variables for secrets
+- No hardcoded credentials
+
+---
+
+10. DEPLOYMENT
+
+- Prepare for deployment on:
+  - Replit / Docker / VPS
+- Include:
+  - .env example
+  - Database migration setup
+  - Seed data
+
+---
+
+11. BRANDING
+
+System name:
+New Model Bread
+
+- Use bakery-themed UI accents
+- Logo placeholder
+- Professional business color palette
+
+---
+
+12. FINAL OUTPUT
+
+Generate:
+
+- Full backend code
+- Full frontend code
+- Database schema
+- API routes
+- PWA configuration
+- Sample data
+- README with setup instructions
+
+Ensure the system runs end-to-end without missing components.  Do you have any improvement or any additional details

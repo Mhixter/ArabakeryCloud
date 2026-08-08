@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: new-model-bread
+    runtime: node
+    plan: free
+    buildCommand: PORT=3000 BASE_PATH=/ pnpm --filter @workspace/bakery run build && pnpm --filter @workspace/api-server run build
+    startCommand: NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: ""
