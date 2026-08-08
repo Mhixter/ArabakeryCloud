@@ -3,6 +3,7 @@ import { db, productionBatchesTable, usersTable, branchesTable } from "@workspac
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -42,6 +43,15 @@ router.post("/production", authenticate, async (req: AuthenticatedRequest, res):
   const [staff] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, batch.branchId));
   await logAudit({ req, userId: user.userId, companyId, action: "PRODUCTION_RECORDED", entityType: "production", entityId: batch.id, details: `${breadType}: produced ${quantityProduced}, waste ${wasteQuantity ?? 0}`, branchId: batch.branchId });
+  await notifyDirectorsOnEmployeeRecord({
+    companyId,
+    actorUserId: user.userId,
+    actorRole: user.role,
+    entityType: "production",
+    entityId: batch.id,
+    title: "Employee added production record",
+    message: `${staff?.fullName ?? "An employee"} recorded ${quantityProduced} × ${breadType} production.`,
+  });
   res.status(201).json(formatBatch(batch, staff?.fullName ?? "Unknown", branch?.name ?? "Unknown"));
 });
 

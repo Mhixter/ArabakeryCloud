@@ -2,18 +2,20 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, Package, CreditCard, PackageCheck, X, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { getToken } from "@/lib/auth";
+import { getStoredUser, getToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface AppNotification {
   id: string;
   type: "warning" | "info" | "danger" | "success";
-  category: "inventory" | "subscription" | "allocation";
+  category: "inventory" | "subscription" | "allocation" | "activity";
   title: string;
   message: string;
   link?: string;
   createdAt: string;
+  isRead?: boolean;
 }
 
 const SEEN_KEY = "nmb_seen_notifications";
@@ -30,23 +32,24 @@ function markSeen(ids: string[]) {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  danger:  "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",
+  danger: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",
   warning: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
-  info:    "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
+  info: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
   success: "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800",
 };
 
 const DOT_STYLES: Record<string, string> = {
-  danger:  "bg-red-500",
+  danger: "bg-red-500",
   warning: "bg-amber-500",
-  info:    "bg-blue-500",
+  info: "bg-blue-500",
   success: "bg-green-500",
 };
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
-  inventory:    Package,
+  inventory: Package,
   subscription: CreditCard,
-  allocation:   PackageCheck,
+  allocation: PackageCheck,
+  activity: Bell,
 };
 
 export default function NotificationsDropdown({ themeClass }: { themeClass?: string }) {
@@ -54,9 +57,39 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const previousUnreadDbIdsRef = useRef<Set<string>>(new Set());
+  const { toast } = useToast();
+  const user = getStoredUser();
+  const isDirector = user?.role === "managing_director";
 
   const seenIds = getSeenIds();
-  const unreadCount = notifications.filter(n => !seenIds.has(n.id)).length;
+  const unreadCount = notifications.filter(n => n.id.startsWith("db-") ? !n.isRead : !seenIds.has(n.id)).length;
+
+  const markNotificationRead = async (id: string) => {
+    if (!id.startsWith("db-")) return;
+    const numericId = id.replace("db-", "");
+    const token = getToken();
+    if (!token) return;
+    try {
+      await fetch(`${API_BASE}/api/notifications/${numericId}/read`, {
+        method: "PATCH",
+        headers: { Authorization: "Bearer " + token },
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch {}
+  };
+
+  const markAllRead = async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await fetch(`${API_BASE}/api/notifications/read-all`, {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+      });
+      setNotifications(prev => prev.map(n => n.id.startsWith("db-") ? { ...n, isRead: true } : n));
+    } catch {}
+  };
 
   const fetchNotifications = async () => {
     const token = getToken();
@@ -64,16 +97,33 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
     setLoading(true);
     try {
       const res = await fetch(API_BASE + "/api/notifications", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: "Bearer " + token },
       });
-      if (res.ok) setNotifications(await res.json());
+      if (res.ok) {
+        const nextNotifications = await res.json() as AppNotification[];
+        if (isDirector) {
+          const currentUnreadDbIds = new Set(
+            nextNotifications.filter(n => n.id.startsWith("db-") && !n.isRead).map(n => n.id),
+          );
+          const previousUnreadDbIds = previousUnreadDbIdsRef.current;
+          const newlyUnread = [...currentUnreadDbIds].filter(id => !previousUnreadDbIds.has(id));
+          if (newlyUnread.length > 0) {
+            toast({
+              title: "New employee record notification",
+              description: `${newlyUnread.length} new update${newlyUnread.length > 1 ? "s" : ""} added.`,
+            });
+          }
+          previousUnreadDbIdsRef.current = currentUnreadDbIds;
+        }
+        setNotifications(nextNotifications);
+      }
     } catch {}
     finally { setLoading(false); }
   };
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60_000);
+    const interval = setInterval(fetchNotifications, 30_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -90,19 +140,19 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
     setOpen(o => !o);
     if (!open) {
       markSeen(notifications.map(n => n.id));
+      markAllRead();
     }
   };
 
   return (
     <div className="relative" ref={ref}>
-      {/* Bell button */}
       <button
         onClick={handleOpen}
         className={cn(
           "relative p-1.5 rounded transition-colors",
           themeClass
             ? "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent",
         )}
         aria-label="Notifications"
         data-testid="button-notifications"
@@ -115,10 +165,8 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
         )}
       </button>
 
-      {/* Dropdown panel */}
       {open && (
         <div className="absolute right-0 top-9 w-80 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Bell size={14} className="text-muted-foreground" />
@@ -132,7 +180,6 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
             </button>
           </div>
 
-          {/* Body */}
           <div className="max-h-[360px] overflow-y-auto">
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
@@ -153,7 +200,7 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
                       className={cn(
                         "flex gap-3 p-3 rounded-lg border text-sm transition-colors cursor-default",
                         TYPE_STYLES[n.type],
-                        n.link && "hover:opacity-90 cursor-pointer"
+                        n.link && "hover:opacity-90 cursor-pointer",
                       )}
                     >
                       <div className="flex-shrink-0 mt-0.5">
@@ -161,25 +208,42 @@ export default function NotificationsDropdown({ themeClass }: { themeClass?: str
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold text-foreground leading-tight">{n.title}</p>
+                          <div className="flex items-center gap-1.5">
+                            <Icon size={12} className="text-muted-foreground mt-0.5" />
+                            <p className="font-semibold text-foreground leading-tight">{n.title}</p>
+                          </div>
                           {n.link && <ExternalLink size={12} className="flex-shrink-0 text-muted-foreground mt-0.5" />}
                         </div>
                         <p className="text-muted-foreground text-xs mt-0.5 leading-snug">{n.message}</p>
+                        {n.id.startsWith("db-") && !n.isRead && (
+                          <button
+                            type="button"
+                            className="text-[11px] mt-1 font-medium text-blue-700 hover:underline"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              markNotificationRead(n.id);
+                            }}
+                          >
+                            Mark as read
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
                   return n.link ? (
-                    <Link key={n.id} href={n.link} onClick={() => setOpen(false)}>{content}</Link>
+                    <Link key={n.id} href={n.link} onClick={() => { setOpen(false); markNotificationRead(n.id); }}>
+                      {content}
+                    </Link>
                   ) : content;
                 })}
               </div>
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center">Updates every 60 seconds</p>
+              <p className="text-xs text-muted-foreground text-center">Updates every 30 seconds</p>
             </div>
           )}
         </div>

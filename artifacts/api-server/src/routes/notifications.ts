@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
-import { db, inventoryItemsTable, subscriptionsTable, sellerAllocationsTable, usersTable, branchesTable } from "@workspace/db";
-import { eq, and, isNull, gte } from "drizzle-orm";
+import { db, inventoryItemsTable, notificationsTable, sellerAllocationsTable, subscriptionsTable, usersTable, branchesTable } from "@workspace/db";
+import { eq, and, isNull, gte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -8,11 +8,12 @@ const router: IRouter = Router();
 interface Notification {
   id: string;
   type: "warning" | "info" | "danger" | "success";
-  category: "inventory" | "subscription" | "allocation";
+  category: "inventory" | "subscription" | "allocation" | "activity";
   title: string;
   message: string;
   link?: string;
   createdAt: string;
+  isRead?: boolean;
 }
 
 router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -21,6 +22,27 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
   const now = new Date();
 
   try {
+    const storedNotifications = await db
+      .select()
+      .from(notificationsTable)
+      .where(and(
+        eq(notificationsTable.companyId, companyId),
+        eq(notificationsTable.recipientUserId, userId),
+      ))
+      .orderBy(desc(notificationsTable.createdAt))
+      .limit(100);
+
+    notifications.push(...storedNotifications.map((n) => ({
+      id: `db-${n.id}`,
+      type: "info",
+      category: "activity" as const,
+      title: n.title,
+      message: n.message,
+      link: n.entityType === "allocation" ? "/allocations" : n.entityType === "sale" ? "/sales" : n.entityType === "production" ? "/production" : n.entityType === "expense" ? "/expenses" : n.entityType === "inventory" ? "/inventory" : undefined,
+      createdAt: n.createdAt.toISOString(),
+      isRead: n.isRead,
+    })));
+
     /* ── 1. Low-stock inventory alerts (MD, manager, production_staff) ── */
     if (["managing_director", "manager", "production_staff"].includes(role)) {
       const items = await db
@@ -30,7 +52,7 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
         .where(and(eq(inventoryItemsTable.companyId, companyId), isNull(inventoryItemsTable.deletedAt)));
 
       const lowStock = items.filter(({ item }) =>
-        parseFloat(item.currentQuantity as unknown as string) <= parseFloat(item.minimumQuantity as unknown as string)
+        parseFloat(item.currentQuantity as unknown as string) <= parseFloat(item.minimumQuantity as unknown as string),
       );
 
       if (lowStock.length > 0) {
@@ -40,7 +62,7 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
           category: "inventory",
           title: `${lowStock.length} item${lowStock.length > 1 ? "s" : ""} low on stock`,
           message: lowStock.slice(0, 3).map(({ item, branchName }) =>
-            `${item.name}${branchName ? ` (${branchName})` : ""}`
+            `${item.name}${branchName ? ` (${branchName})` : ""}`,
           ).join(", ") + (lowStock.length > 3 ? ` and ${lowStock.length - 3} more` : ""),
           link: "/inventory",
           createdAt: now.toISOString(),
@@ -105,8 +127,8 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
             eq(sellerAllocationsTable.companyId, companyId),
             eq(sellerAllocationsTable.sellerId, userId),
             isNull(sellerAllocationsTable.deletedAt),
-            gte(sellerAllocationsTable.allocationDate, todayStart)
-          )
+            gte(sellerAllocationsTable.allocationDate, todayStart),
+          ),
         );
 
       if (myAllocations.length > 0) {
@@ -124,9 +146,48 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
     }
 
     res.json(notifications);
-  } catch (err) {
+  } catch {
     res.json([]);
   }
+});
+
+router.patch("/notifications/:id/read", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { companyId, userId } = req.user!;
+  const id = parseInt(String(req.params.id), 10);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "Invalid notification id" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(notificationsTable)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(
+      eq(notificationsTable.id, id),
+      eq(notificationsTable.companyId, companyId),
+      eq(notificationsTable.recipientUserId, userId),
+    ))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Notification not found" });
+    return;
+  }
+
+  res.json({ success: true });
+});
+
+router.post("/notifications/read-all", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  const { companyId, userId } = req.user!;
+  await db
+    .update(notificationsTable)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(
+      eq(notificationsTable.companyId, companyId),
+      eq(notificationsTable.recipientUserId, userId),
+      eq(notificationsTable.isRead, false),
+    ));
+  res.json({ success: true });
 });
 
 export default router;

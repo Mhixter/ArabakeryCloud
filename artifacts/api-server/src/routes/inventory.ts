@@ -3,6 +3,7 @@ import { db, inventoryItemsTable, inventoryLogsTable, branchesTable } from "@wor
 import { eq, and, isNull } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -48,6 +49,15 @@ router.post("/inventory", authenticate, requireRole("managing_director", "manage
   const [item] = await db.insert(inventoryItemsTable).values({ companyId, name, category, unit, currentQuantity: (currentQuantity ?? 0).toString(), minimumQuantity: (minimumQuantity ?? 0).toString(), costPerUnit: (costPerUnit ?? 0).toString(), branchId: parseInt(branchId) }).returning();
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, item.branchId));
   await logAudit({ req, userId: req.user!.userId, companyId, action: "INVENTORY_CREATED", entityType: "inventory", entityId: item.id, details: `Added ${name} (${category})`, branchId: item.branchId });
+  await notifyDirectorsOnEmployeeRecord({
+    companyId,
+    actorUserId: req.user!.userId,
+    actorRole: req.user!.role,
+    entityType: "inventory",
+    entityId: item.id,
+    title: "Employee added inventory record",
+    message: `${req.user!.role.replace("_", " ")} added inventory item ${name}.`,
+  });
   res.status(201).json(formatItem(item, branch?.name ?? "Unknown"));
 });
 

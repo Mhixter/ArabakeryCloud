@@ -46,15 +46,28 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
 /* ── Product-focused dashboard (new) ── */
 router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId, role, branchId: userBranchId } = req.user!;
-  const { branchId: queryBranchId, date: queryDate } = req.query as { branchId?: string; date?: string };
+  const { branchId: queryBranchId, date: queryDate, reportDate, startDate, endDate } = req.query as {
+    branchId?: string;
+    date?: string;
+    reportDate?: string;
+    startDate?: string;
+    endDate?: string;
+  };
   const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
     : role !== "managing_director" ? userBranchId : null;
   /* For the stock (remaining) calculation the MD always sees company-wide bread,
      not just a single branch. Period KPIs (revenue, expenses) still respect branchFilter. */
   const stockBranchFilter = role !== "managing_director" ? branchFilter : null;
-  /* Support custom date for "view by date" filter — fallback to today */
-  const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
+  const dateInput = reportDate ?? queryDate ?? startDate ?? endDate;
+  const isDateOnly = dateInput ? /^\d{4}-\d{2}-\d{2}$/.test(dateInput) : false;
+  const baseDate = dateInput
+    ? new Date(isDateOnly ? `${dateInput}T12:00:00` : dateInput)
+    : new Date();
+  if (Number.isNaN(baseDate.getTime())) {
+    res.status(400).json({ error: "Invalid reportDate. Use YYYY-MM-DD." });
+    return;
+  }
   const now = new Date();
   const todayStart = new Date(baseDate); todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(baseDate); todayEnd.setHours(23, 59, 59, 999);
@@ -81,21 +94,32 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
   const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
+  const allTimeSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  if (stockBranchFilter) allTimeSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
+  const allSalesEver = await db
+    .select({ sale: salesTable })
+    .from(salesTable)
+    .where(and(...allTimeSalesConds));
+
   /* Production, allocations & returns use stockBranchFilter so the MD always sees
      company-wide bread stock regardless of which branch KPI tab they have open. */
   const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
+  prodConds.push(gte(productionBatchesTable.productionDate, todayStart));
+  prodConds.push(lte(productionBatchesTable.productionDate, todayEnd));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
   /* Join sales with cashier role so we can split direct vs supplier sales.
      Supplier sales are WITHIN allocated bread — counting both would double-subtract. */
-  const allSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
-  if (stockBranchFilter) allSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
-  const allSalesEver = await db
+  const remainingSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  if (stockBranchFilter) remainingSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
+  remainingSalesConds.push(gte(salesTable.saleDate, todayStart));
+  remainingSalesConds.push(lte(salesTable.saleDate, todayEnd));
+  const salesForSelectedDay = await db
     .select({ sale: salesTable, cashierRole: usersTable.role })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
-    .where(and(...allSalesConds));
+    .where(and(...remainingSalesConds));
 
   /* Fetch approved returns only — pending/rejected don't affect stock */
   const returnsConds = [
@@ -103,6 +127,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     eq(productReturnsTable.status, "approved" as const),
   ];
   if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
+  returnsConds.push(gte(productReturnsTable.returnDate, todayStart));
+  returnsConds.push(lte(productReturnsTable.returnDate, todayEnd));
   const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
@@ -111,7 +137,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allocConds = [
     eq(sellerAllocationsTable.companyId, companyId),
     isNull(sellerAllocationsTable.deletedAt),
-    eq(sellerAllocationsTable.isCleared, false),
+    gte(sellerAllocationsTable.allocationDate, todayStart),
+    lte(sellerAllocationsTable.allocationDate, todayEnd),
   ];
   if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
@@ -136,7 +163,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const directSalesByType   = new Map<string, number>();
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
-  for (const { sale: s, cashierRole } of allSalesEver) {
+  for (const { sale: s, cashierRole } of salesForSelectedDay) {
     allSalesByType.set(s.breadType, (allSalesByType.get(s.breadType) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
       supplierSalesByType.set(s.breadType, (supplierSalesByType.get(s.breadType) ?? 0) + s.quantity);

@@ -6,6 +6,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,10 @@ const formatAllocation = (
   quantity: a.quantity,
   notes: a.notes,
   isCleared: a.isCleared ?? false,
+  settlementStatus: a.isCleared ? "SETTLED" : "UNSETTLED",
+  settledAt: a.clearedAt ? a.clearedAt.toISOString() : null,
+  settledById: a.clearedById ?? null,
+  settledByName: clearedByName ?? null,
   clearedAt: a.clearedAt ? a.clearedAt.toISOString() : null,
   clearedById: a.clearedById ?? null,
   clearedByName: clearedByName ?? null,
@@ -61,12 +66,19 @@ router.get("/allocations/sellers", authenticate, requireRole("managing_director"
 router.get("/allocations", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, role, companyId, branchId: userBranchId } = req.user!;
-    const { branchId: queryBranchId } = req.query as { branchId?: string };
+    const { branchId: queryBranchId, settlementStatus: querySettlementStatus } = req.query as { branchId?: string; settlementStatus?: string };
+    const settlementStatus = (querySettlementStatus ?? "UNSETTLED").toUpperCase();
+    if (!["UNSETTLED", "SETTLED", "ALL"].includes(settlementStatus)) {
+      res.status(400).json({ error: "Invalid settlementStatus. Use UNSETTLED, SETTLED, or ALL." });
+      return;
+    }
 
     const conditions = [
       isNull(sellerAllocationsTable.deletedAt),
       eq(sellerAllocationsTable.companyId, companyId),
     ] as Parameters<typeof and>[0][];
+    if (settlementStatus === "UNSETTLED") conditions.push(eq(sellerAllocationsTable.isCleared, false));
+    if (settlementStatus === "SETTLED") conditions.push(eq(sellerAllocationsTable.isCleared, true));
 
     if (role === "supplier") {
       conditions.push(eq(sellerAllocationsTable.sellerId, userId));
@@ -164,6 +176,15 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     ]);
 
     await logAudit({ req, userId: issuedById, companyId, action: "ALLOCATION_CREATED", entityType: "allocation", entityId: allocation.id, details: `Allocated ${quantity}x ${breadType} to ${sellerRow?.fullName}`, branchId });
+    await notifyDirectorsOnEmployeeRecord({
+      companyId,
+      actorUserId: issuedById,
+      actorRole: req.user!.role,
+      entityType: "allocation",
+      entityId: allocation.id,
+      title: "Employee added allocation record",
+      message: `${issuerRow?.fullName ?? "An employee"} allocated ${quantity} × ${breadType} to ${sellerRow?.fullName ?? "supplier"}.`,
+    });
     res.status(201).json(formatAllocation(allocation, sellerRow?.fullName ?? "Unknown", issuerRow?.fullName ?? "Unknown", branchRow?.name ?? "Unknown"));
   } catch (err) {
     console.error("POST /allocations error:", err);
@@ -171,8 +192,8 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
   }
 });
 
-/* PATCH /allocations/:id/clear — company owner / manager / receptionist marks allocation cleared */
-router.patch("/allocations/:id/clear", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
+/* PATCH /allocations/:id/clear|settle — settle allocation with supplier */
+router.patch(["/allocations/:id/clear", "/allocations/:id/settle"], authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId } = req.user!;
     const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -225,8 +246,8 @@ router.patch("/allocations/:id/clear", authenticate, requireRole("managing_direc
   }
 });
 
-/* POST /allocations/clear-supplier — clear all active allocations for a specific supplier */
-router.post("/allocations/clear-supplier", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
+/* POST /allocations/clear-supplier|settle-supplier — settle all allocations for a supplier */
+router.post(["/allocations/clear-supplier", "/allocations/settle-supplier"], authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId } = req.user!;
     const { sellerId } = req.body;
@@ -263,7 +284,7 @@ router.post("/allocations/clear-supplier", authenticate, requireRole("managing_d
       ));
 
     if (unclearedAllocations.length === 0) {
-      res.json({ success: true, clearedCount: 0, message: "No uncleared allocations found for this supplier" });
+      res.json({ success: true, clearedCount: 0, message: "No unsettled allocations found for this supplier" });
       return;
     }
 
@@ -286,13 +307,13 @@ router.post("/allocations/clear-supplier", authenticate, requireRole("managing_d
       req, userId, companyId,
       action: "SUPPLIER_ALLOCATIONS_CLEARED",
       entityType: "supplier_allocations",
-      details: `Cleared ${unclearedAllocations.length} allocations for supplier ${seller.fullName}`,
+      details: `Settled ${unclearedAllocations.length} allocations for supplier ${seller.fullName}`,
     });
 
     res.json({
       success: true,
       clearedCount: unclearedAllocations.length,
-      message: `Successfully cleared ${unclearedAllocations.length} allocations for ${seller.fullName}`,
+      message: `Successfully settled ${unclearedAllocations.length} allocations for ${seller.fullName}`,
     });
   } catch (err) {
     console.error("POST /allocations/clear-supplier error:", err);
