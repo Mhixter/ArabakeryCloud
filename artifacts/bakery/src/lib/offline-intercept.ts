@@ -120,7 +120,7 @@ async function handleOfflineMutation(
 export function installOfflineInterceptor() {
   const originalFetch = window.fetch.bind(window);
 
-  window.fetch = async function offlineFetch(
+  const offlineFetch = async function (
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> {
@@ -210,4 +210,14 @@ export function installOfflineInterceptor() {
     /* ── All other requests ─────────────────────────────────────────── */
     return originalFetch(input, init);
   };
+
+  try {
+    Object.defineProperty(window, "fetch", {
+      value: offlineFetch,
+      writable: true,
+      configurable: true,
+    });
+  } catch {
+    (window as any).fetch = offlineFetch;
+  }
 }

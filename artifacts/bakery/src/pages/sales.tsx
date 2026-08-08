@@ -352,6 +352,27 @@ export default function SalesPage() {
   const [showNewSale, setShowNewSale] = useState(false);
   const [showBulkSale, setShowBulkSale] = useState(false);
   const [showQuickSale, setShowQuickSale] = useState(false);
+  const [quickStock, setQuickStock] = useState<{ name: string; remaining: number; allocated: number }[]>([]);
+  const [quickStockLoading, setQuickStockLoading] = useState(false);
+
+  const openQuickSaleModal = async () => {
+    setShowQuickSale(true);
+    setQuickStockLoading(true);
+    const token = getToken();
+    const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const qs = branchParam ? `?branchId=${branchParam}` : "";
+      const dash = await fetch(`${API_BASE}/api/reports/product-dashboard${qs}`, { headers: h, credentials: "include" })
+        .then(r => r.ok ? r.json() : null);
+      if (dash?.remaining) {
+        setQuickStock(dash.remaining);
+      }
+    } catch {
+      setQuickStock([]);
+    } finally {
+      setQuickStockLoading(false);
+    }
+  };
   const [receiptSale, setReceiptSale] = useState<ReceiptData | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
   const [quickForm, setQuickForm] = useState({
@@ -644,7 +665,7 @@ export default function SalesPage() {
         </div>
         <div className="flex items-center gap-2">
           {isManager && (
-            <Button variant="outline" onClick={() => setShowQuickSale(true)} disabled={isExpired} data-testid="button-quick-sale">
+            <Button variant="outline" onClick={openQuickSaleModal} disabled={isExpired} data-testid="button-quick-sale">
               <Plus size={16} className="mr-2" />
               Quick Sale
             </Button>
@@ -954,6 +975,31 @@ export default function SalesPage() {
             <p className="text-sm text-muted-foreground -mt-1">
               Record a sale by amount only — no product selection required.
             </p>
+
+            {/* Stock Overview Banner */}
+            {quickStockLoading ? (
+              <div className="h-16 bg-muted animate-pulse rounded-xl" />
+            ) : quickStock.length > 0 && (
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between font-semibold text-amber-900">
+                  <span>Current Stock Status</span>
+                  <span className="text-[10px] bg-amber-200/60 text-amber-800 rounded px-1.5 py-0.5 font-normal">
+                    Allocated + Remaining
+                  </span>
+                </div>
+                <div className="space-y-1 text-slate-700">
+                  {quickStock.map(s => (
+                    <div key={s.name} className="flex justify-between items-center text-[11px]">
+                      <span className="font-medium truncate max-w-[130px]">{s.name}</span>
+                      <span className="text-muted-foreground">
+                        <span className="font-semibold text-amber-800">{s.allocated ?? 0}</span> with suppliers · <span className="font-semibold text-emerald-800">{s.remaining ?? 0}</span> in store
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
                 <Label>Amount (₦)</Label>

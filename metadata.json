@@ -1,0 +1,8 @@
+{
+  "name": "Ara Bakery Cloud",
+  "description": "Complete bakery management platform for Nigerian bakeries — production, inventory, sales and reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

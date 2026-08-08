@@ -107,8 +107,12 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
 
-  /* Total allocations ever made (bread sent out to suppliers) */
-  const allocConds = [eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt)];
+  /* Total allocations ever made that are still UNCLEARED (bread currently with suppliers) */
+  const allocConds = [
+    eq(sellerAllocationsTable.companyId, companyId),
+    isNull(sellerAllocationsTable.deletedAt),
+    eq(sellerAllocationsTable.isCleared, false),
+  ];
   if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
 
@@ -295,8 +299,8 @@ router.get("/reports/user-activity", authenticate, async (req: AuthenticatedRequ
       const approvedReturns = allReturns.filter(r => r.receptionistId === uid && r.status === "approved");
       const batches = allBatches.filter(b => b.staffId === uid);
       const allocIssued = allAllocations.filter(a => a.issuedById === uid);
-      /* Allocations received by this user (as a supplier) */
-      const allocReceived = allAllocations.filter(a => a.sellerId === uid);
+      /* Allocations received by this user (as a supplier) that are still uncleared */
+      const allocReceived = allAllocations.filter(a => a.sellerId === uid && !a.isCleared);
       const totalReceivedUnits = allocReceived.reduce((s, a) => s + a.quantity, 0);
       const unitsSold = userSales.reduce((s, x) => s + x.quantity, 0);
       const unitsReturned = supplierReturns.filter(r => r.status === "approved").reduce((s, r) => s + r.quantity, 0);

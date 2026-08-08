@@ -14,6 +14,7 @@ const formatAllocation = (
   sellerName: string,
   issuedByName: string,
   branchName: string,
+  clearedByName?: string,
 ) => ({
   id: a.id,
   companyId: a.companyId,
@@ -26,6 +27,10 @@ const formatAllocation = (
   breadType: a.breadType,
   quantity: a.quantity,
   notes: a.notes,
+  isCleared: a.isCleared ?? false,
+  clearedAt: a.clearedAt ? a.clearedAt.toISOString() : null,
+  clearedById: a.clearedById ?? null,
+  clearedByName: clearedByName ?? null,
   allocationDate: a.allocationDate.toISOString(),
   createdAt: a.createdAt.toISOString(),
 });
@@ -126,11 +131,11 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId;
     if (!branchId) { res.status(400).json({ error: "branchId could not be determined — please select a branch" }); return; }
 
-    /* Stock check: produced - sold - already allocated */
+    /* Stock check: produced - sold - uncleared allocated */
     const [production, sales, existingAllocations] = await Promise.all([
       db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.breadType, breadType), isNull(productionBatchesTable.deletedAt))),
       db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
     ]);
 
     const totalProduced = production.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
@@ -163,6 +168,135 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
   } catch (err) {
     console.error("POST /allocations error:", err);
     res.status(500).json({ error: "Failed to create allocation" });
+  }
+});
+
+/* PATCH /allocations/:id/clear — company owner / manager / receptionist marks allocation cleared */
+router.patch("/allocations/:id/clear", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  try {
+    const { userId, companyId } = req.user!;
+    const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+    const [existing] = await db
+      .select()
+      .from(sellerAllocationsTable)
+      .where(and(eq(sellerAllocationsTable.id, id), eq(sellerAllocationsTable.companyId, companyId), isNull(sellerAllocationsTable.deletedAt)));
+
+    if (!existing) { res.status(404).json({ error: "Allocation not found" }); return; }
+
+    const now = new Date();
+    const [updated] = await db
+      .update(sellerAllocationsTable)
+      .set({
+        isCleared: true,
+        clearedAt: now,
+        clearedById: userId,
+      })
+      .where(eq(sellerAllocationsTable.id, id))
+      .returning();
+
+    const [[sellerRow], [branchRow], [issuerRow], [clearedByRow]] = await Promise.all([
+      db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, updated.sellerId)),
+      db.select({ name: branchesTable.name }).from(branchesTable).where(eq(branchesTable.id, updated.branchId)),
+      db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, updated.issuedById)),
+      db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, userId)),
+    ]);
+
+    await logAudit({
+      req, userId, companyId,
+      action: "ALLOCATION_CLEARED",
+      entityType: "allocation",
+      entityId: id,
+      details: `Cleared ${updated.breadType} x${updated.quantity} for supplier ${sellerRow?.fullName ?? "Unknown"}`,
+      branchId: updated.branchId,
+    });
+
+    res.json(formatAllocation(
+      updated,
+      sellerRow?.fullName ?? "Unknown",
+      issuerRow?.fullName ?? "Unknown",
+      branchRow?.name ?? "Unknown",
+      clearedByRow?.fullName ?? "Unknown",
+    ));
+  } catch (err) {
+    console.error("PATCH /allocations/:id/clear error:", err);
+    res.status(500).json({ error: "Failed to clear allocation" });
+  }
+});
+
+/* POST /allocations/clear-supplier — clear all active allocations for a specific supplier */
+router.post("/allocations/clear-supplier", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  try {
+    const { userId, companyId } = req.user!;
+    const { sellerId } = req.body;
+
+    if (!sellerId) {
+      res.status(400).json({ error: "sellerId is required" });
+      return;
+    }
+
+    const sid = parseInt(sellerId);
+    if (isNaN(sid)) {
+      res.status(400).json({ error: "Invalid sellerId" });
+      return;
+    }
+
+    const [seller] = await db
+      .select({ fullName: usersTable.fullName })
+      .from(usersTable)
+      .where(and(eq(usersTable.id, sid), eq(usersTable.companyId, companyId)));
+
+    if (!seller) {
+      res.status(404).json({ error: "Supplier not found" });
+      return;
+    }
+
+    const unclearedAllocations = await db
+      .select()
+      .from(sellerAllocationsTable)
+      .where(and(
+        eq(sellerAllocationsTable.sellerId, sid),
+        eq(sellerAllocationsTable.companyId, companyId),
+        isNull(sellerAllocationsTable.deletedAt),
+        eq(sellerAllocationsTable.isCleared, false),
+      ));
+
+    if (unclearedAllocations.length === 0) {
+      res.json({ success: true, clearedCount: 0, message: "No uncleared allocations found for this supplier" });
+      return;
+    }
+
+    const now = new Date();
+    await db
+      .update(sellerAllocationsTable)
+      .set({
+        isCleared: true,
+        clearedAt: now,
+        clearedById: userId,
+      })
+      .where(and(
+        eq(sellerAllocationsTable.sellerId, sid),
+        eq(sellerAllocationsTable.companyId, companyId),
+        isNull(sellerAllocationsTable.deletedAt),
+        eq(sellerAllocationsTable.isCleared, false),
+      ));
+
+    await logAudit({
+      req, userId, companyId,
+      action: "SUPPLIER_ALLOCATIONS_CLEARED",
+      entityType: "supplier_allocations",
+      details: `Cleared ${unclearedAllocations.length} allocations for supplier ${seller.fullName}`,
+    });
+
+    res.json({
+      success: true,
+      clearedCount: unclearedAllocations.length,
+      message: `Successfully cleared ${unclearedAllocations.length} allocations for ${seller.fullName}`,
+    });
+  } catch (err) {
+    console.error("POST /allocations/clear-supplier error:", err);
+    res.status(500).json({ error: "Failed to clear supplier allocations" });
   }
 });
 

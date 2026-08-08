@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
-  ArrowLeft, Building2, ChevronRight,
+  ArrowLeft, Building2, ChevronRight, CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser, getStoredCompany } from "@/lib/auth";
@@ -48,6 +48,9 @@ interface Allocation {
   issuedByName: string;
   branchName: string;
   notes: string | null;
+  isCleared?: boolean;
+  clearedAt?: string | null;
+  clearedByName?: string | null;
   allocationDate: string;
   createdAt: string;
 }
@@ -420,6 +423,47 @@ export default function AllocationsPage() {
     }
   };
 
+  const handleClearAllocation = async (id: number) => {
+    const token = localStorage.getItem("nmb_token");
+    try {
+      const res = await fetch(`${API_BASE}/api/allocations/${id}/clear`, {
+        method: "PATCH",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast({ title: data.error ?? "Failed to clear allocation", variant: "destructive" }); return;
+      }
+      const updated: Allocation = await res.json();
+      setAllocations(prev => prev.map(a => a.id === id ? updated : a));
+      toast({ title: "Allocation cleared — lifted from supplier balance" });
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
+
+  const handleClearAllForSupplier = async (sellerId: number, sellerName: string) => {
+    const token = localStorage.getItem("nmb_token");
+    try {
+      const res = await fetch(`${API_BASE}/api/allocations/clear-supplier`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: "include",
+        body: JSON.stringify({ sellerId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast({ title: data.error ?? "Failed to clear allocations", variant: "destructive" }); return;
+      }
+      const data = await res.json();
+      toast({ title: data.message ?? `Cleared all allocations for ${sellerName}` });
+      load();
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
+
   const canApproveReturns = ["managing_director", "manager", "receptionist"].includes(role);
 
   const handleApproveReturn = async (id: number) => {
@@ -662,9 +706,25 @@ export default function AllocationsPage() {
                           </div>
                         )}
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-semibold text-foreground">{totalUnits} units</p>
-                        <p className="text-xs text-muted-foreground">{rows.length} product{rows.length !== 1 ? "s" : ""}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {canCreate && sellerAllocs.some(a => !a.isCleared) && (
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                            onClick={() => {
+                              const sid = sellerAllocs[0]?.sellerId;
+                              if (sid && confirm(`Mark ALL allocations cleared for ${selectedSeller}? This will lift the record from active supplier inventory.`)) {
+                                handleClearAllForSupplier(sid, selectedSeller);
+                              }
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> Clear All
+                          </Button>
+                        )}
+                        <div className="text-right">
+                          <p className="text-xs font-semibold text-foreground">{totalUnits} units</p>
+                          <p className="text-xs text-muted-foreground">{rows.length} product{rows.length !== 1 ? "s" : ""}</p>
+                        </div>
                       </div>
                     </div>
 
@@ -737,16 +797,40 @@ export default function AllocationsPage() {
                       </p>
                       {[...sellerAllocs].reverse().map(alloc => (
                         <div key={alloc.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors border-b border-border/30 last:border-0">
-                          <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-                            <PackageCheck size={13} className="text-amber-600" />
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${alloc.isCleared ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                            <PackageCheck size={13} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-foreground">{alloc.breadType}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm text-foreground">{alloc.breadType}</p>
+                              {alloc.isCleared ? (
+                                <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">
+                                  Cleared
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(alloc.allocationDate), "dd MMM yyyy, HH:mm")} · by {alloc.issuedByName}
+                              {alloc.isCleared && alloc.clearedByName && ` · Cleared by ${alloc.clearedByName}`}
                             </p>
                           </div>
-                          <Badge variant="secondary" className="text-xs flex-shrink-0">{alloc.quantity} units</Badge>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge variant="secondary" className="text-xs">{alloc.quantity} units</Badge>
+                            {canCreate && !alloc.isCleared && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
+                                onClick={() => handleClearAllocation(alloc.id)}
+                              >
+                                <CheckCircle2 size={12} /> Clear
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -768,9 +852,11 @@ export default function AllocationsPage() {
                 return (
                   <div className="divide-y divide-border/50">
                     {supplierGroups.map(group => {
-                      const totalUnits = group.allocations.reduce((s, a) => s + a.quantity, 0);
+                      const unclearedAllocs = group.allocations.filter(a => !a.isCleared);
+                      const totalUnits = unclearedAllocs.reduce((s, a) => s + a.quantity, 0);
+                      const isFullyCleared = group.allocations.length > 0 && unclearedAllocs.length === 0;
                       const byType = new Map<string, number>();
-                      for (const a of group.allocations) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
+                      for (const a of unclearedAllocs) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
                       const productCount = byType.size;
                       const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
                         const price = productPrices.get(bt) ?? 0;
@@ -786,13 +872,24 @@ export default function AllocationsPage() {
                           onClick={() => setSelectedSeller(group.sellerName)}
                         >
                           {/* Avatar */}
-                          <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center flex-shrink-0">
-                            <Users size={16} className="text-amber-400" />
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isFullyCleared ? "bg-emerald-100 text-emerald-800" : "bg-slate-950 text-amber-400"}`}>
+                            <Users size={16} />
                           </div>
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                              {isFullyCleared ? (
+                                <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">
+                                  All Cleared
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+                                  With Supplier
+                                </Badge>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               {group.branchName && (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -802,7 +899,7 @@ export default function AllocationsPage() {
                               )}
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="text-xs text-muted-foreground">
-                                {productCount} product{productCount !== 1 ? "s" : ""}
+                                {isFullyCleared ? "0 active items" : `${productCount} product${productCount !== 1 ? "s" : ""}`}
                               </span>
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -815,8 +912,10 @@ export default function AllocationsPage() {
                           {/* Right: totals + chevron */}
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <p className="font-bold text-sm text-foreground">{totalUnits} units</p>
-                              {totalValue > 0 && (
+                              <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>
+                                {isFullyCleared ? "0 units" : `${totalUnits} units`}
+                              </p>
+                              {totalValue > 0 && !isFullyCleared && (
                                 <p className="text-xs text-muted-foreground">
                                   ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
                                 </p>

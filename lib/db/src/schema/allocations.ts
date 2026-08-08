@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -14,6 +14,9 @@ export const sellerAllocationsTable = pgTable("seller_allocations", {
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),
   notes: text("notes"),
+  isCleared: boolean("is_cleared").notNull().default(false),
+  clearedAt: timestamp("cleared_at", { withTimezone: true }),
+  clearedById: integer("cleared_by_id").references(() => usersTable.id),
   allocationDate: timestamp("allocation_date", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
