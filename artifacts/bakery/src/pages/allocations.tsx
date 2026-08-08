@@ -49,6 +49,9 @@ interface Allocation {
   branchName: string;
   notes: string | null;
   isCleared?: boolean;
+  settlementStatus?: "UNSETTLED" | "SETTLED";
+  settledAt?: string | null;
+  settledByName?: string | null;
   clearedAt?: string | null;
   clearedByName?: string | null;
   allocationDate: string;
@@ -364,11 +367,13 @@ export default function AllocationsPage() {
   const role = user?.role ?? "";
   const isSeller = role === "supplier";
   const canCreate = ["managing_director", "manager", "receptionist"].includes(role);
+  const canSettle = role === "managing_director";
   const canDelete = ["managing_director", "manager"].includes(role);
   const { activeBranch } = useActiveBranch();
 
   const [tab, setTab] = useState<"allocations" | "returns">("allocations");
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [settlementFilter, setSettlementFilter] = useState<"UNSETTLED" | "SETTLED" | "ALL">("UNSETTLED");
   const [returns, setReturns] = useState<Return[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -381,7 +386,10 @@ export default function AllocationsPage() {
   const load = useCallback(() => {
     const token = localStorage.getItem("nmb_token");
     setLoading(true);
-    const allUrl = activeBranch ? `${API_BASE}/api/allocations?branchId=${activeBranch.id}` : `${API_BASE}/api/allocations`;
+    const allocQuery = new URLSearchParams();
+    allocQuery.set("settlementStatus", settlementFilter);
+    if (activeBranch?.id) allocQuery.set("branchId", activeBranch.id.toString());
+    const allUrl = `${API_BASE}/api/allocations?${allocQuery.toString()}`;
     const retUrl = activeBranch ? `${API_BASE}/api/returns?branchId=${activeBranch.id}` : `${API_BASE}/api/returns`;
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.all([
@@ -400,7 +408,7 @@ export default function AllocationsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [activeBranch]);
+  }, [activeBranch, settlementFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -426,7 +434,7 @@ export default function AllocationsPage() {
   const handleClearAllocation = async (id: number) => {
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch(`${API_BASE}/api/allocations/${id}/clear`, {
+      const res = await fetch(`${API_BASE}/api/allocations/${id}/settle`, {
         method: "PATCH",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
@@ -437,7 +445,7 @@ export default function AllocationsPage() {
       }
       const updated: Allocation = await res.json();
       setAllocations(prev => prev.map(a => a.id === id ? updated : a));
-      toast({ title: "Allocation cleared — lifted from supplier balance" });
+      toast({ title: "Allocation settled with supplier" });
     } catch {
       toast({ title: "Network error", variant: "destructive" });
     }
@@ -446,7 +454,7 @@ export default function AllocationsPage() {
   const handleClearAllForSupplier = async (sellerId: number, sellerName: string) => {
     const token = localStorage.getItem("nmb_token");
     try {
-      const res = await fetch(`${API_BASE}/api/allocations/clear-supplier`, {
+      const res = await fetch(`${API_BASE}/api/allocations/settle-supplier`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
@@ -457,7 +465,7 @@ export default function AllocationsPage() {
         toast({ title: data.error ?? "Failed to clear allocations", variant: "destructive" }); return;
       }
       const data = await res.json();
-      toast({ title: data.message ?? `Cleared all allocations for ${sellerName}` });
+      toast({ title: data.message ?? `Settled all allocations for ${sellerName}` });
       load();
     } catch {
       toast({ title: "Network error", variant: "destructive" });
@@ -550,6 +558,25 @@ export default function AllocationsPage() {
           </button>
         ))}
       </div>
+
+      {tab === "allocations" && (
+        <div className="flex gap-2 flex-wrap">
+          {(["UNSETTLED", "SETTLED", "ALL"] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => {
+                setSettlementFilter(filter);
+                setSelectedSeller(null);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                settlementFilter === filter ? "bg-slate-900 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {filter === "UNSETTLED" ? "Active Dues" : filter === "SETTLED" ? "Settled History" : "All Records"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary cards */}
       {tab === "allocations" && !loading && allocations.length > 0 && (
@@ -707,18 +734,18 @@ export default function AllocationsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {canCreate && sellerAllocs.some(a => !a.isCleared) && (
+                        {canSettle && sellerAllocs.some(a => !a.isCleared) && (
                           <Button
                             size="sm"
                             className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
                             onClick={() => {
                               const sid = sellerAllocs[0]?.sellerId;
-                              if (sid && confirm(`Mark ALL allocations cleared for ${selectedSeller}? This will lift the record from active supplier inventory.`)) {
+                              if (sid && confirm(`Settle ALL allocations for ${selectedSeller}? This moves them to settled supplier history.`)) {
                                 handleClearAllForSupplier(sid, selectedSeller);
                               }
                             }}
                           >
-                            <CheckCircle2 size={13} /> Clear All
+                            <CheckCircle2 size={13} /> Settle All
                           </Button>
                         )}
                         <div className="text-right">
@@ -805,29 +832,29 @@ export default function AllocationsPage() {
                               <p className="font-medium text-sm text-foreground">{alloc.breadType}</p>
                               {alloc.isCleared ? (
                                 <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">
-                                  Cleared
+                                  Settled
                                 </Badge>
                               ) : (
                                 <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">
-                                  Active
+                                  Unsettled
                                 </Badge>
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(alloc.allocationDate), "dd MMM yyyy, HH:mm")} · by {alloc.issuedByName}
-                              {alloc.isCleared && alloc.clearedByName && ` · Cleared by ${alloc.clearedByName}`}
+                              {alloc.isCleared && (alloc.settledByName ?? alloc.clearedByName) && ` · Settled by ${alloc.settledByName ?? alloc.clearedByName}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Badge variant="secondary" className="text-xs">{alloc.quantity} units</Badge>
-                            {canCreate && !alloc.isCleared && (
+                            {canSettle && !alloc.isCleared && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
                                 onClick={() => handleClearAllocation(alloc.id)}
                               >
-                                <CheckCircle2 size={12} /> Clear
+                                <CheckCircle2 size={12} /> Settle
                               </Button>
                             )}
                           </div>
@@ -853,10 +880,12 @@ export default function AllocationsPage() {
                   <div className="divide-y divide-border/50">
                     {supplierGroups.map(group => {
                       const unclearedAllocs = group.allocations.filter(a => !a.isCleared);
-                      const totalUnits = unclearedAllocs.reduce((s, a) => s + a.quantity, 0);
                       const isFullyCleared = group.allocations.length > 0 && unclearedAllocs.length === 0;
+                      /* Use all allocations in the current filter set for display stats */
+                      const displayAllocs = group.allocations;
+                      const totalUnits = displayAllocs.reduce((s, a) => s + a.quantity, 0);
                       const byType = new Map<string, number>();
-                      for (const a of unclearedAllocs) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
+                      for (const a of displayAllocs) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
                       const productCount = byType.size;
                       const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
                         const price = productPrices.get(bt) ?? 0;
@@ -882,11 +911,11 @@ export default function AllocationsPage() {
                               <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
                               {isFullyCleared ? (
                                 <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">
-                                  All Cleared
+                                  Settled
                                 </Badge>
                               ) : (
                                 <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">
-                                  With Supplier
+                                  Unsettled
                                 </Badge>
                               )}
                             </div>
@@ -899,7 +928,7 @@ export default function AllocationsPage() {
                               )}
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="text-xs text-muted-foreground">
-                                {isFullyCleared ? "0 active items" : `${productCount} product${productCount !== 1 ? "s" : ""}`}
+                                {`${productCount} product${productCount !== 1 ? "s" : ""}`}
                               </span>
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -913,9 +942,9 @@ export default function AllocationsPage() {
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
                               <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>
-                                {isFullyCleared ? "0 units" : `${totalUnits} units`}
+                                {totalUnits} units
                               </p>
-                              {totalValue > 0 && !isFullyCleared && (
+                              {totalValue > 0 && (
                                 <p className="text-xs text-muted-foreground">
                                   ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
                                 </p>

@@ -57,3 +57,25 @@ Hosted on Render (backend) and served as a static PWA (frontend). Database on Ne
 - Keep existing project structure — do not restructure or migrate the monorepo layout.
 - Never change the UI, routes, database schema, API endpoints, auth flow, or existing business logic unless absolutely necessary.
 - Only extend, never replace working code.
+
+## Recent Functional Changes
+
+- **Daily Remaining Bread by Type**
+  - `GET /api/reports/product-dashboard` now supports `reportDate=YYYY-MM-DD` and computes **Remaining Bread by Type** for exactly that day.
+  - If `reportDate` is omitted, the endpoint defaults to the server's current day.
+  - Invalid `reportDate` returns `400` with a user-friendly error.
+
+- **Supplier settlement flow**
+  - Allocation responses now include `settlementStatus` (`UNSETTLED`/`SETTLED`) plus `settledAt` and `settledByName`.
+  - `GET /api/allocations` defaults to `settlementStatus=UNSETTLED` (active dues), and accepts `SETTLED` or `ALL`.
+  - Director-only settlement actions:
+    - `PATCH /api/allocations/:id/settle` (alias: `/clear`)
+    - `POST /api/allocations/settle-supplier` (alias: `/clear-supplier`)
+
+- **Director in-app notifications for employee-created records**
+  - Added `notifications` table in `lib/db/src/schema/notifications.ts` for persisted in-app notifications.
+  - Employee-created operational records now create director notifications (sales, allocations, production, expenses, inventory).
+  - Notification APIs:
+    - `GET /api/notifications`
+    - `PATCH /api/notifications/:id/read`
+    - `POST /api/notifications/read-all`

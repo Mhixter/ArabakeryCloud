@@ -4,6 +4,7 @@ import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { notifyManagers } from "../lib/push";
+import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -194,6 +195,15 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   ]);
 
   await logAudit({ req, userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
+  await notifyDirectorsOnEmployeeRecord({
+    companyId,
+    actorUserId: userId,
+    actorRole: role,
+    entityType: "sale",
+    entityId: sale.id,
+    title: "Employee added sales record",
+    message: `${cashier?.fullName ?? "An employee"} recorded sale of ${qty} × ${breadType}.`,
+  });
 
   if (role === "supplier") {
     notifyManagers(companyId, {
@@ -260,6 +270,15 @@ router.post("/sales/quick", authenticate, requireRole("manager", "managing_direc
     entityId: sale.id,
     details: `Quick Sale ₦${totalAmount} (${pm})`,
     branchId: sale.branchId,
+  });
+  await notifyDirectorsOnEmployeeRecord({
+    companyId,
+    actorUserId: userId,
+    actorRole: role,
+    entityType: "sale",
+    entityId: sale.id,
+    title: "Employee added quick sales record",
+    message: `${cashier?.fullName ?? "An employee"} recorded a quick sale of ₦${totalAmount.toLocaleString()}.`,
   });
 
   res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown", role, branch?.phone, branch?.address));

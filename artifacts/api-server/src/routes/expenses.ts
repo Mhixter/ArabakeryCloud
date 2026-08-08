@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, expenseCategoriesTable, expensesTable, workersTable, workerCategoriesTable, branchesTable, usersTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte, asc, desc } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { notifyDirectorsOnEmployeeRecord } from "../lib/notifications";
 
 const router = Router();
 const ALLOWED_ROLES = ["managing_director", "manager", "receptionist"];
@@ -114,6 +115,19 @@ router.post("/expenses", authenticate, requireRole(...ALLOWED_ROLES), async (req
       expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
       createdById: userId,
     }).returning();
+    const [createdBy] = await db
+      .select({ fullName: usersTable.fullName })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    await notifyDirectorsOnEmployeeRecord({
+      companyId,
+      actorUserId: userId,
+      actorRole: role,
+      entityType: "expense",
+      entityId: expense.id,
+      title: "Employee added expense record",
+      message: `${createdBy?.fullName ?? "An employee"} recorded expense "${note.trim()}" (₦${parseFloat(amount).toLocaleString("en-NG")}).`,
+    });
     res.status(201).json(expense);
   } catch (err) {
     console.error("POST /expenses error:", err);

@@ -15,3 +15,4 @@ export * from "./returns";
 export * from "./workers";
 export * from "./expenses";
 export * from "./push-subscriptions";
+export * from "./notifications";

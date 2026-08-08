@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 /* ── PWA Install Prompt ── */
 interface BeforeInstallPromptEvent extends Event {
@@ -862,49 +863,54 @@ function ManagerDashboard() {
   const { activeBranch } = useActiveBranch();
   const { canInstall, install, showIosHint } = useInstallPrompt();
 
-  const [period, setPeriod] = useState<"today" | "week" | "date">("today");
-  const [customDate, setCustomDate] = useState<string>("");
+  const [period, setPeriod] = useState<"today" | "week">("today");
+  const [reportDate, setReportDate] = useState<string>(toLocalDateStr(new Date()));
   const [data, setData] = useState<ProductDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [inventoryTotal, setInventoryTotal] = useState(0);
+  const { toast } = useToast();
 
-  const fetchDashboard = useCallback((date?: string) => {
+  const fetchDashboard = useCallback((selectedDate: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+      toast({ title: "Invalid date selected", description: "Please select a valid report date.", variant: "destructive" });
+      return;
+    }
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const params = new URLSearchParams();
     if (activeBranch?.id) params.set("branchId", activeBranch.id.toString());
-    if (date) params.set("date", date);
+    params.set("reportDate", selectedDate);
     const qs = params.toString();
     const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
     setLoading(true);
     fetch(url, { headers, credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) {
-          setData(d);
-          /* Total bread units = in-store + with-suppliers across all product types.
-             This updates automatically as sales, allocations and returns are recorded. */
-          const breadTotal = (d.remaining as { remaining: number; allocated: number }[] ?? [])
-            .reduce((s, r) => s + r.remaining + (r.allocated ?? 0), 0);
-          setInventoryTotal(breadTotal);
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err?.error ?? "Failed to load dashboard");
         }
+        return r.json();
       })
-      .catch(() => {})
+      .then(d => {
+        setData(d);
+        /* Total bread units = in-store + with-suppliers across all product types.
+           This updates automatically as sales, allocations and returns are recorded. */
+        const breadTotal = (d.remaining as { remaining: number; allocated: number }[] ?? [])
+          .reduce((s, r) => s + r.remaining + (r.allocated ?? 0), 0);
+        setInventoryTotal(breadTotal);
+      })
+      .catch((err: Error) => {
+        toast({ title: "Could not load report", description: err.message, variant: "destructive" });
+      })
       .finally(() => setLoading(false));
-  }, [activeBranch?.id]);
+  }, [activeBranch?.id, toast]);
 
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    fetchDashboard(reportDate);
+  }, [fetchDashboard, reportDate]);
 
-  /* When user picks a custom date, re-fetch */
-  useEffect(() => {
-    if (period === "date" && customDate) fetchDashboard(customDate);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customDate]);
-
-  const periodData = data ? (period === "date" ? data["today"] : data[period]) : null;
-  const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : customDate ? format(new Date(customDate + "T12:00:00"), "d MMM yyyy") : "Selected Date";
+  const periodData = data ? data[period] : null;
+  const periodLabel = period === "today" ? format(new Date(reportDate + "T12:00:00"), "d MMM yyyy") : "This Week";
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -946,21 +952,19 @@ function ManagerDashboard() {
       )}
 
       <div className="flex flex-wrap gap-2 items-center">
-        {(["today", "week", "date"] as const).map(p => (
+        {(["today", "week"] as const).map(p => (
           <button key={p} onClick={() => setPeriod(p)}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${period === p ? "bg-amber-400 text-slate-950" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            {p === "today" ? "Today" : p === "week" ? "This Week" : "Pick Date"}
+            {p === "today" ? "Selected Day Sales" : "This Week"}
           </button>
         ))}
-        {period === "date" && (
-          <input
-            type="date"
-            value={customDate}
-            max={format(new Date(), "yyyy-MM-dd")}
-            onChange={e => setCustomDate(e.target.value)}
-            className="text-sm border border-border rounded-xl px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-        )}
+        <input
+          type="date"
+          value={reportDate}
+          max={format(new Date(), "yyyy-MM-dd")}
+          onChange={e => setReportDate(e.target.value)}
+          className="text-sm border border-border rounded-xl px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
       </div>
 
       {/* Stock at a glance — 4 KPIs */}
@@ -1017,7 +1021,7 @@ function ManagerDashboard() {
           ) : !periodData?.byProduct?.length ? (
             <div className="text-center py-10 text-muted-foreground">
               <Package size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No sales {period === "date" ? `on ${periodLabel}` : period === "today" ? "today" : "this week"} yet.</p>
+              <p className="text-sm">No sales {period === "today" ? `on ${periodLabel}` : "this week"} yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
@@ -1047,7 +1051,7 @@ function ManagerDashboard() {
             </div>
             <div>
               <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
-              <CardDescription className="text-xs">In-store stock vs with suppliers</CardDescription>
+              <CardDescription className="text-xs">In-store stock vs with suppliers for {format(new Date(reportDate + "T12:00:00"), "d MMM yyyy")}</CardDescription>
             </div>
           </div>
         </CardHeader>
