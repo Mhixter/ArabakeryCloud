@@ -14,8 +14,8 @@
 "scripts"
 ],
 "scripts": {
-"dev": "npm run dev --workspace=@workspace/bakery",
-"build": "npm run build --workspace=@workspace/bakery",
+"dev": "cd artifacts/bakery && npm run dev",
+"build": "cd artifacts/bakery && npm run build",
 "typecheck:libs": "tsc --build",
 "typecheck": "npm run typecheck:libs"
 },
