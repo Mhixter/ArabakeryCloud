@@ -3,7 +3,7 @@ services:
     name: new-model-bread
     runtime: node
     plan: free
-    buildCommand: npm install && PORT=3000 BASE_PATH=/ npm run build --workspace=@workspace/bakery && npm run build --workspace=@workspace/api-server
+    buildCommand: PORT=3000 BASE_PATH=/ npm install && npm run build --workspace=@workspace/bakery && npm run build --workspace=@workspace/api-server
     startCommand: NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs
     healthCheckPath: /api/health
     envVars:
