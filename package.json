@@ -1,27 +1,27 @@
 {
-  "name": "workspace",
-  "version": "0.0.0",
-  "license": "MIT",
-  "private": true,
-  "packageManager": "npm@10.9.0",
-  "engines": {
-    "node": "20.x",
-    "npm": "10.x"
-  },
-  "workspaces": [
-    "artifacts/*",
-    "lib/*",
-    "scripts"
-  ],
-  "scripts": {
-    "dev": "npm run dev --workspace=@workspace/bakery",
-    "build": "npm run typecheck",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "npm run typecheck:libs"
-  },
-  "devDependencies": {
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "~5.9.2"
-  }
+"name": "workspace",
+"version": "0.0.0",
+"license": "MIT",
+"private": true,
+"packageManager": "npm@10.9.0",
+"engines": {
+"node": "20.x",
+"npm": "10.x"
+},
+"workspaces": [
+"artifacts/",
+"lib/",
+"scripts"
+],
+"scripts": {
+"dev": "npm run dev --workspace=@workspace/bakery",
+"build": "npm run typecheck && npm run build --workspace=@workspace/bakery",
+"typecheck:libs": "tsc --build",
+"typecheck": "npm run typecheck:libs"
+},
+"devDependencies": {
+"prettier": "^3.8.1",
+"tsx": "^4.21.0",
+"typescript": "~5.9.2"
+}
 }
