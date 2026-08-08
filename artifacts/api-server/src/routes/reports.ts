@@ -111,13 +111,13 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   /* Join sales with cashier role so we can split direct vs supplier sales.
      Supplier sales are WITHIN allocated bread — counting both would double-subtract.
      Use all-time sales for stock calculation. */
-  const remainingSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
-  if (stockBranchFilter) remainingSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
-  const salesForSelectedDay = await db
+  const stockSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  if (stockBranchFilter) stockSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
+  const allSalesForStock = await db
     .select({ sale: salesTable, cashierRole: usersTable.role })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
-    .where(and(...remainingSalesConds));
+    .where(and(...stockSalesConds));
 
   /* Fetch approved returns only — pending/rejected don't affect stock. All-time. */
   const returnsConds = [
@@ -158,7 +158,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const directSalesByType   = new Map<string, number>();
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
-  for (const { sale: s, cashierRole } of salesForSelectedDay) {
+  for (const { sale: s, cashierRole } of allSalesForStock) {
     allSalesByType.set(s.breadType, (allSalesByType.get(s.breadType) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
       supplierSalesByType.set(s.breadType, (supplierSalesByType.get(s.breadType) ?? 0) + s.quantity);
