@@ -880,10 +880,12 @@ export default function AllocationsPage() {
                   <div className="divide-y divide-border/50">
                     {supplierGroups.map(group => {
                       const unclearedAllocs = group.allocations.filter(a => !a.isCleared);
-                      const totalUnits = unclearedAllocs.reduce((s, a) => s + a.quantity, 0);
                       const isFullyCleared = group.allocations.length > 0 && unclearedAllocs.length === 0;
+                      /* Use all allocations in the current filter set for display stats */
+                      const displayAllocs = group.allocations;
+                      const totalUnits = displayAllocs.reduce((s, a) => s + a.quantity, 0);
                       const byType = new Map<string, number>();
-                      for (const a of unclearedAllocs) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
+                      for (const a of displayAllocs) byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
                       const productCount = byType.size;
                       const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
                         const price = productPrices.get(bt) ?? 0;
@@ -926,7 +928,7 @@ export default function AllocationsPage() {
                               )}
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="text-xs text-muted-foreground">
-                                {isFullyCleared ? "0 active items" : `${productCount} product${productCount !== 1 ? "s" : ""}`}
+                                {`${productCount} product${productCount !== 1 ? "s" : ""}`}
                               </span>
                               <span className="text-muted-foreground/40 text-xs">·</span>
                               <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -940,9 +942,9 @@ export default function AllocationsPage() {
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
                               <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>
-                                {isFullyCleared ? "0 units" : `${totalUnits} units`}
+                                {totalUnits} units
                               </p>
-                              {totalValue > 0 && !isFullyCleared && (
+                              {totalValue > 0 && (
                                 <p className="text-xs text-muted-foreground">
                                   ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
                                 </p>

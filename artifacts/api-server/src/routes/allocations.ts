@@ -113,6 +113,7 @@ router.get("/allocations", authenticate, async (req: AuthenticatedRequest, res):
         sellerName ?? "Unknown",
         issuerMap.get(allocation.issuedById) ?? "Unknown",
         branchName ?? "Unknown",
+        allocation.clearedById ? (issuerMap.get(allocation.clearedById) ?? undefined) : undefined,
       ),
     ));
   } catch (err) {

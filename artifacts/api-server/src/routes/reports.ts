@@ -102,33 +102,29 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     .where(and(...allTimeSalesConds));
 
   /* Production, allocations & returns use stockBranchFilter so the MD always sees
-     company-wide bread stock regardless of which branch KPI tab they have open. */
+     company-wide bread stock regardless of which branch KPI tab they have open.
+     Stock (remaining) is ALL-TIME cumulative — no date filter here. */
   const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
-  prodConds.push(gte(productionBatchesTable.productionDate, todayStart));
-  prodConds.push(lte(productionBatchesTable.productionDate, todayEnd));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
   /* Join sales with cashier role so we can split direct vs supplier sales.
-     Supplier sales are WITHIN allocated bread — counting both would double-subtract. */
+     Supplier sales are WITHIN allocated bread — counting both would double-subtract.
+     Use all-time sales for stock calculation. */
   const remainingSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
   if (stockBranchFilter) remainingSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
-  remainingSalesConds.push(gte(salesTable.saleDate, todayStart));
-  remainingSalesConds.push(lte(salesTable.saleDate, todayEnd));
   const salesForSelectedDay = await db
     .select({ sale: salesTable, cashierRole: usersTable.role })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
     .where(and(...remainingSalesConds));
 
-  /* Fetch approved returns only — pending/rejected don't affect stock */
+  /* Fetch approved returns only — pending/rejected don't affect stock. All-time. */
   const returnsConds = [
     eq(productReturnsTable.companyId, companyId),
     eq(productReturnsTable.status, "approved" as const),
   ];
   if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
-  returnsConds.push(gte(productReturnsTable.returnDate, todayStart));
-  returnsConds.push(lte(productReturnsTable.returnDate, todayEnd));
   const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
@@ -137,8 +133,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allocConds = [
     eq(sellerAllocationsTable.companyId, companyId),
     isNull(sellerAllocationsTable.deletedAt),
-    gte(sellerAllocationsTable.allocationDate, todayStart),
-    lte(sellerAllocationsTable.allocationDate, todayEnd),
+    eq(sellerAllocationsTable.isCleared, false),
   ];
   if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
