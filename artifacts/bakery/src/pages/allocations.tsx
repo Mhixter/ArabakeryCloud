@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   PackageCheck, Plus, X, ChevronDown, Users, Calendar, RotateCcw, AlertCircle, Download,
-  ArrowLeft, Building2, ChevronRight, CheckCircle2,
+  ArrowLeft, Building2, ChevronRight, CheckCircle2, HandCoins,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser, getStoredCompany } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE } from "@/lib/api";
 import { generatePdf } from "@/lib/pdf";
+import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 
 function formatDate(iso: string) {
   return format(new Date(iso), "dd MMM yyyy, HH:mm");
@@ -376,6 +377,20 @@ export default function AllocationsPage() {
   // Supplier detail drill-down (manager/receptionist view)
   const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
   const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
+  const [settleDialog, setSettleDialog] = useState<{
+    open: boolean;
+    sellerId: number;
+    sellerName: string;
+    agentId?: string | null;
+    branchId?: number | null;
+    branchName?: string | null;
+    allocations: SupplierAllocationItem[];
+  }>({
+    open: false,
+    sellerId: 0,
+    sellerName: "",
+    allocations: [],
+  });
   const { toast } = useToast();
 
   const load = useCallback(() => {
@@ -708,20 +723,42 @@ export default function AllocationsPage() {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {canCreate && sellerAllocs.some(a => !a.isCleared) && (
-                          <Button
-                            size="sm"
-                            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                            onClick={() => {
-                              const sid = sellerAllocs[0]?.sellerId;
-                              if (sid && confirm(`Mark ALL allocations cleared for ${selectedSeller}? This will lift the record from active supplier inventory.`)) {
-                                handleClearAllForSupplier(sid, selectedSeller);
-                              }
-                            }}
-                          >
-                            <CheckCircle2 size={13} /> Clear All
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 shadow-sm"
+                              onClick={() => {
+                                const sid = sellerAllocs[0]?.sellerId;
+                                if (sid) {
+                                  setSettleDialog({
+                                    open: true,
+                                    sellerId: sid,
+                                    sellerName: selectedSeller,
+                                    branchName: sellerAllocs[0]?.branchName,
+                                    allocations: sellerAllocs.filter(a => !a.isCleared),
+                                  });
+                                }
+                              }}
+                            >
+                              <HandCoins size={13} /> Settle Supplier
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs text-muted-foreground gap-1.5"
+                              onClick={() => {
+                                const sid = sellerAllocs[0]?.sellerId;
+                                if (sid && confirm(`Mark ALL allocations cleared for ${selectedSeller} without recording sales remittance?`)) {
+                                  handleClearAllForSupplier(sid, selectedSeller);
+                                }
+                              }}
+                              title="Clear without recording sales"
+                            >
+                              <CheckCircle2 size={13} /> Quick Clear
+                            </Button>
+                          </>
                         )}
-                        <div className="text-right">
+                        <div className="text-right ml-1">
                           <p className="text-xs font-semibold text-foreground">{totalUnits} units</p>
                           <p className="text-xs text-muted-foreground">{rows.length} product{rows.length !== 1 ? "s" : ""}</p>
                         </div>
@@ -909,8 +946,8 @@ export default function AllocationsPage() {
                             </div>
                           </div>
 
-                          {/* Right: totals + chevron */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          {/* Right: totals + Settle button + chevron */}
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
                             <div className="text-right">
                               <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>
                                 {isFullyCleared ? "0 units" : `${totalUnits} units`}
@@ -921,6 +958,27 @@ export default function AllocationsPage() {
                                 </p>
                               )}
                             </div>
+                            {canCreate && !isFullyCleared && (
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1 px-2.5 shadow-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const sid = group.allocations[0]?.sellerId;
+                                  if (sid) {
+                                    setSettleDialog({
+                                      open: true,
+                                      sellerId: sid,
+                                      sellerName: group.sellerName,
+                                      branchName: group.branchName,
+                                      allocations: group.allocations.filter(a => !a.isCleared),
+                                    });
+                                  }
+                                }}
+                              >
+                                <HandCoins size={12} /> Settle
+                              </Button>
+                            )}
                             <ChevronRight size={16} className="text-muted-foreground/50" />
                           </div>
                         </button>
@@ -1086,6 +1144,22 @@ export default function AllocationsPage() {
 
       {showForm && <AllocationForm onClose={() => setShowForm(false)} onCreated={a => { setAllocations(prev => [...prev, a]); setShowForm(false); }} />}
       {showReturnForm && <ReturnForm onClose={() => setShowReturnForm(false)} onCreated={r => { setReturns(prev => [...prev, r]); setShowReturnForm(false); }} />}
+
+      {/* Settle Supplier Dialog */}
+      <SettleSupplierDialog
+        open={settleDialog.open}
+        onOpenChange={open => setSettleDialog(prev => ({ ...prev, open }))}
+        sellerId={settleDialog.sellerId}
+        sellerName={settleDialog.sellerName}
+        agentId={settleDialog.agentId}
+        branchId={settleDialog.branchId}
+        branchName={settleDialog.branchName}
+        allocations={settleDialog.allocations}
+        productPrices={productPrices}
+        onSettled={() => {
+          load();
+        }}
+      />
     </div>
   );
 }

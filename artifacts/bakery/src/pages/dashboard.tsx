@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, ShoppingCart, Factory, Package, PackageCheck,
   Plus, FileText, Clock, ArrowUpRight, Layers, RotateCcw, Download,
-  CheckCircle2, AlertTriangle, Smartphone, Share,
+  CheckCircle2, AlertTriangle, Smartphone, Share, HandCoins, Users, ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
+import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 
 /* ── PWA Install Prompt ── */
 interface BeforeInstallPromptEvent extends Event {
@@ -868,6 +869,25 @@ function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [inventoryTotal, setInventoryTotal] = useState(0);
 
+  /* Supplier settlements state */
+  const [allocations, setAllocations] = useState<any[]>([]);
+  const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
+  const [allocLoading, setAllocLoading] = useState(true);
+  const [settleDialog, setSettleDialog] = useState<{
+    open: boolean;
+    sellerId: number;
+    sellerName: string;
+    agentId?: string | null;
+    branchId?: number | null;
+    branchName?: string | null;
+    allocations: SupplierAllocationItem[];
+  }>({
+    open: false,
+    sellerId: 0,
+    sellerName: "",
+    allocations: [],
+  });
+
   const fetchDashboard = useCallback((date?: string) => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
@@ -877,20 +897,37 @@ function ManagerDashboard() {
     const qs = params.toString();
     const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
     setLoading(true);
-    fetch(url, { headers, credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
+    setAllocLoading(true);
+    const allocUrl = activeBranch?.id ? `${API_BASE}/api/allocations?branchId=${activeBranch.id}` : `${API_BASE}/api/allocations`;
+
+    Promise.all([
+      fetch(url, { headers, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(allocUrl, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/products`, { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ])
+      .then(([d, a, prods]) => {
         if (d) {
           setData(d);
-          /* Total bread units = in-store + with-suppliers across all product types.
-             This updates automatically as sales, allocations and returns are recorded. */
           const breadTotal = (d.remaining as { remaining: number; allocated: number }[] ?? [])
             .reduce((s, r) => s + r.remaining + (r.allocated ?? 0), 0);
           setInventoryTotal(breadTotal);
         }
+        if (Array.isArray(a)) {
+          setAllocations(a);
+        }
+        if (Array.isArray(prods)) {
+          const pm = new Map<string, number>();
+          for (const p of prods) {
+            pm.set(p.name, parseFloat(p.pricePerUnit as unknown as string) || 0);
+          }
+          setProductPrices(pm);
+        }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setAllocLoading(false);
+      });
   }, [activeBranch?.id]);
 
   useEffect(() => {
@@ -906,11 +943,36 @@ function ManagerDashboard() {
   const periodData = data ? (period === "date" ? data["today"] : data[period]) : null;
   const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : customDate ? format(new Date(customDate + "T12:00:00"), "d MMM yyyy") : "Selected Date";
 
+  // Group uncleared allocations by supplier
+  const supplierUnclearedMap = new Map<number, {
+    sellerId: number;
+    sellerName: string;
+    branchName: string;
+    branchId?: number | null;
+    allocations: any[];
+  }>();
+
+  for (const alloc of allocations) {
+    if (!alloc.isCleared && alloc.sellerId) {
+      const prev = supplierUnclearedMap.get(alloc.sellerId) ?? {
+        sellerId: alloc.sellerId,
+        sellerName: alloc.sellerName,
+        branchName: alloc.branchName,
+        branchId: alloc.branchId,
+        allocations: [],
+      };
+      prev.allocations.push(alloc);
+      supplierUnclearedMap.set(alloc.sellerId, prev);
+    }
+  }
+
+  const activeSupplierGroups = Array.from(supplierUnclearedMap.values());
+
   return (
     <div className="space-y-6" data-testid="page-dashboard">
       <PageHeader
         title="Dashboard"
-        subtitle="Product sales and stock overview"
+        subtitle="Product sales, stock and supplier overview"
         action={
           <div className="flex items-center gap-2">
             {canInstall && (
@@ -997,6 +1059,104 @@ function ManagerDashboard() {
           <KpiCard title={`Net — ${periodLabel}`} value={loading ? "—" : formatCurrency((periodData.totalAmount ?? 0) - (periodData.totalExpenses ?? 0))} sub="revenue minus expenses" icon={TrendingUp} loading={loading} accent={(periodData.totalAmount ?? 0) - (periodData.totalExpenses ?? 0) >= 0 ? "green" : "red"} />
         </div>
       )}
+
+      {/* ── SUPPLIER BALANCES & SETTLEMENT SECTION (Director Action) ── */}
+      <Card className="rounded-2xl border-0 shadow-sm overflow-hidden">
+        <CardHeader className="pb-3 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
+                <HandCoins size={16} />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold tracking-tight">Supplier Stock & Settlements</CardTitle>
+                <CardDescription className="text-xs">Settle field suppliers, record sales remittances, and clear balances</CardDescription>
+              </div>
+            </div>
+            <Badge variant={activeSupplierGroups.length > 0 ? "default" : "secondary"} className={activeSupplierGroups.length > 0 ? "bg-amber-500 text-white text-xs" : "text-xs"}>
+              {activeSupplierGroups.length} Active {activeSupplierGroups.length === 1 ? "Supplier" : "Suppliers"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {allocLoading ? (
+            <div className="p-4 space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          ) : activeSupplierGroups.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500 opacity-80" />
+              <p className="text-sm font-semibold text-foreground">All suppliers are settled</p>
+              <p className="text-xs text-muted-foreground mt-0.5">No outstanding bread allocations currently with field suppliers.</p>
+              <Button variant="outline" size="sm" className="mt-3 text-xs" onClick={() => setLocation("/allocations")}>
+                View Allocations History
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {activeSupplierGroups.map(group => {
+                const totalUnits = group.allocations.reduce((s, a) => s + a.quantity, 0);
+                const byType = new Map<string, number>();
+                for (const a of group.allocations) {
+                  byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
+                }
+                const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
+                  const price = productPrices.get(bt) ?? 0;
+                  return s + price * qty;
+                }, 0);
+
+                const breadSummary = Array.from(byType.entries())
+                  .map(([bt, qty]) => `${qty}× ${bt}`)
+                  .join(", ");
+
+                return (
+                  <div key={group.sellerId} className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Users size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                          <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                            {totalUnits} units in hand
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {breadSummary}
+                        </p>
+                        {totalValue > 0 && (
+                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            Estimated Value: ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 h-8 text-xs shadow-sm"
+                        onClick={() => {
+                          setSettleDialog({
+                            open: true,
+                            sellerId: group.sellerId,
+                            sellerName: group.sellerName,
+                            branchId: group.branchId,
+                            branchName: group.branchName,
+                            allocations: group.allocations,
+                          });
+                        }}
+                      >
+                        <HandCoins size={14} />
+                        Settled
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Sales by product */}
       <Card className="rounded-2xl border-0 shadow-sm">
@@ -1119,6 +1279,22 @@ function ManagerDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Settlement Dialog */}
+      <SettleSupplierDialog
+        open={settleDialog.open}
+        onOpenChange={open => setSettleDialog(prev => ({ ...prev, open }))}
+        sellerId={settleDialog.sellerId}
+        sellerName={settleDialog.sellerName}
+        agentId={settleDialog.agentId}
+        branchId={settleDialog.branchId}
+        branchName={settleDialog.branchName}
+        allocations={settleDialog.allocations}
+        productPrices={productPrices}
+        onSettled={() => {
+          fetchDashboard();
+        }}
+      />
     </div>
   );
 }
