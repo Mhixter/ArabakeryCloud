@@ -20,12 +20,14 @@ export interface SupplierAllocationItem {
 export interface SettleSupplierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sellerId: number;
-  sellerName: string;
+  sellerId?: number;
+  sellerName?: string;
   agentId?: string | null;
   branchId?: number | null;
   branchName?: string | null;
   allocations: SupplierAllocationItem[];
+  allAllocations?: any[];
+  availableSellers?: { id: number; fullName: string; agentId?: string | null; branchId?: number | null; branchName?: string | null }[];
   productPrices?: Map<string, number>;
   onSettled: (result: any) => void;
 }
@@ -33,23 +35,48 @@ export interface SettleSupplierDialogProps {
 export function SettleSupplierDialog({
   open,
   onOpenChange,
-  sellerId,
-  sellerName,
-  agentId,
-  branchId,
-  branchName,
-  allocations,
+  sellerId: initialSellerId = 0,
+  sellerName: initialSellerName = "",
+  agentId: initialAgentId,
+  branchId: initialBranchId,
+  branchName: initialBranchName,
+  allocations: directAllocations,
+  allAllocations = [],
+  availableSellers = [],
   productPrices,
   onSettled,
 }: SettleSupplierDialogProps) {
   const { toast } = useToast();
+  const [selectedSellerId, setSelectedSellerId] = useState<number>(initialSellerId);
   const [amountSettled, setAmountSettled] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Group uncleared allocations by breadType
-  const uncleared = allocations.filter(a => !a.isCleared);
+  useEffect(() => {
+    if (open) {
+      if (initialSellerId) {
+        setSelectedSellerId(initialSellerId);
+      } else if (availableSellers.length > 0 && !selectedSellerId) {
+        setSelectedSellerId(availableSellers[0].id);
+      }
+    }
+  }, [open, initialSellerId, availableSellers]);
+
+  const currentSeller = availableSellers.find(s => s.id === selectedSellerId);
+  const effectiveSellerName = initialSellerName || currentSeller?.fullName || "Supplier";
+  const effectiveAgentId = initialAgentId ?? currentSeller?.agentId;
+  const effectiveBranchName = initialBranchName ?? currentSeller?.branchName;
+  const effectiveBranchId = initialBranchId ?? currentSeller?.branchId;
+
+  // Determine active allocations for the chosen supplier
+  const relevantAllocations: SupplierAllocationItem[] = (
+    initialSellerId && directAllocations.length > 0
+      ? directAllocations
+      : allAllocations.filter(a => a.sellerId === selectedSellerId)
+  );
+
+  const uncleared = relevantAllocations.filter(a => !a.isCleared);
   const byType = new Map<string, { quantity: number; unitPrice: number; total: number }>();
 
   for (const a of uncleared) {
@@ -71,14 +98,14 @@ export function SettleSupplierDialog({
   const totalCalculatedValue = items.reduce((s, x) => s + x.total, 0);
   const totalUnits = items.reduce((s, x) => s + x.quantity, 0);
 
-  // Initialize amountSettled when dialog opens or allocations change
+  // Initialize amountSettled when dialog opens or supplier changes
   useEffect(() => {
     if (open) {
       setAmountSettled(totalCalculatedValue > 0 ? totalCalculatedValue.toString() : "");
       setPaymentMethod("cash");
       setNotes("");
     }
-  }, [open, totalCalculatedValue]);
+  }, [open, selectedSellerId, totalCalculatedValue]);
 
   const parsedAmount = parseFloat(amountSettled) || 0;
   const isDifferentFromCalculated = totalCalculatedValue > 0 && Math.abs(parsedAmount - totalCalculatedValue) > 0.01;

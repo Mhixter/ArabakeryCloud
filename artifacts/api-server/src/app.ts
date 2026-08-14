@@ -53,8 +53,27 @@ app.use("/api", router);
 /* ── In production serve the built React SPA ── */
 if (process.env.NODE_ENV === "production") {
   const staticDir = path.resolve(process.cwd(), "artifacts/bakery/dist/public");
-  app.use(express.static(staticDir, { maxAge: "7d", immutable: true }));
+  app.use(express.static(staticDir, {
+    setHeaders: (res, filePath) => {
+      const normalized = filePath.replace(/\\/g, "/");
+      if (
+        normalized.endsWith("index.html") ||
+        normalized.endsWith("sw.js") ||
+        normalized.endsWith("registerSW.js") ||
+        normalized.endsWith(".webmanifest")
+      ) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else if (normalized.includes("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  }));
   app.get("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path.join(staticDir, "index.html"));
   });
 } else {
