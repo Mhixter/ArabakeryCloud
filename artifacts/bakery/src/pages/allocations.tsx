@@ -235,6 +235,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
+  const [stockLoaded, setStockLoaded] = useState(false);
   const [sellerId, setSellerId] = useState("");
   const [breadType, setBreadType] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -256,14 +257,18 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
-      if (dash?.remaining) setStock(dash.remaining as StockItem[]);
-    }).catch(() => {});
+      setStock(Array.isArray(dash?.remaining) ? dash.remaining as StockItem[] : []);
+    }).catch(() => {
+      setStock([]);
+    }).finally(() => setStockLoaded(true));
   }, [activeBranch]);
 
-  const selectedStock = stock.find(s => s.name === breadType);
+  const selectedStock = stock.find(s => s.name.trim().toLowerCase() === breadType.trim().toLowerCase());
   const availableQty = selectedStock?.remaining ?? null;
   const enteredQty = quantity ? parseInt(quantity) : 0;
   const overStock = availableQty !== null && enteredQty > availableQty;
+  const stockForProduct = (name: string) =>
+    stock.find(s => s.name.trim().toLowerCase() === name.trim().toLowerCase());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,8 +284,14 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
         credentials: "include",
         body: JSON.stringify({ sellerId, breadType, quantity: parseInt(quantity), notes: notes || null, branchId: activeBranch?.id ?? null }),
       });
-      const data = await res.json();
-      if (!res.ok) { toast({ title: data.error ?? "Failed to create allocation", variant: "destructive" }); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: data.error ?? data.message ?? `Allocation failed (${res.status})`,
+          variant: "destructive",
+        });
+        return;
+      }
       toast({ title: `Allocated ${quantity} × ${breadType} to ${data.sellerName}` });
       onCreated(data);
     } catch {
@@ -317,8 +328,8 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
                 className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required>
                 <option value="">Select bread type…</option>
                 {products.map(p => {
-                  const s = stock.find(st => st.name === p.name);
-                  return <option key={p.id} value={p.name}>{p.name}{s ? ` — ${s.remaining} available` : ""}</option>;
+                  const s = stockForProduct(p.name);
+                  return <option key={p.id} value={p.name}>{p.name} — {s?.remaining ?? 0} available</option>;
                 })}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -327,6 +338,12 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
               <div className={`flex items-center gap-1.5 mt-1.5 text-xs font-medium ${availableQty === 0 ? "text-red-600" : availableQty < 10 ? "text-amber-600" : "text-emerald-600"}`}>
                 <AlertCircle size={12} />
                 {availableQty === 0 ? "No stock available — log production first" : `${availableQty} units available to allocate`}
+              </div>
+            )}
+            {breadType && availableQty === null && stockLoaded && (
+              <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-600">
+                <AlertCircle size={12} />
+                No stock record found for this product. Record production using the exact product name.
               </div>
             )}
           </div>
@@ -351,7 +368,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
               className="w-full pl-3 pr-3 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting || (availableQty !== null && availableQty === 0)}>
+          <Button type="submit" className="w-full" disabled={submitting || !stockLoaded || (availableQty !== null && availableQty === 0)}>
             {submitting ? "Saving…" : "Allocate Bread"}
           </Button>
         </form>
