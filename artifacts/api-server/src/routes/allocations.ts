@@ -309,7 +309,7 @@ router.post("/allocations/clear-supplier", authenticate, requireRole("managing_d
 });
 
 /* POST /allocations/settle-supplier — settle active allocations for a supplier, record sales, and clear allocations */
-router.post("/allocations/settle-supplier", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
+router.post("/allocations/settle-supplier", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId, branchId: userBranchId } = req.user!;
     const { sellerId, amountSettled, paymentMethod = "cash", notes, branchId: bodyBranchId, allocationIds } = req.body;

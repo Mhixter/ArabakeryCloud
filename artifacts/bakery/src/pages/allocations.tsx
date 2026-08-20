@@ -364,6 +364,7 @@ export default function AllocationsPage() {
   const user = getStoredUser();
   const role = user?.role ?? "";
   const isSeller = role === "supplier";
+  const canSettle = role === "managing_director";
   const canCreate = ["managing_director", "manager", "receptionist"].includes(role);
   const canDelete = ["managing_director", "manager"].includes(role);
   const { activeBranch } = useActiveBranch();
@@ -756,7 +757,7 @@ export default function AllocationsPage() {
                     </div>
 
                     {/* Date-specific settlement actions */}
-                    {canCreate && sellerAllocs.some(a => !a.isCleared) && (
+                    {canSettle && sellerAllocs.some(a => !a.isCleared) && (
                       <div className="border-t border-border/50 bg-amber-50/40 dark:bg-amber-950/10 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <div>
@@ -792,7 +793,7 @@ export default function AllocationsPage() {
                                   <p className="text-xs text-muted-foreground truncate">{products.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
                                 </div>
                                 <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{units} units</span>
-                                {active.length > 0 && (
+                                {canSettle && active.length > 0 && (
                                   <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={() => {
                                     const sid = sellerAllocs[0]?.sellerId;
                                     if (sid) setSettleDialog({
@@ -1011,7 +1012,7 @@ export default function AllocationsPage() {
                                     <p className="text-xs text-muted-foreground truncate">{dateTypes.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
                                   </div>
                                   <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{dateUnits} units</span>
-                                  {canCreate && active.length > 0 && (
+                            {canSettle && active.length > 0 && (
                                     <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(e) => {
                                       e.stopPropagation();
                                       const sid = group.allocations[0]?.sellerId;
