@@ -11,6 +11,15 @@ self.skipWaiting();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
+/* Immediately refresh open app tabs when a new release takes control. */
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const clients = await self.clients.matchAll({ type: "window" });
+    await Promise.all(clients.map((client) => client.navigate(client.url)));
+  })());
+});
+
 /* ─── SPA navigation ─────────────────────────────────────────────────
    Prefer the current server HTML so a deployed release is visible
    immediately. Fall back to the precached shell only when offline.

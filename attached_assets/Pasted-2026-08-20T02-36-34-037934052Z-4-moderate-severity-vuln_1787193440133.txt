@@ -1,0 +1,104 @@
+2026-08-20T02:36:34.037934052Z 4 moderate severity vulnerabilities
+2026-08-20T02:36:34.03793583Z 
+2026-08-20T02:36:34.037937817Z To address all issues (including breaking changes), run:
+2026-08-20T02:36:34.037939694Z   npm audit fix --force
+2026-08-20T02:36:34.037940966Z 
+2026-08-20T02:36:34.037942616Z Run `npm audit` for details.
+2026-08-20T02:36:35.208080756Z 
+2026-08-20T02:36:35.208093883Z up to date, audited 795 packages in 1s
+2026-08-20T02:36:35.208098748Z 
+2026-08-20T02:36:35.208100043Z 174 packages are looking for funding
+2026-08-20T02:36:35.20811489Z   run `npm fund` for details
+2026-08-20T02:36:35.217642827Z 
+2026-08-20T02:36:35.217649568Z 4 moderate severity vulnerabilities
+2026-08-20T02:36:35.217650934Z 
+2026-08-20T02:36:35.217653113Z To address all issues (including breaking changes), run:
+2026-08-20T02:36:35.217654785Z   npm audit fix --force
+2026-08-20T02:36:35.217655975Z 
+2026-08-20T02:36:35.217657582Z Run `npm audit` for details.
+2026-08-20T02:36:35.278042171Z ==> Running build command 'npm ci --include=dev && npm run build'...
+2026-08-20T02:36:43.924867507Z 
+2026-08-20T02:36:43.924883737Z added 786 packages, and audited 795 packages in 9s
+2026-08-20T02:36:43.925011361Z 
+2026-08-20T02:36:43.925022758Z 174 packages are looking for funding
+2026-08-20T02:36:43.925042344Z   run `npm fund` for details
+2026-08-20T02:36:43.934368082Z 
+2026-08-20T02:36:43.934375003Z 4 moderate severity vulnerabilities
+2026-08-20T02:36:43.934376698Z 
+2026-08-20T02:36:43.934378563Z To address all issues (including breaking changes), run:
+2026-08-20T02:36:43.93438037Z   npm audit fix --force
+2026-08-20T02:36:43.934381613Z 
+2026-08-20T02:36:43.934383261Z Run `npm audit` for details.
+2026-08-20T02:36:44.133072646Z 
+2026-08-20T02:36:44.133096058Z > workspace@0.0.0 build
+2026-08-20T02:36:44.133099748Z > npm run build --workspace=@workspace/bakery && npm run build --workspace=@workspace/api-server
+2026-08-20T02:36:44.133111386Z 
+2026-08-20T02:36:44.259691079Z 
+2026-08-20T02:36:44.259703278Z > @workspace/bakery@0.0.0 build
+2026-08-20T02:36:44.259706683Z > vite build --config vite.config.ts
+2026-08-20T02:36:44.259708779Z 
+2026-08-20T02:36:44.545874354Z vite v7.3.6 building client environment for production...
+2026-08-20T02:36:44.606970767Z transforming...
+2026-08-20T02:36:45.342126123Z src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-08-20T02:36:46.323158519Z src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-08-20T02:36:46.329406129Z src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-08-20T02:36:46.331284296Z src/components/ui/sheet.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+2026-08-20T02:36:51.782357917Z ✓ 3049 modules transformed.
+2026-08-20T02:36:52.185286402Z rendering chunks...
+2026-08-20T02:36:52.636776377Z [plugin vite:reporter] 
+2026-08-20T02:36:52.636793628Z (!) /opt/render/project/src/artifacts/bakery/src/lib/sync-service.ts is dynamically imported by /opt/render/project/src/artifacts/bakery/src/App.tsx but also statically imported by /opt/render/project/src/artifacts/bakery/src/hooks/use-offline.ts, /opt/render/project/src/artifacts/bakery/src/lib/offline-intercept.ts, dynamic import will not move module into another chunk.
+2026-08-20T02:36:52.636796773Z 
+2026-08-20T02:36:52.680493087Z computing gzip size...
+2026-08-20T02:36:52.722746367Z dist/public/registerSW.js                           0.13 kB
+2026-08-20T02:36:52.722757312Z dist/public/manifest.webmanifest                    0.85 kB
+2026-08-20T02:36:52.722760929Z dist/public/index.html                              2.30 kB │ gzip:   0.88 kB
+2026-08-20T02:36:52.722775009Z dist/public/assets/index-BdoknqXA.css             156.04 kB │ gzip:  24.90 kB
+2026-08-20T02:36:52.722785338Z dist/public/assets/purify.es-Cz4mVeUR.js           28.98 kB │ gzip:  10.87 kB
+2026-08-20T02:36:52.722807551Z dist/public/assets/index.es-cn9rI52e.js           158.91 kB │ gzip:  53.03 kB
+2026-08-20T02:36:52.722897983Z dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+2026-08-20T02:36:52.722904918Z dist/public/assets/index-C27l9aql.js            1,798.92 kB │ gzip: 511.96 kB
+2026-08-20T02:36:52.722926769Z 
+2026-08-20T02:36:52.722929911Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-08-20T02:36:52.722932272Z - Using dynamic import() to code-split the application
+2026-08-20T02:36:52.722934221Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-08-20T02:36:52.722936232Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-08-20T02:36:52.723158309Z ✓ built in 8.15s
+2026-08-20T02:36:52.729891615Z 
+2026-08-20T02:36:52.729897462Z PWA v1.3.0
+2026-08-20T02:36:52.729899069Z Building src/sw.ts service worker ("es" format)...
+2026-08-20T02:36:53.103821455Z vite v7.3.6 building client environment for production...
+2026-08-20T02:36:53.108681358Z transforming...
+2026-08-20T02:36:53.430660327Z ✓ 82 modules transformed.
+2026-08-20T02:36:53.517401461Z rendering chunks...
+2026-08-20T02:36:53.523420922Z computing gzip size...
+2026-08-20T02:36:53.525387813Z dist/public/sw.mjs  26.55 kB │ gzip: 8.65 kB
+2026-08-20T02:36:53.525436679Z ✓ built in 421ms
+2026-08-20T02:36:53.709853762Z 
+2026-08-20T02:36:53.709860557Z PWA v1.3.0
+2026-08-20T02:36:53.709862859Z mode      injectManifest
+2026-08-20T02:36:53.709864411Z format:   es
+2026-08-20T02:36:53.709866449Z precache  14 entries (2310.79 KiB)
+2026-08-20T02:36:53.709867972Z files generated
+2026-08-20T02:36:53.709869281Z   dist/public/sw.js
+2026-08-20T02:36:53.911367034Z 
+2026-08-20T02:36:53.911379521Z > @workspace/api-server@0.0.0 build
+2026-08-20T02:36:53.911381547Z > node ./build.mjs
+2026-08-20T02:36:53.9113828Z 
+2026-08-20T02:36:54.51731802Z 
+2026-08-20T02:36:54.517326045Z   dist/index.mjs                       2.6mb ⚠️
+2026-08-20T02:36:54.517328171Z   dist/pino-worker.mjs               150.3kb
+2026-08-20T02:36:54.517329615Z   dist/pino-file.mjs                 139.2kb
+2026-08-20T02:36:54.517331033Z   dist/pino-pretty.mjs               111.3kb
+2026-08-20T02:36:54.51733274Z   dist/thread-stream-worker.mjs        7.0kb
+2026-08-20T02:36:54.517334145Z   dist/index.mjs.map                   4.6mb
+2026-08-20T02:36:54.517335602Z   dist/pino-worker.mjs.map           255.6kb
+2026-08-20T02:36:54.517337115Z   dist/pino-file.mjs.map             227.9kb
+2026-08-20T02:36:54.517338431Z   dist/pino-pretty.mjs.map           201.9kb
+2026-08-20T02:36:54.517339739Z   dist/thread-stream-worker.mjs.map   11.9kb
+2026-08-20T02:36:54.517340865Z 
+2026-08-20T02:36:54.517342556Z ⚡ Done in 542ms
+2026-08-20T02:36:54.598250995Z ==> Requesting Node.js version 20
+2026-08-20T02:36:54.692412906Z ==> Using Node.js version 20.20.2 via /opt/render/project/src/.node-version
+2026-08-20T02:36:54.692418212Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-08-20T02:36:55.546753661Z ==> Uploading build...
+2026-08-20T02:36:55.808835825Z ==> Your site is live 🎉
