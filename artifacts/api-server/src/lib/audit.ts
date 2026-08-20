@@ -1,6 +1,7 @@
 import { db } from "@workspace/db";
 import { auditLogsTable } from "@workspace/db";
 import { Request } from "express";
+import { notifyManagingDirectors } from "./push";
 
 interface AuditParams {
   req?: Request;
@@ -33,6 +34,14 @@ export async function logAudit(params: AuditParams): Promise<void> {
       ipAddress,
       branchId: params.branchId,
     });
+    if (params.companyId) {
+      void notifyManagingDirectors(params.companyId, {
+        title: "New activity",
+        body: `${params.userName ? `${params.userName}: ` : ""}${params.details || params.action.replaceAll("_", " ").toLowerCase()}`,
+        url: "/audit-logs",
+        tag: `activity-${params.action}`,
+      }).catch(() => {});
+    }
   } catch {
     // Audit logs should never fail silently in production — but we don't want audit failures to break the main request
   }

@@ -20,10 +20,8 @@ export interface PushPayload {
   tag?: string;
 }
 
-export async function notifyManagers(companyId: number, payload: PushPayload): Promise<void> {
+async function notifyUsersWithRoles(companyId: number, roles: string[], payload: PushPayload): Promise<void> {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
-
-  const managerRoles = ["managing_director", "manager", "receptionist"];
 
   const subs = await db
     .select({
@@ -37,7 +35,7 @@ export async function notifyManagers(companyId: number, payload: PushPayload): P
     .where(
       and(
         eq(pushSubscriptionsTable.companyId, companyId),
-        inArray(usersTable.role, managerRoles),
+        inArray(usersTable.role, roles),
       ),
     );
 
@@ -61,4 +59,14 @@ export async function notifyManagers(companyId: number, payload: PushPayload): P
   if (staleIds.length > 0) {
     await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, staleIds));
   }
+}
+
+/* Operational alerts used by sales, returns, and inventory workflows. */
+export function notifyManagers(companyId: number, payload: PushPayload): Promise<void> {
+  return notifyUsersWithRoles(companyId, ["managing_director", "manager", "receptionist"], payload);
+}
+
+/* Every audited activity is delivered to Managing Directors only. */
+export function notifyManagingDirectors(companyId: number, payload: PushPayload): Promise<void> {
+  return notifyUsersWithRoles(companyId, ["managing_director"], payload);
 }
