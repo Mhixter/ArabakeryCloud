@@ -106,6 +106,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
+  const productKey = (value: string) => value.trim().toLowerCase();
 
   /* Total allocations ever made that are still UNCLEARED (bread currently with suppliers) */
   const allocConds = [
@@ -129,7 +130,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const productionByType = new Map<string, number>();
   for (const b of allProduction) {
-    productionByType.set(b.breadType, (productionByType.get(b.breadType) ?? 0) + b.quantityProduced - b.wasteQuantity);
+    const key = productKey(b.breadType);
+    productionByType.set(key, (productionByType.get(key) ?? 0) + b.quantityProduced - b.wasteQuantity);
   }
 
   /* Split sales: direct (non-supplier staff sell from store) vs supplier (sell from their allocation) */
@@ -137,11 +139,12 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
   for (const { sale: s, cashierRole } of allSalesEver) {
-    allSalesByType.set(s.breadType, (allSalesByType.get(s.breadType) ?? 0) + s.quantity);
+    const key = productKey(s.breadType);
+    allSalesByType.set(key, (allSalesByType.get(key) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
-      supplierSalesByType.set(s.breadType, (supplierSalesByType.get(s.breadType) ?? 0) + s.quantity);
+      supplierSalesByType.set(key, (supplierSalesByType.get(key) ?? 0) + s.quantity);
     } else {
-      directSalesByType.set(s.breadType, (directSalesByType.get(s.breadType) ?? 0) + s.quantity);
+      directSalesByType.set(key, (directSalesByType.get(key) ?? 0) + s.quantity);
     }
   }
 
@@ -150,28 +153,31 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const damagedByType    = new Map<string, number>();
   const allReturnsByType = new Map<string, number>(); // all approved returns (restorable + damaged)
   for (const r of allReturns) {
-    allReturnsByType.set(r.breadType, (allReturnsByType.get(r.breadType) ?? 0) + r.quantity);
+    const key = productKey(r.breadType);
+    allReturnsByType.set(key, (allReturnsByType.get(key) ?? 0) + r.quantity);
     if (RESTORABLE.includes(r.reason)) {
-      restorableByType.set(r.breadType, (restorableByType.get(r.breadType) ?? 0) + r.quantity);
+      restorableByType.set(key, (restorableByType.get(key) ?? 0) + r.quantity);
     } else if (DAMAGED.includes(r.reason)) {
-      damagedByType.set(r.breadType, (damagedByType.get(r.breadType) ?? 0) + r.quantity);
+      damagedByType.set(key, (damagedByType.get(key) ?? 0) + r.quantity);
     }
   }
 
   const totalAllocatedByType = new Map<string, number>();
   for (const a of activeAllocations) {
-    totalAllocatedByType.set(a.breadType, (totalAllocatedByType.get(a.breadType) ?? 0) + a.quantity);
+    const key = productKey(a.breadType);
+    totalAllocatedByType.set(key, (totalAllocatedByType.get(key) ?? 0) + a.quantity);
   }
 
   const remaining = activeProducts.map(p => {
-    const produced      = productionByType.get(p.name) ?? 0;
-    const totalAllocated = totalAllocatedByType.get(p.name) ?? 0;
-    const directSold    = directSalesByType.get(p.name) ?? 0;
-    const supplierSold  = supplierSalesByType.get(p.name) ?? 0;
-    const restored      = restorableByType.get(p.name) ?? 0;
-    const damaged       = damagedByType.get(p.name) ?? 0;
-    const allReturned   = allReturnsByType.get(p.name) ?? 0;
-    const totalSold     = allSalesByType.get(p.name) ?? 0;
+    const key = productKey(p.name);
+    const produced      = productionByType.get(key) ?? 0;
+    const totalAllocated = totalAllocatedByType.get(key) ?? 0;
+    const directSold    = directSalesByType.get(key) ?? 0;
+    const supplierSold  = supplierSalesByType.get(key) ?? 0;
+    const restored      = restorableByType.get(key) ?? 0;
+    const damaged       = damagedByType.get(key) ?? 0;
+    const allReturned   = allReturnsByType.get(key) ?? 0;
+    const totalSold     = allSalesByType.get(key) ?? 0;
 
     /*
      * Bread flow:
