@@ -1,0 +1,67 @@
+2026-08-20T03:05:46.037136193Z ==> Running build command 'npm ci --include=dev && npm run build'...
+2026-08-20T03:05:48.43314017Z 
+2026-08-20T03:05:48.433157488Z added 175 packages, and audited 179 packages in 2s
+2026-08-20T03:05:48.433169013Z 
+2026-08-20T03:05:48.433180654Z 35 packages are looking for funding
+2026-08-20T03:05:48.433186888Z   run `npm fund` for details
+2026-08-20T03:05:48.441026972Z 
+2026-08-20T03:05:48.441044006Z 4 moderate severity vulnerabilities
+2026-08-20T03:05:48.441045934Z 
+2026-08-20T03:05:48.441047812Z To address all issues (including breaking changes), run:
+2026-08-20T03:05:48.441049485Z   npm audit fix --force
+2026-08-20T03:05:48.44105072Z 
+2026-08-20T03:05:48.441052463Z Run `npm audit` for details.
+2026-08-20T03:05:48.583759002Z 
+2026-08-20T03:05:48.583787557Z > @workspace/api-server@0.0.0 build
+2026-08-20T03:05:48.58379142Z > node ./build.mjs
+2026-08-20T03:05:48.583793634Z 
+2026-08-20T03:05:49.231753364Z 
+2026-08-20T03:05:49.231770525Z   dist/index.mjs                       2.6mb ⚠️
+2026-08-20T03:05:49.231772848Z   dist/pino-worker.mjs               150.3kb
+2026-08-20T03:05:49.23177424Z   dist/pino-file.mjs                 139.2kb
+2026-08-20T03:05:49.231775693Z   dist/pino-pretty.mjs               111.3kb
+2026-08-20T03:05:49.231777234Z   dist/thread-stream-worker.mjs        7.0kb
+2026-08-20T03:05:49.23177876Z   dist/index.mjs.map                   4.6mb
+2026-08-20T03:05:49.231780043Z   dist/pino-worker.mjs.map           255.6kb
+2026-08-20T03:05:49.23178167Z   dist/pino-file.mjs.map             227.9kb
+2026-08-20T03:05:49.231782946Z   dist/pino-pretty.mjs.map           201.9kb
+2026-08-20T03:05:49.231784218Z   dist/thread-stream-worker.mjs.map   11.9kb
+2026-08-20T03:05:49.231785328Z 
+2026-08-20T03:05:49.231787039Z ⚡ Done in 589ms
+2026-08-20T03:05:50.895553829Z ==> Uploading build...
+2026-08-20T03:05:54.803170065Z ==> Uploaded in 2.6s. Compression took 1.3s
+2026-08-20T03:05:54.804635393Z ==> Build successful 🎉
+2026-08-20T03:05:55.770849514Z ==> Deploying...
+2026-08-20T03:05:55.887914884Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-08-20T03:06:02.511377578Z ==> Running 'NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs'
+2026-08-20T03:06:02.865359953Z node:internal/modules/cjs/loader:1210
+2026-08-20T03:06:02.865376283Z   throw err;
+2026-08-20T03:06:02.865380493Z   ^
+2026-08-20T03:06:02.865383484Z 
+2026-08-20T03:06:02.865387404Z Error: Cannot find module '/opt/render/project/src/artifacts/api-server/artifacts/api-server/dist/index.mjs'
+2026-08-20T03:06:02.865391354Z     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-08-20T03:06:02.865395174Z     at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-08-20T03:06:02.865398954Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2026-08-20T03:06:02.865482056Z     at node:internal/main/run_main_module:28:49 {
+2026-08-20T03:06:02.865488526Z   code: 'MODULE_NOT_FOUND',
+2026-08-20T03:06:02.865492546Z   requireStack: []
+2026-08-20T03:06:02.865495616Z }
+2026-08-20T03:06:02.865521547Z 
+2026-08-20T03:06:02.865524807Z Node.js v20.20.2
+2026-08-20T03:06:04.815705926Z ==> Exited with status 1
+2026-08-20T03:06:04.820163059Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2026-08-20T03:06:05.807328738Z ==> Running 'NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs'
+2026-08-20T03:06:05.846328414Z node:internal/modules/cjs/loader:1210
+2026-08-20T03:06:05.846352975Z   throw err;
+2026-08-20T03:06:05.846356335Z   ^
+2026-08-20T03:06:05.846359005Z 
+2026-08-20T03:06:05.846362945Z Error: Cannot find module '/opt/render/project/src/artifacts/api-server/artifacts/api-server/dist/index.mjs'
+2026-08-20T03:06:05.846366765Z     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-08-20T03:06:05.846370925Z     at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-08-20T03:06:05.846374725Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2026-08-20T03:06:05.846385556Z     at node:internal/main/run_main_module:28:49 {
+2026-08-20T03:06:05.846389656Z   code: 'MODULE_NOT_FOUND',
+2026-08-20T03:06:05.846393766Z   requireStack: []
+2026-08-20T03:06:05.846396776Z }
+2026-08-20T03:06:05.846407126Z 
+2026-08-20T03:06:05.846410256Z Node.js v20.20.2
