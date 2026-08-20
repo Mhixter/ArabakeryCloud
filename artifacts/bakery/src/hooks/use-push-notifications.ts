@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -15,18 +13,22 @@ export function usePushNotifications() {
   const [permission, setPermission] = useState<PushPermission>("default");
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
 
   const isSupported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    !!VAPID_PUBLIC_KEY;
+    "PushManager" in window;
 
   useEffect(() => {
     if (!isSupported) {
       setPermission("unsupported");
       return;
     }
+    fetch("/api/push/vapid-public-key")
+      .then(response => response.ok ? response.json() : null)
+      .then(data => setVapidPublicKey(data?.publicKey ?? null))
+      .catch(() => setVapidPublicKey(null));
     setPermission(Notification.permission as PushPermission);
 
     navigator.serviceWorker.ready.then(async (reg) => {
@@ -36,7 +38,7 @@ export function usePushNotifications() {
   }, [isSupported]);
 
   const subscribe = useCallback(async () => {
-    if (!isSupported || !VAPID_PUBLIC_KEY) return;
+    if (!isSupported || !vapidPublicKey) return;
     setLoading(true);
     try {
       const perm = await Notification.requestPermission();
@@ -46,7 +48,7 @@ export function usePushNotifications() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
 
       const token = localStorage.getItem("nmb_token");
@@ -65,7 +67,7 @@ export function usePushNotifications() {
     } finally {
       setLoading(false);
     }
-  }, [isSupported]);
+  }, [isSupported, vapidPublicKey]);
 
   const unsubscribe = useCallback(async () => {
     if (!isSupported) return;
