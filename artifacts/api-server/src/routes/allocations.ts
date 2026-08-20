@@ -1,7 +1,7 @@
 import { Router, IRouter } from "express";
 import {
   db, sellerAllocationsTable, usersTable, branchesTable,
-  salesTable, productionBatchesTable, productsTable,
+  salesTable, productionBatchesTable, productsTable, productReturnsTable,
 } from "@workspace/db";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
@@ -135,21 +135,38 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     if (!seller) { res.status(404).json({ error: "Supplier not found" }); return; }
     if (seller.role !== "supplier") { res.status(400).json({ error: "Selected user is not a supplier" }); return; }
 
-    /* Resolve branchId: explicit body > seller's branch > issuer's branch */
-    const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId;
+    /* Resolve branchId: explicit body > seller's branch > issuer's branch > company default */
+    const [defaultBranch] = await db
+      .select({ id: branchesTable.id })
+      .from(branchesTable)
+      .where(eq(branchesTable.companyId, companyId))
+      .limit(1);
+    const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId ?? defaultBranch?.id;
     if (!branchId) { res.status(400).json({ error: "branchId could not be determined — please select a branch" }); return; }
 
-    /* Stock check: produced - sold - uncleared allocated */
-    const [production, sales, existingAllocations] = await Promise.all([
+    /*
+     * Stock check mirrors the product dashboard:
+     * in-store = net produced + restorable returns - direct sales - uncleared allocations.
+     * Supplier sales are already part of allocated stock and must not reduce store stock.
+     */
+    const [production, sales, existingAllocations, approvedReturns] = await Promise.all([
       db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.breadType, breadType), isNull(productionBatchesTable.deletedAt))),
-      db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
+      db.select({ sale: salesTable, cashierRole: usersTable.role })
+        .from(salesTable)
+        .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+        .where(and(eq(salesTable.companyId, companyId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
       db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
+      db.select().from(productReturnsTable).where(and(eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.breadType, breadType), eq(productReturnsTable.status, "approved" as const))),
     ]);
 
     const totalProduced = production.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
-    const totalSold = sales.reduce((s, s2) => s + s2.quantity, 0);
+    const directSold = sales.reduce((s, { sale, cashierRole }) => s + (cashierRole === "supplier" ? 0 : sale.quantity), 0);
     const totalAllocated = existingAllocations.reduce((s, a) => s + a.quantity, 0);
-    const remaining = totalProduced - totalSold - totalAllocated;
+    const restorableReturned = approvedReturns.reduce(
+      (sum, r) => sum + (["not_sold", "wrong_item", "other"].includes(r.reason) ? r.quantity : 0),
+      0,
+    );
+    const remaining = totalProduced + restorableReturned - directSold - totalAllocated;
 
     if (parseInt(quantity) > remaining) {
       res.status(400).json({
