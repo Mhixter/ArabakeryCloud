@@ -134,13 +134,13 @@ export function SettleSupplierDialog({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({
-           sellerId: selectedSellerId || sellerId,
+         body: JSON.stringify({
+          sellerId: selectedSellerId || sellerId,
           amountSettled: parsedAmount,
           paymentMethod,
           notes: notes.trim() || undefined,
           branchId: branchId || undefined,
-           allocationIds: directAllocations.length > 0 ? uncleared.map(a => a.id) : undefined,
+          allocationIds: directAllocations.length > 0 ? uncleared.map(a => a.id) : undefined,
         }),
       });
 
@@ -187,7 +187,7 @@ export function SettleSupplierDialog({
           {/* Allocated Products Breakdown */}
           <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <span>{allocationDate ? `Allocated on ${allocationDate}` : "Allocated Bread"}</span>
+              <span>{allocationDate ? `Allocated on ${allocationDate}` : "Allocated Bread"}</span>
               <span>{totalUnits} Units Total</span>
             </div>
 
