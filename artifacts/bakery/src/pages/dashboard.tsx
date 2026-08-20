@@ -880,6 +880,7 @@ function ManagerDashboard() {
     agentId?: string | null;
     branchId?: number | null;
     branchName?: string | null;
+    allocationDate?: string | null;
     allocations: SupplierAllocationItem[];
   }>({
     open: false,
@@ -943,7 +944,8 @@ function ManagerDashboard() {
   const periodData = data ? (period === "date" ? data["today"] : data[period]) : null;
   const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : customDate ? format(new Date(customDate + "T12:00:00"), "d MMM yyyy") : "Selected Date";
 
-  // Group uncleared allocations by supplier
+  // Group allocations by supplier. Keep settled rows in the group so the
+  // dashboard can show date history while only outstanding dates are actions.
   const supplierUnclearedMap = new Map<number, {
     sellerId: number;
     sellerName: string;
@@ -953,7 +955,7 @@ function ManagerDashboard() {
   }>();
 
   for (const alloc of allocations) {
-    if (!alloc.isCleared && alloc.sellerId) {
+    if (alloc.sellerId) {
       const prev = supplierUnclearedMap.get(alloc.sellerId) ?? {
         sellerId: alloc.sellerId,
         sellerName: alloc.sellerName,
@@ -966,7 +968,8 @@ function ManagerDashboard() {
     }
   }
 
-  const activeSupplierGroups = Array.from(supplierUnclearedMap.values());
+  const activeSupplierGroups = Array.from(supplierUnclearedMap.values())
+    .filter(group => group.allocations.some(alloc => !alloc.isCleared));
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
@@ -1093,62 +1096,78 @@ function ManagerDashboard() {
           ) : (
             <div className="divide-y divide-border/50">
               {activeSupplierGroups.map(group => {
-                const totalUnits = group.allocations.reduce((s, a) => s + a.quantity, 0);
-                const byType = new Map<string, number>();
-                for (const a of group.allocations) {
-                  byType.set(a.breadType, (byType.get(a.breadType) ?? 0) + a.quantity);
-                }
-                const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => {
-                  const price = productPrices.get(bt) ?? 0;
-                  return s + price * qty;
-                }, 0);
-
-                const breadSummary = Array.from(byType.entries())
-                  .map(([bt, qty]) => `${qty}× ${bt}`)
-                  .join(", ");
-
                 return (
-                  <div key={group.sellerId} className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="w-9 h-9 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div key={group.sellerId} className="px-4 py-3.5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center flex-shrink-0">
                         <Users size={16} />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
-                          <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300">
-                            {totalUnits} units in hand
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {breadSummary}
-                        </p>
-                        {totalValue > 0 && (
-                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                            Estimated Value: ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
-                          </p>
-                        )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                        <p className="text-xs text-muted-foreground">{group.branchName || "All branches"}</p>
                       </div>
+                      <Badge variant="outline" className="ml-auto text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                        {group.allocations.filter(a => !a.isCleared).reduce((s, a) => s + a.quantity, 0)} units outstanding
+                      </Badge>
                     </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 h-8 text-xs shadow-sm"
-                        onClick={() => {
-                          setSettleDialog({
-                            open: true,
-                            sellerId: group.sellerId,
-                            sellerName: group.sellerName,
-                            branchId: group.branchId,
-                            branchName: group.branchName,
-                            allocations: group.allocations,
-                          });
-                        }}
-                      >
-                        <HandCoins size={14} />
-                        Settled
-                      </Button>
+                    <div className="space-y-2">
+                      {Array.from(
+                        group.allocations.reduce((dates, allocation) => {
+                          const key = toLocalDateStr(new Date(allocation.allocationDate));
+                          const dateRows = dates.get(key) ?? [];
+                          dateRows.push(allocation);
+                          dates.set(key, dateRows);
+                          return dates;
+                        }, new Map<string, any[]>())
+                      ).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, dateAllocations]) => {
+                        const activeDateAllocations = dateAllocations.filter(a => !a.isCleared);
+                        const totalUnits = dateAllocations.reduce((s, a) => s + a.quantity, 0);
+                        const outstandingUnits = activeDateAllocations.reduce((s, a) => s + a.quantity, 0);
+                        const byType = dateAllocations.reduce((map, a) => {
+                          map.set(a.breadType, (map.get(a.breadType) ?? 0) + a.quantity);
+                          return map;
+                        }, new Map<string, number>());
+                        const totalValue = Array.from(byType.entries()).reduce((s, [bt, qty]) => s + (productPrices.get(bt) ?? 0) * qty, 0);
+                        return (
+                          <div key={dateKey} className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold">{format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy")}</p>
+                                  {activeDateAllocations.length === 0 ? (
+                                    <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">Settled</Badge>
+                                  ) : (
+                                    <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">Outstanding</Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {Array.from(byType.entries()).map(([bt, qty]) => `${qty}× ${bt}`).join(", ")}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {totalUnits} units{totalValue > 0 ? ` · Estimated ₦${totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}` : ""}
+                                </p>
+                              </div>
+                              {activeDateAllocations.length > 0 && (
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 h-8 text-xs shadow-sm flex-shrink-0"
+                                  onClick={() => setSettleDialog({
+                                    open: true,
+                                    sellerId: group.sellerId,
+                                    sellerName: group.sellerName,
+                                    branchId: group.branchId,
+                                    branchName: group.branchName,
+                                    allocationDate: format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy"),
+                                    allocations: activeDateAllocations,
+                                  })}
+                                >
+                                  <HandCoins size={14} /> Settle Date
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1289,6 +1308,7 @@ function ManagerDashboard() {
         agentId={settleDialog.agentId}
         branchId={settleDialog.branchId}
         branchName={settleDialog.branchName}
+        allocationDate={settleDialog.allocationDate}
         allocations={settleDialog.allocations}
         productPrices={productPrices}
         onSettled={() => {

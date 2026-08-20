@@ -25,6 +25,7 @@ export interface SettleSupplierDialogProps {
   agentId?: string | null;
   branchId?: number | null;
   branchName?: string | null;
+  allocationDate?: string | null;
   allocations: SupplierAllocationItem[];
   allAllocations?: any[];
   availableSellers?: { id: number; fullName: string; agentId?: string | null; branchId?: number | null; branchName?: string | null }[];
@@ -40,6 +41,7 @@ export function SettleSupplierDialog({
   agentId: initialAgentId,
   branchId: initialBranchId,
   branchName: initialBranchName,
+  allocationDate,
   allocations: directAllocations,
   allAllocations = [],
   availableSellers = [],
@@ -133,11 +135,12 @@ export function SettleSupplierDialog({
         },
         credentials: "include",
         body: JSON.stringify({
-          sellerId,
+           sellerId: selectedSellerId || sellerId,
           amountSettled: parsedAmount,
           paymentMethod,
           notes: notes.trim() || undefined,
           branchId: branchId || undefined,
+           allocationIds: directAllocations.length > 0 ? uncleared.map(a => a.id) : undefined,
         }),
       });
 
@@ -184,7 +187,7 @@ export function SettleSupplierDialog({
           {/* Allocated Products Breakdown */}
           <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              <span>Allocated Bread</span>
+                <span>{allocationDate ? `Allocated on ${allocationDate}` : "Allocated Bread"}</span>
               <span>{totalUnits} Units Total</span>
             </div>
 

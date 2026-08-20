@@ -3,7 +3,7 @@ import {
   db, sellerAllocationsTable, usersTable, branchesTable,
   salesTable, productionBatchesTable, productsTable,
 } from "@workspace/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import crypto from "crypto";
@@ -312,7 +312,7 @@ router.post("/allocations/clear-supplier", authenticate, requireRole("managing_d
 router.post("/allocations/settle-supplier", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId, companyId, branchId: userBranchId } = req.user!;
-    const { sellerId, amountSettled, paymentMethod = "cash", notes, branchId: bodyBranchId } = req.body;
+    const { sellerId, amountSettled, paymentMethod = "cash", notes, branchId: bodyBranchId, allocationIds } = req.body;
 
     if (!sellerId) {
       res.status(400).json({ error: "sellerId is required" });
@@ -322,6 +322,14 @@ router.post("/allocations/settle-supplier", authenticate, requireRole("managing_
     const sid = parseInt(sellerId, 10);
     if (isNaN(sid)) {
       res.status(400).json({ error: "Invalid sellerId" });
+      return;
+    }
+
+    const requestedAllocationIds = Array.isArray(allocationIds)
+      ? [...new Set(allocationIds.map((value: unknown) => Number(value)).filter((value: number) => Number.isInteger(value) && value > 0))]
+      : null;
+    if (Array.isArray(allocationIds) && requestedAllocationIds?.length === 0) {
+      res.status(400).json({ error: "allocationIds must contain at least one valid allocation ID" });
       return;
     }
 
@@ -335,19 +343,28 @@ router.post("/allocations/settle-supplier", authenticate, requireRole("managing_
       return;
     }
 
-    // Find all active uncleared allocations for this supplier
-    const activeAllocations = await db
-      .select()
-      .from(sellerAllocationsTable)
-      .where(and(
+    // Find active uncleared allocations for this supplier. When allocationIds
+    // are supplied, settlement is limited to the selected allocation date/group.
+    const allocationConditions = [
         eq(sellerAllocationsTable.sellerId, sid),
         eq(sellerAllocationsTable.companyId, companyId),
         isNull(sellerAllocationsTable.deletedAt),
         eq(sellerAllocationsTable.isCleared, false),
-      ));
+      ] as Parameters<typeof and>[0][];
+    if (requestedAllocationIds) {
+      allocationConditions.push(inArray(sellerAllocationsTable.id, requestedAllocationIds));
+    }
+    const activeAllocations = await db
+      .select()
+      .from(sellerAllocationsTable)
+      .where(and(...allocationConditions));
 
     if (activeAllocations.length === 0) {
       res.status(400).json({ error: "No active uncleared allocations found for this supplier" });
+      return;
+    }
+    if (requestedAllocationIds && activeAllocations.length !== requestedAllocationIds.length) {
+      res.status(409).json({ error: "One or more selected allocations are already settled or unavailable. Refresh and try again." });
       return;
     }
 
@@ -390,64 +407,63 @@ router.post("/allocations/settle-supplier", authenticate, requireRole("managing_
     const [directorUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
     const directorName = directorUser?.fullName ?? "Managing Director";
 
-    const createdSales = [];
-    const now = new Date();
+    const { createdSales, now } = await db.transaction(async (tx) => {
+      const createdSales = [];
+      const now = new Date();
 
-    // Create sales records for each bread type
-    for (const [breadType, data] of byBreadType.entries()) {
-      const standardPrice = priceMap.get(breadType) ?? 0;
-      let itemTotalAmount: number;
-      let itemPricePerUnit: number;
+      // Create sales records for each bread type
+      for (const [breadType, data] of byBreadType.entries()) {
+        const standardPrice = priceMap.get(breadType) ?? 0;
+        let itemTotalAmount: number;
+        let itemPricePerUnit: number;
 
-      if (parsedAmountSettled !== null && calculatedStandardTotal > 0) {
-        // Proportionally scale the amount settled if custom total provided
-        const proportion = (standardPrice * data.quantity) / calculatedStandardTotal;
-        itemTotalAmount = Math.round(finalTotalAmount * proportion * 100) / 100;
-        itemPricePerUnit = data.quantity > 0 ? Math.round((itemTotalAmount / data.quantity) * 100) / 100 : standardPrice;
-      } else if (parsedAmountSettled !== null && calculatedStandardTotal === 0 && totalAllocatedUnits > 0) {
-        itemTotalAmount = Math.round((finalTotalAmount * (data.quantity / totalAllocatedUnits)) * 100) / 100;
-        itemPricePerUnit = data.quantity > 0 ? Math.round((itemTotalAmount / data.quantity) * 100) / 100 : 0;
-      } else {
-        itemPricePerUnit = standardPrice;
-        itemTotalAmount = standardPrice * data.quantity;
+        if (parsedAmountSettled !== null && calculatedStandardTotal > 0) {
+          // Proportionally scale the amount settled if custom total provided
+          const proportion = (standardPrice * data.quantity) / calculatedStandardTotal;
+          itemTotalAmount = Math.round(finalTotalAmount * proportion * 100) / 100;
+          itemPricePerUnit = data.quantity > 0 ? Math.round((itemTotalAmount / data.quantity) * 100) / 100 : standardPrice;
+        } else if (parsedAmountSettled !== null && calculatedStandardTotal === 0 && totalAllocatedUnits > 0) {
+          itemTotalAmount = Math.round((finalTotalAmount * (data.quantity / totalAllocatedUnits)) * 100) / 100;
+          itemPricePerUnit = data.quantity > 0 ? Math.round((itemTotalAmount / data.quantity) * 100) / 100 : 0;
+        } else {
+          itemPricePerUnit = standardPrice;
+          itemTotalAmount = standardPrice * data.quantity;
+        }
+
+        const effectiveBranchId = (bodyBranchId ? parseInt(bodyBranchId, 10) : null) || data.branchId || seller.branchId || userBranchId || 1;
+        const receiptNumber = generateReceiptNumber();
+
+        const [sale] = await tx.insert(salesTable).values({
+          companyId,
+          receiptNumber,
+          breadType,
+          quantity: data.quantity,
+          pricePerUnit: itemPricePerUnit.toFixed(2),
+          totalAmount: itemTotalAmount.toFixed(2),
+          costAmount: "0",
+          profitAmount: itemTotalAmount.toFixed(2),
+          paymentMethod: pm,
+          cashierId: sid, // Credited to the supplier!
+          branchId: effectiveBranchId,
+          notes: notes ? `[Settled by ${directorName}] ${notes}` : `Settled by ${directorName}`,
+          saleDate: now,
+        }).returning();
+
+        createdSales.push(sale);
       }
 
-      const effectiveBranchId = (bodyBranchId ? parseInt(bodyBranchId, 10) : null) || data.branchId || seller.branchId || userBranchId || 1;
-      const receiptNumber = generateReceiptNumber();
+      // Mark exactly the selected active allocations as cleared.
+      await tx
+        .update(sellerAllocationsTable)
+        .set({
+          isCleared: true,
+          clearedAt: now,
+          clearedById: userId,
+        })
+        .where(and(...allocationConditions));
 
-      const [sale] = await db.insert(salesTable).values({
-        companyId,
-        receiptNumber,
-        breadType,
-        quantity: data.quantity,
-        pricePerUnit: itemPricePerUnit.toFixed(2),
-        totalAmount: itemTotalAmount.toFixed(2),
-        costAmount: "0",
-        profitAmount: itemTotalAmount.toFixed(2),
-        paymentMethod: pm,
-        cashierId: sid, // Credited to the supplier!
-        branchId: effectiveBranchId,
-        notes: notes ? `[Settled by ${directorName}] ${notes}` : `Settled by ${directorName}`,
-        saleDate: now,
-      }).returning();
-
-      createdSales.push(sale);
-    }
-
-    // Mark allocations as cleared
-    await db
-      .update(sellerAllocationsTable)
-      .set({
-        isCleared: true,
-        clearedAt: now,
-        clearedById: userId,
-      })
-      .where(and(
-        eq(sellerAllocationsTable.sellerId, sid),
-        eq(sellerAllocationsTable.companyId, companyId),
-        isNull(sellerAllocationsTable.deletedAt),
-        eq(sellerAllocationsTable.isCleared, false),
-      ));
+      return { createdSales, now };
+    });
 
     await logAudit({
       req,
@@ -455,7 +471,7 @@ router.post("/allocations/settle-supplier", authenticate, requireRole("managing_
       companyId,
       action: "SUPPLIER_SETTLED",
       entityType: "supplier_settlement",
-      details: `Settled ${totalAllocatedUnits} units (₦${finalTotalAmount.toLocaleString()}) for supplier ${seller.fullName} by ${directorName}`,
+      details: `Settled ${totalAllocatedUnits} units (₦${finalTotalAmount.toLocaleString()})${requestedAllocationIds ? " for selected allocation date" : ""} for supplier ${seller.fullName} by ${directorName}`,
       branchId: seller.branchId ?? userBranchId ?? undefined,
     });
 
