@@ -135,11 +135,11 @@ export function SettleSupplierDialog({
         },
         credentials: "include",
          body: JSON.stringify({
-          sellerId: selectedSellerId || sellerId,
+          sellerId: selectedSellerId || initialSellerId,
           amountSettled: parsedAmount,
           paymentMethod,
           notes: notes.trim() || undefined,
-          branchId: branchId || undefined,
+          branchId: effectiveBranchId || undefined,
           allocationIds: directAllocations.length > 0 ? uncleared.map(a => a.id) : undefined,
         }),
       });
@@ -152,7 +152,7 @@ export function SettleSupplierDialog({
 
       toast({
         title: "Settlement Complete!",
-        description: `₦${parsedAmount.toLocaleString("en-NG")} credited to sales and ${totalUnits} units cleared for ${sellerName}.`,
+        description: `₦${parsedAmount.toLocaleString("en-NG")} credited to sales and ${totalUnits} units cleared for ${effectiveSellerName}.`,
       });
 
       onSettled(data);
@@ -175,9 +175,9 @@ export function SettleSupplierDialog({
             <div>
               <DialogTitle className="text-lg font-bold">Settle Supplier</DialogTitle>
               <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{sellerName}</span>
-                {agentId ? ` (${agentId})` : ""}
-                {branchName ? ` · ${branchName}` : ""}
+                <span className="font-semibold text-foreground">{effectiveSellerName}</span>
+                {effectiveAgentId ? ` (${effectiveAgentId})` : ""}
+                {effectiveBranchName ? ` · ${effectiveBranchName}` : ""}
               </p>
             </div>
           </div>
@@ -308,7 +308,7 @@ export function SettleSupplierDialog({
           <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 p-3 text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2.5">
             <PackageCheck size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
             <p>
-              Confirming this will record <strong>₦{parsedAmount.toLocaleString("en-NG")}</strong> in total sales credited to <span className="font-semibold">{sellerName}</span> and immediately clear <strong>{totalUnits} units</strong> from "With Suppliers".
+              Confirming this will record <strong>₦{parsedAmount.toLocaleString("en-NG")}</strong> in total sales credited to <span className="font-semibold">{effectiveSellerName}</span> and immediately clear <strong>{totalUnits} units</strong> from "With Suppliers".
             </p>
           </div>
 
