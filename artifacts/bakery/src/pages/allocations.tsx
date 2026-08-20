@@ -384,6 +384,7 @@ export default function AllocationsPage() {
     agentId?: string | null;
     branchId?: number | null;
     branchName?: string | null;
+    allocationDate?: string | null;
     allocations: SupplierAllocationItem[];
   }>({
     open: false,
@@ -528,10 +529,11 @@ export default function AllocationsPage() {
   return (
     <div className="space-y-6" data-testid="page-allocations">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="rounded-2xl bg-slate-950 text-white px-5 py-5 sm:px-6 sm:py-6 shadow-lg shadow-slate-950/10 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Allocations</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300 font-semibold mb-1">Inventory control</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Supplier allocations</h1>
+          <p className="text-slate-300 text-sm mt-1">
             {isSeller ? "Bread allocated to you — return unsold stock here" : "Bread issued to field suppliers"}
           </p>
         </div>
@@ -543,7 +545,7 @@ export default function AllocationsPage() {
             </Button>
           )}
           {canCreate && (
-            <Button size="sm" onClick={() => setShowForm(true)}>
+            <Button size="sm" className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold" onClick={() => setShowForm(true)}>
               <Plus size={14} className="mr-1.5" />
               New Allocation
             </Button>
@@ -552,11 +554,11 @@ export default function AllocationsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-1 rounded-xl bg-muted/70 p-1 w-fit">
         {(["allocations", "returns"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors capitalize ${
-              tab === t ? "bg-amber-400 text-slate-950" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors capitalize ${
+              tab === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}>
             {t === "allocations" ? "Allocations" : "Returns"}
             {t === "returns" && pendingReturns.length > 0 && (
@@ -568,17 +570,25 @@ export default function AllocationsPage() {
 
       {/* Summary cards */}
       {tab === "allocations" && !loading && allocations.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="rounded-2xl border-0 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="rounded-2xl border border-border/70 shadow-sm bg-card">
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-muted-foreground mb-1">Total Allocations</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Allocation records</p>
               <p className="text-2xl font-bold tracking-tight">{allocations.length}</p>
             </CardContent>
           </Card>
-          <Card className="rounded-2xl border-0 shadow-sm">
+          <Card className="rounded-2xl border border-border/70 shadow-sm bg-card">
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-muted-foreground mb-1">Total Units</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Units allocated</p>
               <p className="text-2xl font-bold tracking-tight">{totalQty}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-amber-200 bg-amber-50/70 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Outstanding units</p>
+              <p className="text-2xl font-bold tracking-tight text-amber-950">
+                {allocations.filter(a => !a.isCleared).reduce((s, a) => s + a.quantity, 0)}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -903,85 +913,83 @@ export default function AllocationsPage() {
                         a.allocationDate > latest ? a.allocationDate : latest, group.allocations[0]?.allocationDate ?? "");
 
                       return (
-                        <button
+                        <div
                           key={group.sellerName}
-                          className="w-full px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors text-left flex items-center gap-3"
+                          className="w-full px-4 py-4 hover:bg-muted/20 transition-colors text-left"
                           onClick={() => setSelectedSeller(group.sellerName)}
+                          role="button"
+                          tabIndex={0}
                         >
-                          {/* Avatar */}
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isFullyCleared ? "bg-emerald-100 text-emerald-800" : "bg-slate-950 text-amber-400"}`}>
-                            <Users size={16} />
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
-                              {isFullyCleared ? (
-                                <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">
-                                  All Cleared
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isFullyCleared ? "bg-emerald-100 text-emerald-800" : "bg-slate-950 text-amber-400"}`}>
+                              <Users size={16} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-sm text-foreground truncate">{group.sellerName}</p>
+                                <Badge className={`text-[10px] ${isFullyCleared ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`} variant="outline">
+                                  {isFullyCleared ? "All Cleared" : "With Supplier"}
                                 </Badge>
-                              ) : (
-                                <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200" variant="outline">
-                                  With Supplier
-                                </Badge>
-                              )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {group.branchName && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Building2 size={10} />{group.branchName}</span>}
+                                <span className="text-muted-foreground/40 text-xs">·</span>
+                                <span className="text-xs text-muted-foreground">{isFullyCleared ? "0 active items" : `${productCount} product${productCount !== 1 ? "s" : ""}`}</span>
+                                <span className="text-muted-foreground/40 text-xs">·</span>
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar size={10} />Latest {format(new Date(latestDate), "dd MMM yyyy")}</span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              {group.branchName && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Building2 size={10} />
-                                  {group.branchName}
-                                </span>
-                              )}
-                              <span className="text-muted-foreground/40 text-xs">·</span>
-                              <span className="text-xs text-muted-foreground">
-                                {isFullyCleared ? "0 active items" : `${productCount} product${productCount !== 1 ? "s" : ""}`}
-                              </span>
-                              <span className="text-muted-foreground/40 text-xs">·</span>
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar size={10} />
-                                {format(new Date(latestDate), "dd MMM, HH:mm")}
-                              </span>
+                            <div className="text-right flex-shrink-0">
+                              <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>{isFullyCleared ? "0 units" : `${totalUnits} units`}</p>
+                              {totalValue > 0 && !isFullyCleared && <p className="text-xs text-muted-foreground">₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}</p>}
                             </div>
+                            <ChevronRight size={16} className="text-muted-foreground/50 flex-shrink-0" />
                           </div>
-
-                          {/* Right: totals + Settle button + chevron */}
-                          <div className="flex items-center gap-2.5 flex-shrink-0">
-                            <div className="text-right">
-                              <p className={`font-bold text-sm ${isFullyCleared ? "text-emerald-600" : "text-foreground"}`}>
-                                {isFullyCleared ? "0 units" : `${totalUnits} units`}
-                              </p>
-                              {totalValue > 0 && !isFullyCleared && (
-                                <p className="text-xs text-muted-foreground">
-                                  ₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}
-                                </p>
-                              )}
-                            </div>
-                            {canCreate && !isFullyCleared && (
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1 px-2.5 shadow-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const sid = group.allocations[0]?.sellerId;
-                                  if (sid) {
-                                    setSettleDialog({
-                                      open: true,
-                                      sellerId: sid,
-                                      sellerName: group.sellerName,
-                                      branchName: group.branchName,
-                                      allocations: group.allocations.filter(a => !a.isCleared),
-                                    });
-                                  }
-                                }}
-                              >
-                                <HandCoins size={12} /> Settle
-                              </Button>
-                            )}
-                            <ChevronRight size={16} className="text-muted-foreground/50" />
+                          <div className="mt-3 ml-[52px] grid gap-2">
+                            {Array.from(group.allocations.reduce((dates, allocation) => {
+                              const key = format(new Date(allocation.allocationDate), "yyyy-MM-dd");
+                              dates.set(key, [...(dates.get(key) ?? []), allocation]);
+                              return dates;
+                            }, new Map<string, Allocation[]>())).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, dateAllocations]) => {
+                              const active = dateAllocations.filter(a => !a.isCleared);
+                              const dateUnits = dateAllocations.reduce((s, a) => s + a.quantity, 0);
+                              const dateTypes = Array.from(dateAllocations.reduce((types, a) => {
+                                types.set(a.breadType, (types.get(a.breadType) ?? 0) + a.quantity);
+                                return types;
+                              }, new Map<string, number>()));
+                              return (
+                                <div key={dateKey} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2.5 flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${active.length ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                    <Calendar size={14} />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-semibold">{format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy")}</p>
+                                      <Badge variant="outline" className={`text-[10px] ${active.length ? "text-amber-700 border-amber-200 bg-amber-50" : "text-emerald-700 border-emerald-200 bg-emerald-50"}`}>
+                                        {active.length ? "Outstanding" : "Settled"}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">{dateTypes.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
+                                  </div>
+                                  <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{dateUnits} units</span>
+                                  {canCreate && active.length > 0 && (
+                                    <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(e) => {
+                                      e.stopPropagation();
+                                      const sid = group.allocations[0]?.sellerId;
+                                      if (sid) setSettleDialog({
+                                        open: true, sellerId: sid, sellerName: group.sellerName, branchName: group.branchName,
+                                        allocationDate: format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy"),
+                                        allocations: active,
+                                      });
+                                    }}>
+                                      <HandCoins size={13} /> Settle date
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
