@@ -856,7 +856,7 @@ export default function AllocationsPage() {
                     )}
 
                     {/* Product table */}
-                    <div className="overflow-x-auto">
+                    <div className="hidden overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -918,7 +918,7 @@ export default function AllocationsPage() {
                     </div>
 
                     {/* Individual allocation history for this supplier */}
-                    <div className="border-t border-border/50">
+                    <div className="hidden border-t border-border/50">
                       <p className="px-4 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         Allocation History
                       </p>
