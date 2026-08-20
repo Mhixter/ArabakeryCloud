@@ -1,3 +1,4 @@
 - [PWA SW Strategy](pwa-sw-strategy.md) — switched from generateSW to injectManifest so push events can be handled in a custom src/sw.ts
 - [Offline Conflict Resolution](offline-conflict-resolution.md) — X-Offline-Queued-At header + 409 pattern; IDB conflicts store; forceReplay vs discardConflict
 - [Local-first Offline Mutations](offline-local-first.md) — offline POSTs to sales/production/expenses write to Dexie with syncStatus:'pending'; negative IDs avoid server collision; getPendingLocalCount sums all three tables
+- [Render Forwarded Origins](render-forwarded-origin.md) — same-origin requests may require X-Forwarded-Host or RENDER_EXTERNAL_URL behind Render's proxy
