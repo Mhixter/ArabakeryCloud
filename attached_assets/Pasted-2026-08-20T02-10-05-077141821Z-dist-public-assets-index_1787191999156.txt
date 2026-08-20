@@ -1,0 +1,50 @@
+2026-08-20T02:10:05.077141821Z dist/public/assets/index-CugbpA4J.css             154.89 kB │ gzip:  24.80 kB
+2026-08-20T02:10:05.077180408Z dist/public/assets/purify.es-Cz4mVeUR.js           28.98 kB │ gzip:  10.87 kB
+2026-08-20T02:10:05.07718386Z dist/public/assets/index.es-CVmL0QTE.js           158.91 kB │ gzip:  53.03 kB
+2026-08-20T02:10:05.077274357Z dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+2026-08-20T02:10:05.077277521Z dist/public/assets/index-me2PF75P.js            1,795.71 kB │ gzip: 511.26 kB
+2026-08-20T02:10:05.077315127Z 
+2026-08-20T02:10:05.077317182Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-08-20T02:10:05.077318783Z - Using dynamic import() to code-split the application
+2026-08-20T02:10:05.077320583Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-08-20T02:10:05.077322057Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-08-20T02:10:05.077516233Z ✓ built in 7.25s
+2026-08-20T02:10:05.084503547Z 
+2026-08-20T02:10:05.084508931Z PWA v1.3.0
+2026-08-20T02:10:05.084510922Z Building src/sw.ts service worker ("es" format)...
+2026-08-20T02:10:05.448930329Z vite v7.3.6 building client environment for production...
+2026-08-20T02:10:05.457133951Z transforming...
+2026-08-20T02:10:05.94237317Z ✓ 82 modules transformed.
+2026-08-20T02:10:06.018432999Z rendering chunks...
+2026-08-20T02:10:06.019103908Z computing gzip size...
+2026-08-20T02:10:06.020233428Z dist/public/sw.mjs  26.55 kB │ gzip: 8.65 kB
+2026-08-20T02:10:06.020277691Z ✓ built in 570ms
+2026-08-20T02:10:06.068598396Z 
+2026-08-20T02:10:06.068609914Z PWA v1.3.0
+2026-08-20T02:10:06.068611803Z mode      injectManifest
+2026-08-20T02:10:06.068613158Z format:   es
+2026-08-20T02:10:06.068615397Z precache  14 entries (2306.53 KiB)
+2026-08-20T02:10:06.068616692Z files generated
+2026-08-20T02:10:06.06861821Z   dist/public/sw.js
+2026-08-20T02:10:06.257584194Z 
+2026-08-20T02:10:06.257594726Z > @workspace/api-server@0.0.0 build
+2026-08-20T02:10:06.257596985Z > node ./build.mjs
+2026-08-20T02:10:06.257598278Z 
+2026-08-20T02:10:06.816058706Z 
+2026-08-20T02:10:06.816072846Z   dist/index.mjs                       2.6mb ⚠️
+2026-08-20T02:10:06.816075906Z   dist/pino-worker.mjs               150.3kb
+2026-08-20T02:10:06.816077424Z   dist/pino-file.mjs                 139.2kb
+2026-08-20T02:10:06.816078784Z   dist/pino-pretty.mjs               111.3kb
+2026-08-20T02:10:06.816080115Z   dist/thread-stream-worker.mjs        7.0kb
+2026-08-20T02:10:06.816081411Z   dist/index.mjs.map                   4.6mb
+2026-08-20T02:10:06.816083007Z   dist/pino-worker.mjs.map           255.6kb
+2026-08-20T02:10:06.816084527Z   dist/pino-file.mjs.map             227.9kb
+2026-08-20T02:10:06.816085911Z   dist/pino-pretty.mjs.map           201.9kb
+2026-08-20T02:10:06.816087176Z   dist/thread-stream-worker.mjs.map   11.9kb
+2026-08-20T02:10:06.816088315Z 
+2026-08-20T02:10:06.816089743Z ⚡ Done in 499ms
+2026-08-20T02:10:06.913335109Z ==> Requesting Node.js version 20
+2026-08-20T02:10:07.002362353Z ==> Using Node.js version 20.20.2 via /opt/render/project/src/.node-version
+2026-08-20T02:10:07.002367774Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-08-20T02:10:07.868311341Z ==> Uploading build...
+2026-08-20T02:10:08.008461825Z ==> Your site is live 🎉

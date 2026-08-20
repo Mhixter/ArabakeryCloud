@@ -1,0 +1,201 @@
+Logo
+NEW MODEL BAKERY
+
+NEW MODEL SPECIAL BREAD
+
+
+Dashboard
+
+Sales
+
+Allocations
+
+Production
+
+Products
+
+Inventory
+
+Expenses
+
+Reports
+
+Workers
+
+Users
+
+User Activity
+
+Audit Logs
+
+Settings
+
+Company
+
+Subscription
+MUSTAPHA IBRAHIM
+
+Managing Director
+
+
+
+
+Switch Branch
+
+Sign out
+Allocations
+Bread issued to field suppliers
+
+New Allocation
+Allocations
+Returns
+Total Allocations
+
+118
+
+Total Units
+
+20658
+
+All Allocations
+Bread distributed to suppliers
+Download PDF
+
+ADAMU BARUWA
+
+NEW MODEL SPECIAL BREAD
+
+8482 units
+
+8 products
+
+Product Type	Qty	Unit Price	Total Value	
+NOKIA
+
+Last: 08 Aug 2026, 02:34
+
+4770	₦200.00	₦954,000.00	
+BLACK BERRY
+
+Last: 08 Aug 2026, 02:34
+
+2850	₦400.00	₦1,140,000.00	
+SUPER SPECIAL
+
+Last: 08 Aug 2026, 02:35
+
+300	₦700.00	₦210,000.00	
+NEW SERIES
+
+Last: 08 Aug 2026, 02:15
+
+110	₦1,200.00	₦132,000.00	
+5 IN 1
+
+Last: 08 Aug 2026, 02:14
+
+110	₦1,000.00	₦110,000.00	
+SUPER
+
+Last: 08 Aug 2026, 02:14
+
+300	₦800.00	₦240,000.00	
+RICH TEA
+
+Last: 08 Aug 2026, 02:17
+
+30	₦1,300.00	₦39,000.00	
+RANGLES
+
+Last: 08 Aug 2026, 02:26
+
+12	₦1,700.00	₦20,400.00	
+Total allocation value
+
+8482 units across 8 products
+
+₦2,845,400.00
+
+Allocation History
+
+SUPER SPECIAL
+
+08 Aug 2026, 02:35 · by ADAMU ATTAHIRU
+
+200 units
+BLACK BERRY
+
+08 Aug 2026, 02:34 · by ADAMU ATTAHIRU
+
+150 units
+NOKIA
+
+08 Aug 2026, 02:34 · by ADAMU ATTAHIRU
+
+300 units
+RANGLES
+
+08 Aug 2026, 02:26 · by ADAMU ATTAHIRU
+
+12 units
+RICH TEA
+
+08 Aug 2026, 02:17 · by ADAMU ATTAHIRU
+
+30 units
+NEW SERIES
+
+08 Aug 2026, 02:15 · by ADAMU ATTAHIRU
+
+60 units
+5 IN 1
+
+08 Aug 2026, 02:14 · by ADAMU ATTAHIRU
+
+60 units
+SUPER
+
+08 Aug 2026, 02:14 · by ADAMU ATTAHIRU
+
+100 units
+SUPER
+
+08 Aug 2026, 02:13 · by ADAMU ATTAHIRU
+
+200 units
+BLACK BERRY
+
+08 Aug 2026, 02:13 · by ADAMU ATTAHIRU
+
+1700 units
+NOKIA
+
+08 Aug 2026, 02:12 · by ADAMU ATTAHIRU
+
+2470 units
+5 IN 1
+
+08 Aug 2026, 01:57 · by ADAMU ATTAHIRU
+
+50 units
+NEW SERIES
+
+08 Aug 2026, 01:56 · by ADAMU ATTAHIRU
+
+50 units
+SUPER SPECIAL
+
+08 Aug 2026, 01:56 · by ADAMU ATTAHIRU
+
+100 units
+BLACK BERRY
+
+08 Aug 2026, 01:55 · by ADAMU ATTAHIRU
+
+1000 units
+NOKIA
+
+08 Aug 2026, 01:55 · by ADAMU ATTAHIRU
+
+2000 units
+0
