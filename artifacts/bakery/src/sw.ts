@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
-import { StaleWhileRevalidate, NetworkFirst } from "workbox-strategies";
+import { StaleWhileRevalidate, NetworkFirst, NetworkOnly } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 
@@ -43,6 +43,12 @@ registerRoute(
       new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   }),
+);
+
+registerRoute(
+  ({ request, url }) =>
+    request.method === "GET" && url.pathname === "/api/reports/product-dashboard",
+  new NetworkOnly(),
 );
 
 registerRoute(
