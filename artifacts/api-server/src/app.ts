@@ -31,18 +31,36 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
   .map(o => o.trim())
   .filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        return callback(null, true);
+const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+});
+
+/*
+ * The production SPA and API are served from the same Render host. Browsers
+ * still send an Origin header for some same-origin POSTs, so do not route a
+ * request back through the cross-origin allowlist when its origin matches the
+ * request host. Cross-origin clients remain restricted to CORS_ORIGIN.
+ */
+app.use((req, res, next) => {
+  const origin = req.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).host === req.get("host")) {
+        return next();
       }
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    },
-    credentials: true,
-  }),
-);
+    } catch {
+      // Let the CORS middleware return the normal origin error below.
+    }
+  }
+  return corsMiddleware(req, res, next);
+});
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
