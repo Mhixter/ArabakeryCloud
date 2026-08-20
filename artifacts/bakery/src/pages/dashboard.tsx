@@ -862,6 +862,7 @@ function ManagerDashboard() {
   const [, setLocation] = useLocation();
   const { activeBranch } = useActiveBranch();
   const { canInstall, install, showIosHint } = useInstallPrompt();
+  const isOwner = getStoredUser()?.role === "managing_director";
 
   const [period, setPeriod] = useState<"today" | "week" | "date">("today");
   const [customDate, setCustomDate] = useState<string>("");
@@ -1028,7 +1029,7 @@ function ManagerDashboard() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5 flex items-center justify-between gap-4 shadow-sm">
+      {isOwner && <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5 flex items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center flex-shrink-0">
             <HandCoins size={17} />
@@ -1046,7 +1047,7 @@ function ManagerDashboard() {
           <HandCoins size={14} className="text-amber-400" />
           Open settlements
         </Button>
-      </div>
+      </div>}
 
       {/* Stock at a glance — 4 KPIs */}
       {(() => {
@@ -1084,7 +1085,7 @@ function ManagerDashboard() {
       )}
 
       {/* ── SUPPLIER BALANCES & SETTLEMENT SECTION (Director Action) ── */}
-      <Card id="supplier-settlements" className="rounded-2xl border-0 shadow-sm overflow-hidden scroll-mt-6">
+      {isOwner && <Card id="supplier-settlements" className="rounded-2xl border-0 shadow-sm overflow-hidden scroll-mt-6">
         <CardHeader className="pb-3 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -1195,7 +1196,7 @@ function ManagerDashboard() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Sales by product */}
       <Card className="rounded-2xl border-0 shadow-sm">
