@@ -30,6 +30,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
   .split(",")
   .map(o => o.trim())
   .filter(Boolean);
+const deploymentOrigin = process.env.RENDER_EXTERNAL_URL?.replace(/\/+$/, "");
 
 const corsMiddleware = cors({
   origin: (origin, callback) => {
@@ -52,7 +53,13 @@ app.use((req, res, next) => {
   const origin = req.get("origin");
   if (origin) {
     try {
-      if (new URL(origin).host === req.get("host")) {
+      const originUrl = new URL(origin);
+      const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+      const requestHosts = [req.get("host"), forwardedHost].filter(Boolean);
+      if (
+        origin === deploymentOrigin ||
+        requestHosts.some(host => originUrl.host === host)
+      ) {
         return next();
       }
     } catch {
