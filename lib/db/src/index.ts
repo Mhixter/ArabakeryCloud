@@ -6,11 +6,23 @@ const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
 let db: any;
+let schemaReady: Promise<void> = Promise.resolve();
 
 try {
   if (process.env.DATABASE_URL) {
     pool = new Pool({ connectionString: process.env.DATABASE_URL });
     db = drizzle(pool, { schema });
+    /*
+     * Render uses the existing Neon database without an automatic Drizzle
+     * migration step. Keep this additive and idempotent so older deployments
+     * receive the settlement fields without changing existing allocation rows.
+    */
+    schemaReady = pool.query(`
+      ALTER TABLE seller_allocations
+        ADD COLUMN IF NOT EXISTS is_cleared boolean NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS cleared_at timestamptz,
+        ADD COLUMN IF NOT EXISTS cleared_by_id integer
+    `).then(() => undefined);
   } else {
     console.warn("[AI Studio] DATABASE_URL missing — using mock DB proxy");
     const noOp = {
@@ -40,5 +52,5 @@ try {
   });
 }
 
-export { pool, db };
+export { pool, db, schemaReady };
 export * from "./schema";
