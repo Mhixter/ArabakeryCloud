@@ -1028,6 +1028,26 @@ function ManagerDashboard() {
         )}
       </div>
 
+      <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5 flex items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center flex-shrink-0">
+            <HandCoins size={17} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-amber-950">Supplier settlements</p>
+            <p className="text-xs text-amber-800/80 truncate">Review outstanding allocations and settle one allocation date at a time.</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          className="bg-slate-950 hover:bg-slate-800 text-white font-bold gap-1.5 flex-shrink-0"
+          onClick={() => document.getElementById("supplier-settlements")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        >
+          <HandCoins size={14} className="text-amber-400" />
+          Open settlements
+        </Button>
+      </div>
+
       {/* Stock at a glance — 4 KPIs */}
       {(() => {
         const totalInStore    = (data?.remaining ?? []).reduce((s, r) => s + r.remaining, 0);
@@ -1064,7 +1084,7 @@ function ManagerDashboard() {
       )}
 
       {/* ── SUPPLIER BALANCES & SETTLEMENT SECTION (Director Action) ── */}
-      <Card className="rounded-2xl border-0 shadow-sm overflow-hidden">
+      <Card id="supplier-settlements" className="rounded-2xl border-0 shadow-sm overflow-hidden scroll-mt-6">
         <CardHeader className="pb-3 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
