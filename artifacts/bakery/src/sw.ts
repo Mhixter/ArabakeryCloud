@@ -11,13 +11,17 @@ self.skipWaiting();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
-/* ─── SPA Navigation fallback ───────────────────────────────────────
-   Without this, Chrome shows its own "You're offline" screen when the
-   user opens the app offline because the SW has no handler for HTML
-   navigation requests. This tells the SW to serve the cached index.html
-   for every page navigation — the React router then renders the right page.
+/* ─── SPA navigation ─────────────────────────────────────────────────
+   Prefer the current server HTML so a deployed release is visible
+   immediately. Fall back to the precached shell only when offline.
 ─────────────────────────────────────────────────────────────────────── */
-registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
+registerRoute(new NavigationRoute(async (options) => {
+  try {
+    return await fetch(options.request);
+  } catch {
+    return createHandlerBoundToURL("/index.html")(options);
+  }
+}));
 
 /* ─── Runtime caching (mirrors vite.config.ts workbox settings) ─── */
 registerRoute(
