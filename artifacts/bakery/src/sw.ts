@@ -34,7 +34,8 @@ registerRoute(new NavigationRoute(async (options) => {
 
 /* ─── Runtime caching (mirrors vite.config.ts workbox settings) ─── */
 registerRoute(
-  ({ url }) => /\/api\/(products|branches|users)\b/.test(url.pathname),
+  ({ request, url }) =>
+    request.method === "GET" && /\/api\/(products|branches|users)\b/.test(url.pathname),
   new StaleWhileRevalidate({
     cacheName: "ara-api-static",
     plugins: [
@@ -45,7 +46,9 @@ registerRoute(
 );
 
 registerRoute(
-  ({ url }) => /\/api\/(sales|production|inventory|allocations|returns|reports|dashboard)\b/.test(url.pathname),
+  ({ request, url }) =>
+    request.method === "GET" &&
+    /\/api\/(sales|production|inventory|allocations|returns|reports|dashboard)\b/.test(url.pathname),
   new NetworkFirst({
     cacheName: "ara-api-dynamic",
     networkTimeoutSeconds: 6,
@@ -57,7 +60,8 @@ registerRoute(
 );
 
 registerRoute(
-  ({ url }) => url.pathname.startsWith("/api/"),
+  ({ request, url }) =>
+    request.method === "GET" && url.pathname.startsWith("/api/"),
   new NetworkFirst({
     cacheName: "ara-api-other",
     networkTimeoutSeconds: 8,
