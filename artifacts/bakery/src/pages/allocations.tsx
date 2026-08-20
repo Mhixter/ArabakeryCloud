@@ -394,6 +394,7 @@ export default function AllocationsPage() {
   const [showReturnForm, setShowReturnForm] = useState(false);
   // Supplier detail drill-down (manager/receptionist view)
   const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
+  const [expandedDateKey, setExpandedDateKey] = useState<string | null>(null);
   const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
   const [settleDialog, setSettleDialog] = useState<{
     open: boolean;
@@ -774,14 +775,14 @@ export default function AllocationsPage() {
                     </div>
 
                     {/* Date-specific settlement actions */}
-                    {canSettle && sellerAllocs.some(a => !a.isCleared) && (
-                      <div className="border-t border-border/50 bg-amber-50/40 dark:bg-amber-950/10 px-4 py-3">
+                    {sellerAllocs.length > 0 && (
+                      <div className="border-t border-border/50 bg-muted/20 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-foreground">Settle by allocation date</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Choose one date so unrelated allocations stay open.</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-foreground">Allocation history</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Open a date to review every product issued that day.</p>
                           </div>
-                          <HandCoins size={16} className="text-amber-600 flex-shrink-0" />
+                          <Calendar size={16} className="text-muted-foreground flex-shrink-0" />
                         </div>
                         <div className="space-y-2">
                           {Array.from(sellerAllocs.reduce((dates, allocation) => {
@@ -795,8 +796,13 @@ export default function AllocationsPage() {
                               types.set(a.breadType, (types.get(a.breadType) ?? 0) + a.quantity);
                               return types;
                             }, new Map<string, number>()));
+                            const expanded = expandedDateKey === `${selectedSeller}:${dateKey}`;
                             return (
-                              <div key={dateKey} className="rounded-xl border border-border/70 bg-background px-3 py-2.5 flex items-center gap-3">
+                              <div key={dateKey} className="rounded-xl border border-border/70 bg-background overflow-hidden">
+                               <div
+                                className="px-3 py-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                                onClick={() => setExpandedDateKey(expanded ? null : `${selectedSeller}:${dateKey}`)}
+                               >
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${active.length ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
                                   <Calendar size={14} />
                                 </div>
@@ -807,11 +813,13 @@ export default function AllocationsPage() {
                                       {active.length ? "Outstanding" : "Settled"}
                                     </Badge>
                                   </div>
-                                  <p className="text-xs text-muted-foreground truncate">{products.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{products.length} product{products.length !== 1 ? "s" : ""} · {active.length ? `${active.length} open item${active.length !== 1 ? "s" : ""}` : "Fully settled"}</p>
                                 </div>
                                 <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{units} units</span>
+                                <ChevronRight size={15} className={`text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
                                 {canSettle && active.length > 0 && (
-                                  <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={() => {
+                                  <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(event) => {
+                                    event.stopPropagation();
                                     const sid = sellerAllocs[0]?.sellerId;
                                     if (sid) setSettleDialog({
                                       open: true,
@@ -825,6 +833,21 @@ export default function AllocationsPage() {
                                     <HandCoins size={13} /> Settle date
                                   </Button>
                                 )}
+                               </div>
+                               {expanded && (
+                                 <div className="border-t border-border/60 bg-muted/20 px-3 py-2.5 space-y-2">
+                                   {dateAllocations.map(allocation => (
+                                     <div key={allocation.id} className="flex items-center gap-2.5 rounded-lg bg-background px-2.5 py-2">
+                                       <PackageCheck size={14} className={allocation.isCleared ? "text-emerald-600" : "text-amber-600"} />
+                                       <span className="text-sm font-medium flex-1 min-w-0 truncate">{allocation.breadType}</span>
+                                       <span className="text-sm font-bold">{allocation.quantity}</span>
+                                       <Badge variant="outline" className={`text-[10px] ${allocation.isCleared ? "text-emerald-700 border-emerald-200" : "text-amber-700 border-amber-200"}`}>
+                                         {allocation.isCleared ? "Settled" : "Open"}
+                                       </Badge>
+                                     </div>
+                                   ))}
+                                 </div>
+                               )}
                               </div>
                             );
                           })}
@@ -833,7 +856,7 @@ export default function AllocationsPage() {
                     )}
 
                     {/* Product table */}
-                    <div className="overflow-x-auto">
+                    <div className="hidden overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -895,7 +918,7 @@ export default function AllocationsPage() {
                     </div>
 
                     {/* Individual allocation history for this supplier */}
-                    <div className="border-t border-border/50">
+                    <div className="hidden border-t border-border/50">
                       <p className="px-4 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         Allocation History
                       </p>
@@ -1001,50 +1024,6 @@ export default function AllocationsPage() {
                               {totalValue > 0 && !isFullyCleared && <p className="text-xs text-muted-foreground">₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}</p>}
                             </div>
                             <ChevronRight size={16} className="text-muted-foreground/50 flex-shrink-0" />
-                          </div>
-                          <div className="mt-3 ml-[52px] grid gap-2">
-                            {Array.from(group.allocations.reduce((dates, allocation) => {
-                              const key = format(new Date(allocation.allocationDate), "yyyy-MM-dd");
-                              dates.set(key, [...(dates.get(key) ?? []), allocation]);
-                              return dates;
-                            }, new Map<string, Allocation[]>())).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, dateAllocations]) => {
-                              const active = dateAllocations.filter(a => !a.isCleared);
-                              const dateUnits = dateAllocations.reduce((s, a) => s + a.quantity, 0);
-                              const dateTypes = Array.from(dateAllocations.reduce((types, a) => {
-                                types.set(a.breadType, (types.get(a.breadType) ?? 0) + a.quantity);
-                                return types;
-                              }, new Map<string, number>()));
-                              return (
-                                <div key={dateKey} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2.5 flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${active.length ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                                    <Calendar size={14} />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-sm font-semibold">{format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy")}</p>
-                                      <Badge variant="outline" className={`text-[10px] ${active.length ? "text-amber-700 border-amber-200 bg-amber-50" : "text-emerald-700 border-emerald-200 bg-emerald-50"}`}>
-                                        {active.length ? "Outstanding" : "Settled"}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">{dateTypes.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
-                                  </div>
-                                  <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{dateUnits} units</span>
-                            {canSettle && active.length > 0 && (
-                                    <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(e) => {
-                                      e.stopPropagation();
-                                      const sid = group.allocations[0]?.sellerId;
-                                      if (sid) setSettleDialog({
-                                        open: true, sellerId: sid, sellerName: group.sellerName, branchName: group.branchName,
-                                        allocationDate: format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy"),
-                                        allocations: active,
-                                      });
-                                    }}>
-                                      <HandCoins size={13} /> Settle date
-                                    </Button>
-                                  )}
-                                </div>
-                              );
-                            })}
                           </div>
                         </div>
                       );
