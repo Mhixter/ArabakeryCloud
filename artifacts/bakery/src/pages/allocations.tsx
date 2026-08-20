@@ -394,6 +394,7 @@ export default function AllocationsPage() {
   const [showReturnForm, setShowReturnForm] = useState(false);
   // Supplier detail drill-down (manager/receptionist view)
   const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
+  const [expandedDateKey, setExpandedDateKey] = useState<string | null>(null);
   const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
   const [settleDialog, setSettleDialog] = useState<{
     open: boolean;
@@ -1001,50 +1002,6 @@ export default function AllocationsPage() {
                               {totalValue > 0 && !isFullyCleared && <p className="text-xs text-muted-foreground">₦{totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0 })}</p>}
                             </div>
                             <ChevronRight size={16} className="text-muted-foreground/50 flex-shrink-0" />
-                          </div>
-                          <div className="mt-3 ml-[52px] grid gap-2">
-                            {Array.from(group.allocations.reduce((dates, allocation) => {
-                              const key = format(new Date(allocation.allocationDate), "yyyy-MM-dd");
-                              dates.set(key, [...(dates.get(key) ?? []), allocation]);
-                              return dates;
-                            }, new Map<string, Allocation[]>())).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, dateAllocations]) => {
-                              const active = dateAllocations.filter(a => !a.isCleared);
-                              const dateUnits = dateAllocations.reduce((s, a) => s + a.quantity, 0);
-                              const dateTypes = Array.from(dateAllocations.reduce((types, a) => {
-                                types.set(a.breadType, (types.get(a.breadType) ?? 0) + a.quantity);
-                                return types;
-                              }, new Map<string, number>()));
-                              return (
-                                <div key={dateKey} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2.5 flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${active.length ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                                    <Calendar size={14} />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-sm font-semibold">{format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy")}</p>
-                                      <Badge variant="outline" className={`text-[10px] ${active.length ? "text-amber-700 border-amber-200 bg-amber-50" : "text-emerald-700 border-emerald-200 bg-emerald-50"}`}>
-                                        {active.length ? "Outstanding" : "Settled"}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">{dateTypes.map(([type, qty]) => `${qty}× ${type}`).join(" · ")}</p>
-                                  </div>
-                                  <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{dateUnits} units</span>
-                            {canSettle && active.length > 0 && (
-                                    <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(e) => {
-                                      e.stopPropagation();
-                                      const sid = group.allocations[0]?.sellerId;
-                                      if (sid) setSettleDialog({
-                                        open: true, sellerId: sid, sellerName: group.sellerName, branchName: group.branchName,
-                                        allocationDate: format(new Date(`${dateKey}T12:00:00`), "dd MMM yyyy"),
-                                        allocations: active,
-                                      });
-                                    }}>
-                                      <HandCoins size={13} /> Settle date
-                                    </Button>
-                                  )}
-                                </div>
-                              );
-                            })}
                           </div>
                         </div>
                       );
