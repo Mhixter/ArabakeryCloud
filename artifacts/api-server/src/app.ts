@@ -70,7 +70,7 @@ if (process.env.NODE_ENV === "production") {
       }
     },
   }));
-  app.get("*", (_req, res) => {
+  app.get(/.*/, (_req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");

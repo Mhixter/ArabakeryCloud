@@ -1,0 +1,73 @@
+2026-08-20T03:08:03.318316576Z 
+2026-08-20T03:08:03.318321676Z PWA v1.3.0
+2026-08-20T03:08:03.318323533Z mode      injectManifest
+2026-08-20T03:08:03.318324953Z format:   es
+2026-08-20T03:08:03.318328687Z precache  14 entries (2982.92 KiB)
+2026-08-20T03:08:03.318330121Z files generated
+2026-08-20T03:08:03.318331503Z   dist/public/sw.js
+2026-08-20T03:08:03.520017158Z 
+2026-08-20T03:08:03.520029645Z > @workspace/api-server@0.0.0 build
+2026-08-20T03:08:03.520031407Z > node ./build.mjs
+2026-08-20T03:08:03.520032789Z 
+2026-08-20T03:08:04.067908831Z 
+2026-08-20T03:08:04.067922755Z   dist/index.mjs                       2.6mb ⚠️
+2026-08-20T03:08:04.067924874Z   dist/pino-worker.mjs               150.3kb
+2026-08-20T03:08:04.067926263Z   dist/pino-file.mjs                 139.2kb
+2026-08-20T03:08:04.067927601Z   dist/pino-pretty.mjs               111.3kb
+2026-08-20T03:08:04.06792946Z   dist/thread-stream-worker.mjs        7.0kb
+2026-08-20T03:08:04.06793112Z   dist/index.mjs.map                   4.6mb
+2026-08-20T03:08:04.067932715Z   dist/pino-worker.mjs.map           255.6kb
+2026-08-20T03:08:04.067933985Z   dist/pino-file.mjs.map             227.9kb
+2026-08-20T03:08:04.067935296Z   dist/pino-pretty.mjs.map           201.9kb
+2026-08-20T03:08:04.067936598Z   dist/thread-stream-worker.mjs.map   11.9kb
+2026-08-20T03:08:04.06793771Z 
+2026-08-20T03:08:04.067939393Z ⚡ Done in 489ms
+2026-08-20T03:08:06.163115425Z ==> Uploading build...
+2026-08-20T03:08:14.154617003Z ==> Uploaded in 4.9s. Compression took 3.1s
+2026-08-20T03:08:14.157969615Z ==> Build successful 🎉
+2026-08-20T03:08:15.079495725Z ==> Deploying...
+2026-08-20T03:08:15.149681016Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-08-20T03:08:36.197877037Z ==> Running 'NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs'
+2026-08-20T03:08:37.114084797Z /opt/render/project/src/node_modules/path-to-regexp/src/index.ts:218
+2026-08-20T03:08:37.114114299Z           throw new PathError(`Missing parameter name at index ${index}`, str);
+2026-08-20T03:08:37.11411905Z                 ^
+2026-08-20T03:08:37.11412161Z 
+2026-08-20T03:08:37.1141241Z 
+2026-08-20T03:08:37.11412795Z PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+2026-08-20T03:08:37.11413172Z     at consumeUntil (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:218:17)
+2026-08-20T03:08:37.114134451Z     at parse (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:262:24)
+2026-08-20T03:08:37.114137041Z     at process (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:466:52)
+2026-08-20T03:08:37.114139991Z     at pathToRegexp (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:478:3)
+2026-08-20T03:08:37.114143021Z     at Object.match (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:416:28)
+2026-08-20T03:08:37.114145881Z     at matcher (/opt/render/project/src/node_modules/router/lib/layer.js:86:23)
+2026-08-20T03:08:37.114148752Z     at new Layer (/opt/render/project/src/node_modules/router/lib/layer.js:93:62)
+2026-08-20T03:08:37.114152072Z     at Function.route (/opt/render/project/src/node_modules/router/index.js:428:17)
+2026-08-20T03:08:37.114155052Z     at Function.route (/opt/render/project/src/node_modules/express/lib/application.js:257:22)
+2026-08-20T03:08:37.114158162Z     at Function.app2.<computed> (/opt/render/project/src/node_modules/express/lib/application.js:478:22) {
+2026-08-20T03:08:37.114164513Z   originalPath: '*'
+2026-08-20T03:08:37.114167603Z }
+2026-08-20T03:08:37.114170053Z 
+2026-08-20T03:08:37.114172753Z Node.js v20.20.2
+2026-08-20T03:08:39.760322651Z ==> Exited with status 1
+2026-08-20T03:08:39.763558973Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2026-08-20T03:08:40.999096958Z ==> Running 'NODE_ENV=production node --enable-source-maps ./artifacts/api-server/dist/index.mjs'
+2026-08-20T03:08:41.918268551Z /opt/render/project/src/node_modules/path-to-regexp/src/index.ts:218
+2026-08-20T03:08:41.918290762Z           throw new PathError(`Missing parameter name at index ${index}`, str);
+2026-08-20T03:08:41.918293982Z                 ^
+2026-08-20T03:08:41.918296222Z 
+2026-08-20T03:08:41.918298263Z 
+2026-08-20T03:08:41.918300863Z PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+2026-08-20T03:08:41.918303163Z     at consumeUntil (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:218:17)
+2026-08-20T03:08:41.918305463Z     at parse (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:262:24)
+2026-08-20T03:08:41.918307833Z     at process (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:466:52)
+2026-08-20T03:08:41.918310114Z     at pathToRegexp (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:478:3)
+2026-08-20T03:08:41.918312244Z     at Object.match (/opt/render/project/src/node_modules/path-to-regexp/src/index.ts:416:28)
+2026-08-20T03:08:41.918314704Z     at matcher (/opt/render/project/src/node_modules/router/lib/layer.js:86:23)
+2026-08-20T03:08:41.918316874Z     at new Layer (/opt/render/project/src/node_modules/router/lib/layer.js:93:62)
+2026-08-20T03:08:41.918319014Z     at Function.route (/opt/render/project/src/node_modules/router/index.js:428:17)
+2026-08-20T03:08:41.918321614Z     at Function.route (/opt/render/project/src/node_modules/express/lib/application.js:257:22)
+2026-08-20T03:08:41.918323894Z     at Function.app2.<computed> (/opt/render/project/src/node_modules/express/lib/application.js:478:22) {
+2026-08-20T03:08:41.918326224Z   originalPath: '*'
+2026-08-20T03:08:41.918328575Z }
+2026-08-20T03:08:41.918330595Z 
+2026-08-20T03:08:41.918332735Z Node.js v20.20.2
