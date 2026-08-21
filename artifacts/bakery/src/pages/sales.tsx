@@ -21,6 +21,7 @@ import { generatePdf, fmtCurrency as pdfFmt } from "@/lib/pdf";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 import { API_BASE } from "@/lib/api";
+import { businessDateFor } from "@/lib/business-date";
 
 /** Per-user, per-branch receipt storage — prevents receipts leaking between users or branches */
 function getSlipsKey(branchId?: number | null): string {
@@ -329,7 +330,7 @@ function useProducts(branchId?: number | null) {
 }
 
 function todayStr() {
-  return format(new Date(), "yyyy-MM-dd");
+  return businessDateFor();
 }
 
 export default function SalesPage() {
@@ -515,11 +516,11 @@ export default function SalesPage() {
     }
   }, [activeBranch]);
 
-  /* Build API params — convert local midnight → UTC ISO so the server query is timezone-correct */
+  /* Date-only values are interpreted by the API in the bakery business timezone. */
   const listParams: Record<string, string | number | null> = { branchId: branchParam };
   if (filterDate) {
-    listParams.startDate = new Date(`${filterDate}T00:00:00`).toISOString();
-    listParams.endDate   = new Date(`${filterDate}T23:59:59`).toISOString();
+    listParams.startDate = filterDate;
+    listParams.endDate   = filterDate;
   }
 
   const { data: sales, isLoading } = useListSales(listParams as any);
@@ -781,7 +782,7 @@ export default function SalesPage() {
                         ]),
                         totals: ["", "", "", sortedRows.reduce((s, x) => s + x.quantity, 0).toString(), "", pdfFmt(totalRev), "", ""],
                       }],
-                      filename: `sales-${filterDate ?? format(new Date(), "yyyy-MM-dd")}.pdf`,
+                      filename: `sales-${filterDate ?? businessDateFor()}.pdf`,
                     });
                   }}>
                   <Download size={12} /> Download PDF

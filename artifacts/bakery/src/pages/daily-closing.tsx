@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardCheck, Save, CheckCircle2 } from "lucide-react";
+import { businessDateFor } from "@/lib/business-date";
 
 type Line = {
   id?: number; productId?: number; productName: string; openingStock: number; produced: number;
@@ -20,7 +21,7 @@ type Closing = { id: number; status: "draft" | "submitted" | "approved"; busines
 export default function DailyClosingPage() {
   const { activeBranch } = useActiveBranch();
   const { toast } = useToast();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(businessDateFor());
   const [closing, setClosing] = useState<Closing | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);

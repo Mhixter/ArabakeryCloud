@@ -10,14 +10,13 @@ import {
   calculateClosingLine, canApproveClosing, canEditClosing,
   isDirectStoreSale, latestPriorClosingLine, nextClosingStatus, validateSubmission,
 } from "./daily-closing-logic";
+import { businessDateFor, businessDateRange } from "../lib/business-date";
 
 const router: IRouter = Router();
 const editableRoles = ["managing_director", "manager", "receptionist"] as const;
 
 function dayRange(date: string) {
-  const start = new Date(`${date}T00:00:00`);
-  const end = new Date(`${date}T23:59:59.999`);
-  return { start, end };
+  return businessDateRange(date);
 }
 
 function effectiveBranch(req: AuthenticatedRequest, requested?: string) {
@@ -153,7 +152,7 @@ async function movementSummary(companyId: number, branchId: number, date: string
 
 router.get("/daily-closings", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const branchId = effectiveBranch(req, req.query.branchId as string | undefined);
-  const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
+  const date = String(req.query.date ?? businessDateFor());
   if (!branchId) { res.status(400).json({ error: "A branch is required" }); return; }
   const [closing] = await db.select().from(dailyClosingsTable).where(and(
     eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId), eq(dailyClosingsTable.businessDate, date),
@@ -165,7 +164,7 @@ router.get("/daily-closings", authenticate, async (req: AuthenticatedRequest, re
 
 router.post("/daily-closings", authenticate, requireRole(...editableRoles), async (req: AuthenticatedRequest, res): Promise<void> => {
   const branchId = effectiveBranch(req, req.body.branchId);
-  const date = String(req.body.businessDate ?? new Date().toISOString().slice(0, 10));
+  const date = String(req.body.businessDate ?? businessDateFor());
   if (!branchId) { res.status(400).json({ error: "A branch is required" }); return; }
   const [existing] = await db.select().from(dailyClosingsTable).where(and(
     eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId), eq(dailyClosingsTable.businessDate, date),

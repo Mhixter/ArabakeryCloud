@@ -3,6 +3,7 @@ import { db, productionBatchesTable, usersTable, branchesTable, productsTable } 
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { queryDateRange } from "../lib/business-date";
 
 const router: IRouter = Router();
 
@@ -28,8 +29,8 @@ router.get("/production", authenticate, async (req: AuthenticatedRequest, res): 
   const { branchId, startDate, endDate } = req.query as { branchId?: string; startDate?: string; endDate?: string };
   const conditions = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (branchId && !isNaN(parseInt(branchId))) conditions.push(eq(productionBatchesTable.branchId, parseInt(branchId)));
-  if (startDate) conditions.push(gte(productionBatchesTable.productionDate, new Date(startDate)));
-  if (endDate) conditions.push(lte(productionBatchesTable.productionDate, new Date(endDate)));
+  if (startDate) conditions.push(gte(productionBatchesTable.productionDate, queryDateRange(startDate).start));
+  if (endDate) conditions.push(lte(productionBatchesTable.productionDate, queryDateRange(endDate).end));
   const batches = await db.select({ batch: productionBatchesTable, staffName: usersTable.fullName, branchName: branchesTable.name }).from(productionBatchesTable).leftJoin(usersTable, eq(productionBatchesTable.staffId, usersTable.id)).leftJoin(branchesTable, eq(productionBatchesTable.branchId, branchesTable.id)).where(and(...conditions)).orderBy(productionBatchesTable.productionDate);
   res.json(batches.map(({ batch, staffName, branchName }) => formatBatch(batch, staffName ?? "Unknown", branchName ?? "Unknown")));
 });

@@ -4,6 +4,7 @@ import { eq, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { notifyManagers } from "../lib/push";
+import { businessDateFor, businessDateRange, queryDateRange } from "../lib/business-date";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -62,8 +63,8 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
     if (branchFilter) conditions.push(eq(salesTable.branchId, branchFilter));
   }
 
-  if (startDate) conditions.push(gte(salesTable.saleDate, new Date(startDate)));
-  if (endDate) conditions.push(lte(salesTable.saleDate, new Date(endDate)));
+  if (startDate) conditions.push(gte(salesTable.saleDate, queryDateRange(startDate).start));
+  if (endDate) conditions.push(lte(salesTable.saleDate, queryDateRange(endDate).end));
 
   const sales = await db
     .select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
@@ -278,9 +279,8 @@ router.post("/sales/quick", authenticate, requireRole("manager", "managing_direc
 router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { date, branchId } = req.query as { date?: string; branchId?: string };
-  const targetDate = date ? new Date(date) : new Date();
-  const startOfDay = new Date(targetDate); startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(targetDate); endOfDay.setHours(23, 59, 59, 999);
+  const targetDate = date ?? businessDateFor();
+  const { start: startOfDay, end: endOfDay } = businessDateRange(targetDate);
   const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
   if (role === "supplier") {
     conditions.push(eq(salesTable.cashierId, userId));

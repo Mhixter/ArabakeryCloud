@@ -22,8 +22,9 @@ import { format } from "date-fns";
 import { API_BASE } from "@/lib/api";
 import { generatePdf } from "@/lib/pdf";
 import { getStoredCompany } from "@/lib/auth";
+import { businessDateFor } from "@/lib/business-date";
 
-function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
+function todayStr() { return businessDateFor(); }
 
 function downloadCSV(rows: Record<string, string | number>[], filename: string) {
   if (!rows.length) return;
@@ -117,7 +118,7 @@ export default function ProductionPage() {
 
   /* Filter by selected date (client-side) */
   const visibleBatches = filterDate
-    ? sorted.filter(b => format(new Date(b.productionDate), "yyyy-MM-dd") === filterDate)
+    ? sorted.filter(b => businessDateFor(new Date(b.productionDate)) === filterDate)
     : sorted;
 
   /* Stats from visible (filtered) batches */
@@ -230,7 +231,7 @@ export default function ProductionPage() {
                       ]),
                       totals: ["", "", statProduced.toString(), statWaste.toString(), statNet.toString(), "", "", "", ""],
                     }],
-                    filename: `production-${filterDate || format(new Date(), "yyyy-MM-dd")}.pdf`,
+                    filename: `production-${filterDate || businessDateFor()}.pdf`,
                   });
                 }}>
                 <Download size={12} /> Download PDF

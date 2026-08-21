@@ -3,25 +3,28 @@ import { db, salesTable, productionBatchesTable, productsTable, productReturnsTa
 import { eq, and, or, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { calculateInStoreStock, calculateSupplierStock, countBreadUnits } from "../lib/stock-calculations";
+import { businessDateFor, businessDateRange, queryDateRange } from "../lib/business-date";
 
 const router: IRouter = Router();
 
 router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
   const { branchId } = req.query as { branchId?: string };
-  const now = new Date();
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
-  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
+
+  const today = businessDateFor();
+  const todayStart = businessDateRange(businessDateFor()).start;
+  const weekStart = weekStartStr ? new Date(`${weekStartStr}T00:00:00`) : (() => {
+    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
+  })();
   const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
 
   const todaySalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todaySalesConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = await db.select().from(salesTable).where(and(...todaySalesConds));
+  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds));
 
   const weekSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekSalesConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = await db.select().from(salesTable).where(and(...weekSalesConds));
+  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
   const todayProdConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId), gte(productionBatchesTable.productionDate, todayStart), lte(productionBatchesTable.productionDate, todayEnd)];
   if (branchFilter) todayProdConds.push(eq(productionBatchesTable.branchId, branchFilter));
@@ -49,18 +52,15 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const { companyId, role, branchId: userBranchId } = req.user!;
   const { branchId: queryBranchId, date: queryDate, scope } = req.query as { branchId?: string; date?: string; scope?: string };
-  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
-    ? parseInt(queryBranchId)
-    : userBranchId;
+  const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
   /* Stock and KPI calculations use the selected branch for MDs too. */
   const stockBranchFilter = branchFilter;
-  /* Support custom date for "view by date" filter — fallback to today */
-  const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
-  const now = new Date();
-  const todayStart = new Date(baseDate); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(baseDate); todayEnd.setHours(23, 59, 59, 999);
-  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7); weekStart.setHours(0, 0, 0, 0);
 
+  const selectedDate = queryDate ?? businessDateFor();
+  const todayStart = businessDateRange(businessDateFor()).start;
+  const weekStart = weekStartStr ? new Date(`${weekStartStr}T00:00:00`) : (() => {
+    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
+  })();
   const activeProducts = await db
     .select()
     .from(productsTable)
@@ -90,9 +90,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
   const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
-  /* Production, allocations & returns use stockBranchFilter so the MD always sees
-     company-wide bread stock regardless of which branch KPI tab they have open. */
-  const prodConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
+  const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt), gte(productionBatchesTable.productionDate, weekStart), lte(productionBatchesTable.productionDate, weekEnd)];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
@@ -141,7 +139,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const productionByType = new Map<string, number>();
   for (const b of allProduction) {
-    const key = transactionProductKey(b.productId, b.breadType);
+    const key = businessDateFor(s.saleDate);
     productionByType.set(key, (productionByType.get(key) ?? 0) + b.quantityProduced - b.wasteQuantity);
   }
 
@@ -150,7 +148,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
   for (const { sale: s, cashierRole } of allSalesEver) {
-    const key = transactionProductKey(s.productId, s.breadType);
+    const key = businessDateFor(s.saleDate);
     allSalesByType.set(key, (allSalesByType.get(key) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
       supplierSalesByType.set(key, (supplierSalesByType.get(key) ?? 0) + s.quantity);
@@ -164,7 +162,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const damagedByType    = new Map<string, number>();
   const allReturnsByType = new Map<string, number>(); // all approved returns (restorable + damaged)
   for (const r of allReturns) {
-    const key = transactionProductKey(r.productId, r.breadType);
+    const key = businessDateFor(s.saleDate);
     allReturnsByType.set(key, (allReturnsByType.get(key) ?? 0) + r.quantity);
     if (RESTORABLE.includes(r.reason)) {
       restorableByType.set(key, (restorableByType.get(key) ?? 0) + r.quantity);
@@ -175,7 +173,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const totalAllocatedByType = new Map<string, number>();
   for (const a of activeAllocations) {
-    const key = transactionProductKey(a.productId, a.breadType);
+    const key = businessDateFor(s.saleDate);
     totalAllocatedByType.set(key, (totalAllocatedByType.get(key) ?? 0) + a.quantity);
   }
 
@@ -254,18 +252,19 @@ router.get("/reports/sales-trend", authenticate, async (req: AuthenticatedReques
   const companyId = req.user!.companyId;
   const { branchId, days = "14" } = req.query as { branchId?: string; days?: string };
   const numDays = parseInt(days);
-  const start = new Date(); start.setDate(start.getDate() - numDays); start.setHours(0, 0, 0, 0);
+  const start = new Date(todayStart);
   const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
-  const conds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, start)];
+  const conds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (branchFilter) conds.push(eq(salesTable.branchId, branchFilter));
   const sales = await db.select().from(salesTable).where(and(...conds)).orderBy(salesTable.saleDate);
   const dayMap = new Map<string, { revenue: number; profit: number; count: number }>();
   for (let i = numDays - 1; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    dayMap.set(d.toISOString().split("T")[0], { revenue: 0, profit: 0, count: 0 });
+    const d = new Date(todayStart);
+    d.setUTCDate(d.getUTCDate() - i);
+    dayMap.set(businessDateFor(d), { revenue: 0, profit: 0, count: 0 });
   }
   for (const s of sales) {
-    const key = s.saleDate.toISOString().split("T")[0];
+    const key = businessDateFor(s.saleDate);
     const prev = dayMap.get(key) ?? { revenue: 0, profit: 0, count: 0 };
     dayMap.set(key, { revenue: prev.revenue + parseFloat(s.totalAmount as unknown as string), profit: prev.profit + parseFloat(s.profitAmount as unknown as string), count: prev.count + 1 });
   }
@@ -278,10 +277,10 @@ router.get("/reports/production-summary", authenticate, async (req: Authenticate
   const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
   const conds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
   if (branchFilter) conds.push(eq(productionBatchesTable.branchId, branchFilter));
-  if (startDate) conds.push(gte(productionBatchesTable.productionDate, new Date(startDate)));
-  if (endDate) conds.push(lte(productionBatchesTable.productionDate, new Date(endDate)));
+  if (startDate) conds.push(gte(productionBatchesTable.productionDate, queryDateRange(startDate).start));
+  if (endDate) conds.push(lte(productionBatchesTable.productionDate, queryDateRange(endDate).end));
   const batches = await db.select().from(productionBatchesTable).where(and(...conds));
-  const totalProduced = batches.reduce((s, b) => s + b.quantityProduced, 0);
+  let totalProduced = 0, totalWaste = 0;
   const totalWaste = batches.reduce((s, b) => s + b.wasteQuantity, 0);
   const wastePercentage = totalProduced > 0 ? (totalWaste / totalProduced) * 100 : 0;
   const breadTypeMap = new Map<string, { produced: number; waste: number }>();
@@ -484,7 +483,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
     totalRevenue += parseFloat(s.totalAmount as unknown as string ?? "0");
     totalProfit  += parseFloat(s.profitAmount as unknown as string ?? "0");
     totalQty     += Number(s.quantity ?? 0);
-    const k = s.breadType ?? "Unknown";
+    const k = e.categoryName ?? "Uncategorised";
     if (!salesByType[k]) salesByType[k] = { breadType: k, revenue: 0, profit: 0, qty: 0 };
     salesByType[k].revenue += parseFloat(s.totalAmount as unknown as string ?? "0");
     salesByType[k].profit  += parseFloat(s.profitAmount as unknown as string ?? "0");
@@ -497,7 +496,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   production.forEach(p => {
     totalProduced += Number(p.quantityProduced ?? 0);
     totalWaste    += Number(p.wasteQuantity ?? 0);
-    const k = p.breadType ?? "Unknown";
+    const k = e.categoryName ?? "Uncategorised";
     if (!prodByType[k]) prodByType[k] = { produced: 0, waste: 0 };
     prodByType[k].produced += Number(p.quantityProduced ?? 0);
     prodByType[k].waste    += Number(p.wasteQuantity ?? 0);
@@ -533,3 +532,9 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
 });
 
 export default router;
+
+  const { start: todayStart, end: todayEnd } = businessDateRange(selectedDate);
+
+  const weekDate = new Date(todayStart);
+
+  const { start: weekStart } = businessDateRange(businessDateFor(weekDate));

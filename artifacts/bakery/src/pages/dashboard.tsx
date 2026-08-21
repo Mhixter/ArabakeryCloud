@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
+import { businessDateFor } from "@/lib/business-date";
 import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 
 /* ── PWA Install Prompt ── */
@@ -70,7 +71,7 @@ function useNow() {
 }
 
 function toLocalDateStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return businessDateFor(d);
 }
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
@@ -130,15 +131,14 @@ function SellerDashboard() {
   const { canInstall, install, showIosHint } = useInstallPrompt();
 
   const now = useNow();
-  const todayDate = toLocalDateStr(now);
+  const todayDate = businessDateFor(now);
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    /* Convert local-midnight and local-end-of-day to UTC ISO strings so the server
-       comparison is timezone-correct regardless of where the server runs. */
-    const startOfDay = new Date(`${todayDate}T00:00:00`).toISOString();
-    const endOfDay   = new Date(`${todayDate}T23:59:59`).toISOString();
+    /* Date-only values are interpreted by the API in the bakery business timezone. */
+    const startOfDay = todayDate;
+    const endOfDay   = todayDate;
     Promise.all([
       fetch(API_BASE + "/api/allocations", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(API_BASE + "/api/sales", { headers, credentials: "include" }).then(r => r.ok ? r.json() : []),
@@ -336,14 +336,14 @@ function ReceptionistDashboard() {
   const { canInstall, install, showIosHint } = useInstallPrompt();
 
   const now = useNow();
-  const todayDate = toLocalDateStr(now);
+  const todayDate = businessDateFor(now);
 
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    /* Use UTC-converted timestamps for accurate date filtering on the server */
-    const startOfDay = new Date(`${todayDate}T00:00:00`).toISOString();
-    const endOfDay   = new Date(`${todayDate}T23:59:59`).toISOString();
+    /* Date-only values are interpreted by the API in the bakery business timezone. */
+    const startOfDay = todayDate;
+    const endOfDay   = todayDate;
     setDailyLoading(true);
     setStockLoading(true);
     Promise.all([
@@ -572,12 +572,12 @@ function ProductionDashboard() {
   useEffect(() => {
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const todayStart = new Date(`${todayStr}T00:00:00`).toISOString();
-    const todayEnd   = new Date(`${todayStr}T23:59:59`).toISOString();
+    const todayStart = todayStr;
+    const todayEnd   = todayStr;
     // Week: last 7 days
     const weekStartDate = new Date(now); weekStartDate.setDate(weekStartDate.getDate() - 6);
-    const weekStartStr  = toLocalDateStr(weekStartDate);
-    const weekStartUtc  = new Date(`${weekStartStr}T00:00:00`).toISOString();
+    const weekStartStr  = businessDateFor(weekStartDate);
+    const weekStartUtc  = weekStartStr;
     Promise.all([
       fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`${API_BASE}/api/production?startDate=${encodeURIComponent(todayStart)}&endDate=${encodeURIComponent(todayEnd)}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
@@ -1025,7 +1025,7 @@ function ManagerDashboard() {
           <input
             type="date"
             value={customDate}
-            max={format(new Date(), "yyyy-MM-dd")}
+            max={businessDateFor()}
             onChange={e => setCustomDate(e.target.value)}
             className="text-sm border border-border rounded-xl px-3 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
