@@ -170,7 +170,9 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
   const weekStart = (() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
   })();
-  const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
+  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
+    ? parseInt(queryBranchId)
+    : userBranchId;
 
   const todaySalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todaySalesConds.push(eq(salesTable.branchId, branchFilter));
@@ -296,7 +298,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const productionByType = new Map<string, number>();
   for (const b of allProduction) {
-    const key = businessDateFor(s.saleDate);
+    const key = transactionProductKey(b.productId, b.breadType);
     productionByType.set(key, (productionByType.get(key) ?? 0) + b.quantityProduced - b.wasteQuantity);
   }
 
@@ -305,7 +307,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
   for (const { sale: s, cashierRole } of allSalesEver) {
-    const key = businessDateFor(s.saleDate);
+    if (countBreadUnits(s.breadType, s.quantity) === 0) continue;
+    const key = transactionProductKey(s.productId, s.breadType);
     allSalesByType.set(key, (allSalesByType.get(key) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
       supplierSalesByType.set(key, (supplierSalesByType.get(key) ?? 0) + s.quantity);
@@ -319,7 +322,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const damagedByType    = new Map<string, number>();
   const allReturnsByType = new Map<string, number>(); // all approved returns (restorable + damaged)
   for (const r of allReturns) {
-    const key = businessDateFor(s.saleDate);
+    const key = transactionProductKey(r.productId, r.breadType);
     allReturnsByType.set(key, (allReturnsByType.get(key) ?? 0) + r.quantity);
     if (RESTORABLE.includes(r.reason)) {
       restorableByType.set(key, (restorableByType.get(key) ?? 0) + r.quantity);
@@ -330,7 +333,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const totalAllocatedByType = new Map<string, number>();
   for (const a of activeAllocations) {
-    const key = businessDateFor(s.saleDate);
+    const key = transactionProductKey(a.productId, a.breadType);
     totalAllocatedByType.set(key, (totalAllocatedByType.get(key) ?? 0) + a.quantity);
   }
 
