@@ -1,4 +1,4 @@
-export const BUSINESS_TIMEZONE = "Africa/Lagos";
+export const BUSINESS_TIMEZONE = "America/Los_Angeles";
 
 export function businessDateFor(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -13,7 +13,8 @@ export function businessDateFor(date = new Date()): string {
 
 export function businessDateTimeRange(date: string) {
   const [year, month, day] = date.split("-").map(Number);
-  // Africa/Lagos is UTC+01:00. The API remains authoritative for filtering.
+  // The API remains authoritative for filtering; this range is used for
+  // displaying and labeling the selected business date in the browser.
   return {
     start: `${date}T00:00:00+01:00`,
     end: `${year}-${String(month).padStart(2, "0")}-${String(day + 1).padStart(2, "0")}T00:00:00+01:00`,

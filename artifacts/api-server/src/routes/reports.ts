@@ -208,7 +208,9 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const { companyId, role, branchId: userBranchId } = req.user!;
   const { branchId: queryBranchId, date: queryDate, scope } = req.query as { branchId?: string; date?: string; scope?: string };
-  const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
+  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
+    ? parseInt(queryBranchId)
+    : userBranchId;
   /* Stock and KPI calculations use the selected branch for MDs too. */
   const stockBranchFilter = branchFilter;
 

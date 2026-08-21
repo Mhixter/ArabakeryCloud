@@ -2,7 +2,7 @@
  * Business days are calendar days in the bakery's operating timezone.
  * Keep this explicit instead of relying on the machine/browser timezone.
  */
-export const BUSINESS_TIMEZONE = "Africa/Lagos";
+export const BUSINESS_TIMEZONE = "America/Los_Angeles";
 
 function partsInBusinessTimezone(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {

@@ -128,7 +128,8 @@ export default function DailyClosingPage() {
             </p>
             <div className="flex gap-2">
               {closing?.status === "submitted" && <Button onClick={approve}><CheckCircle2 size={15} className="mr-2" />Approve reconciliation</Button>}
-              {editable && <Button onClick={() => save(true)} disabled={saving || !lines.length}><Save size={15} className="mr-2" />{saving ? "Saving…" : "Save closing"}</Button>}
+              {editable && <Button variant="outline" onClick={() => save(false)} disabled={saving || !lines.length}><Save size={15} className="mr-2" />{saving ? "Saving…" : "Save draft"}</Button>}
+              {editable && <Button onClick={() => save(true)} disabled={saving || !lines.length}><Save size={15} className="mr-2" />Submit for approval</Button>}
             </div>
           </div>
         </>
