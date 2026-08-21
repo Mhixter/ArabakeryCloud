@@ -23,6 +23,7 @@ import AllocationsPage from "@/pages/allocations";
 import DailyClosingPage from "@/pages/daily-closing";
 import ExpensesPage from "@/pages/expenses";
 import WorkersPage from "@/pages/workers";
+import StockIdentityReviewPage from "@/pages/stock-identity-review";
 import Layout from "@/components/layout";
 import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboardPage from "@/pages/admin/dashboard";
@@ -165,6 +166,7 @@ function Router() {
       <Route path="/production"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><ProductionPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/inventory"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><InventoryPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/stock-identity-review"><ProtectedRole roles={["managing_director","manager"]}><StockIdentityReviewPage /></ProtectedRole></Route>
       <Route path="/users"><ProtectedRole roles={["managing_director","manager"]}><UsersPage /></ProtectedRole></Route>
       <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
       <Route path="/user-activity"><ProtectedRole roles={["managing_director"]}><UserActivityPage /></ProtectedRole></Route>

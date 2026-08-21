@@ -1,30 +1,140 @@
 import { Router, IRouter } from "express";
 import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, productIdentityBackfillIssuesTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
-import { eq, and, or, isNull, gte, lte, desc } from "drizzle-orm";
-import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { eq, and, or, isNull, gte, lte, desc, sql } from "drizzle-orm";
+import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { calculateInStoreStock, calculateSupplierStock, countBreadUnits } from "../lib/stock-calculations";
 import { businessDateFor, businessDateRange, queryDateRange } from "../lib/business-date";
 
 const router: IRouter = Router();
+
+const identityReviewTables = {
+  production: productionBatchesTable,
+  sale: salesTable,
+  allocation: sellerAllocationsTable,
+  return: productReturnsTable,
+} as const;
+
+type IdentityReviewType = keyof typeof identityReviewTables;
+type IdentityReviewTable = typeof productionBatchesTable;
+
+function isIdentityReviewType(value: string): value is IdentityReviewType {
+  return value in identityReviewTables;
+}
+
+async function getIdentityReviewRow(type: IdentityReviewType, transactionId: number, companyId: number) {
+  const table = identityReviewTables[type] as IdentityReviewTable;
+  const [row] = await db.select().from(table).where(and(eq(table.id, transactionId), eq(table.companyId, companyId)));
+  return row;
+}
+
+async function getIdentityCandidates(breadType: string, branchId: number | null, companyId: number) {
+  return db.select({
+    id: productsTable.id,
+    name: productsTable.name,
+    branchId: productsTable.branchId,
+  }).from(productsTable).where(and(
+    eq(productsTable.companyId, companyId),
+    eq(productsTable.isActive, true),
+    sql`lower(trim(${productsTable.name})) = lower(trim(${breadType}))`,
+    branchId == null ? isNull(productsTable.branchId) : or(isNull(productsTable.branchId), eq(productsTable.branchId, branchId)),
+  ));
+}
+
+/* ── Historical product identity review ── */
+router.get("/reports/stock-identity-review", authenticate, requireRole("manager", "managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const companyId = req.user!.companyId;
+  const issues = await db.select().from(productIdentityBackfillIssuesTable)
+    .where(eq(productIdentityBackfillIssuesTable.companyId, companyId))
+    .orderBy(desc(productIdentityBackfillIssuesTable.createdAt));
+
+  const reviewRows = await Promise.all(issues.map(async (issue) => {
+    if (!isIdentityReviewType(issue.transactionType)) return null;
+    const row = await getIdentityReviewRow(issue.transactionType, issue.transactionId, companyId);
+    if (!row || row.productId != null) return null;
+    const candidates = await getIdentityCandidates(row.breadType, row.branchId, companyId);
+    return {
+      id: issue.id,
+      transactionType: issue.transactionType,
+      transactionId: issue.transactionId,
+      breadType: row.breadType,
+      candidateCount: candidates.length,
+      reason: issue.reason,
+      createdAt: issue.createdAt,
+      transaction: row,
+      candidates,
+    };
+  }));
+
+  res.json({ issues: reviewRows.filter(Boolean) });
+});
+
+router.patch("/reports/stock-identity-review/:transactionType/:transactionId", authenticate, requireRole("manager", "managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const companyId = req.user!.companyId;
+  const transactionType = String(req.params.transactionType);
+  const transactionId = String(req.params.transactionId);
+  const productId = Number(req.body?.productId);
+  if (!isIdentityReviewType(transactionType) || !Number.isInteger(Number(transactionId)) || !Number.isInteger(productId)) {
+    res.status(400).json({ error: "A valid transaction type, transaction ID, and product ID are required" });
+    return;
+  }
+
+  const issue = await db.select().from(productIdentityBackfillIssuesTable).where(and(
+    eq(productIdentityBackfillIssuesTable.companyId, companyId),
+    eq(productIdentityBackfillIssuesTable.transactionType, transactionType),
+    eq(productIdentityBackfillIssuesTable.transactionId, Number(transactionId)),
+  ));
+  if (!issue.length) {
+    res.status(404).json({ error: "Review item not found or already resolved" });
+    return;
+  }
+
+  const row = await getIdentityReviewRow(transactionType, Number(transactionId), companyId);
+  if (!row) {
+    res.status(404).json({ error: "Historical transaction not found" });
+    return;
+  }
+  const candidates = await getIdentityCandidates(row.breadType, row.branchId, companyId);
+  if (!candidates.some((candidate: { id: number }) => candidate.id === productId)) {
+    res.status(400).json({ error: "Selected product is not an active candidate for this transaction" });
+    return;
+  }
+
+  const table = identityReviewTables[transactionType] as IdentityReviewTable;
+  const [updated] = await db.update(table).set({ productId }).where(and(
+    eq(table.id, Number(transactionId)),
+    eq(table.companyId, companyId),
+    sql`${table.productId} IS NULL`,
+  )).returning();
+  if (!updated) {
+    res.status(409).json({ error: "This transaction was already resolved" });
+    return;
+  }
+  await db.delete(productIdentityBackfillIssuesTable).where(and(
+    eq(productIdentityBackfillIssuesTable.companyId, companyId),
+    eq(productIdentityBackfillIssuesTable.transactionType, transactionType),
+    eq(productIdentityBackfillIssuesTable.transactionId, Number(transactionId)),
+  ));
+  res.json({ resolved: true, transactionType, transactionId: Number(transactionId), productId });
+});
 
 router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
   const { branchId } = req.query as { branchId?: string };
 
   const today = businessDateFor();
-  const todayStart = businessDateRange(businessDateFor()).start;
-  const weekStart = weekStartStr ? new Date(`${weekStartStr}T00:00:00`) : (() => {
+  const { start: todayStart, end: todayEnd } = businessDateRange(today);
+  const weekStart = (() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
   })();
   const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
 
   const todaySalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todaySalesConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds));
+  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todaySalesConds));
 
   const weekSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekSalesConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
+  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekSalesConds));
 
   const todayProdConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId), gte(productionBatchesTable.productionDate, todayStart), lte(productionBatchesTable.productionDate, todayEnd)];
   if (branchFilter) todayProdConds.push(eq(productionBatchesTable.branchId, branchFilter));
@@ -57,8 +167,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const stockBranchFilter = branchFilter;
 
   const selectedDate = queryDate ?? businessDateFor();
-  const todayStart = businessDateRange(businessDateFor()).start;
-  const weekStart = weekStartStr ? new Date(`${weekStartStr}T00:00:00`) : (() => {
+  const { start: todayStart, end: todayEnd } = businessDateRange(selectedDate);
+  const weekStart = (() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
   })();
   const activeProducts = await db
@@ -90,6 +200,9 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
   const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
 
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
   const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt), gte(productionBatchesTable.productionDate, weekStart), lte(productionBatchesTable.productionDate, weekEnd)];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
@@ -280,7 +393,7 @@ router.get("/reports/production-summary", authenticate, async (req: Authenticate
   if (startDate) conds.push(gte(productionBatchesTable.productionDate, queryDateRange(startDate).start));
   if (endDate) conds.push(lte(productionBatchesTable.productionDate, queryDateRange(endDate).end));
   const batches = await db.select().from(productionBatchesTable).where(and(...conds));
-  let totalProduced = 0, totalWaste = 0;
+  const totalProduced = batches.reduce((s, b) => s + b.quantityProduced, 0);
   const totalWaste = batches.reduce((s, b) => s + b.wasteQuantity, 0);
   const wastePercentage = totalProduced > 0 ? (totalWaste / totalProduced) * 100 : 0;
   const breadTypeMap = new Map<string, { produced: number; waste: number }>();
@@ -483,7 +596,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
     totalRevenue += parseFloat(s.totalAmount as unknown as string ?? "0");
     totalProfit  += parseFloat(s.profitAmount as unknown as string ?? "0");
     totalQty     += Number(s.quantity ?? 0);
-    const k = e.categoryName ?? "Uncategorised";
+     const k = s.breadType ?? "Uncategorised";
     if (!salesByType[k]) salesByType[k] = { breadType: k, revenue: 0, profit: 0, qty: 0 };
     salesByType[k].revenue += parseFloat(s.totalAmount as unknown as string ?? "0");
     salesByType[k].profit  += parseFloat(s.profitAmount as unknown as string ?? "0");
@@ -496,7 +609,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   production.forEach(p => {
     totalProduced += Number(p.quantityProduced ?? 0);
     totalWaste    += Number(p.wasteQuantity ?? 0);
-    const k = e.categoryName ?? "Uncategorised";
+     const k = p.breadType ?? "Uncategorised";
     if (!prodByType[k]) prodByType[k] = { produced: 0, waste: 0 };
     prodByType[k].produced += Number(p.quantityProduced ?? 0);
     prodByType[k].waste    += Number(p.wasteQuantity ?? 0);
@@ -532,9 +645,3 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
 });
 
 export default router;
-
-  const { start: todayStart, end: todayEnd } = businessDateRange(selectedDate);
-
-  const weekDate = new Date(todayStart);
-
-  const { start: weekStart } = businessDateRange(businessDateFor(weekDate));
