@@ -45,8 +45,9 @@ export default function DailyClosingPage() {
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Could not start closing");
     const created = await res.json();
-    setClosing(created);
-    return created as Closing;
+    setClosing(created.closing);
+    setLines(created.lines ?? []);
+    return created.closing as Closing;
   }
   async function save(submit = false) {
     if (!activeBranch) return;
