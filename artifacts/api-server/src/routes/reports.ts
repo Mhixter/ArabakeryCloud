@@ -249,7 +249,10 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt), gte(productionBatchesTable.productionDate, weekStart), lte(productionBatchesTable.productionDate, weekEnd)];
+  /* Stock is an all-time balance. The week window is only for KPI/report
+     summaries; limiting this query to the week makes older production vanish
+     from Dashboard stock and makes allocation availability incorrectly zero. */
+  const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt)];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
