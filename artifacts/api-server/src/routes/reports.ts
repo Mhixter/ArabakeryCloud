@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
 import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
-import { eq, and, isNull, gte, lte, desc } from "drizzle-orm";
+import { eq, and, or, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -63,7 +63,15 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const activeProducts = await db
     .select()
     .from(productsTable)
-    .where(and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)));
+    .where(
+      branchFilter
+        ? and(
+            eq(productsTable.companyId, companyId),
+            eq(productsTable.isActive, true),
+            or(eq(productsTable.branchId, branchFilter), isNull(productsTable.branchId)),
+          )
+        : and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)),
+    );
 
   const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
