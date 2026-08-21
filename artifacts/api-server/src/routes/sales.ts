@@ -18,6 +18,7 @@ const formatSale = (
 ) => ({
   id: s.id,
   receiptNumber: s.receiptNumber,
+  productId: s.productId,
   breadType: s.breadType,
   quantity: s.quantity,
   pricePerUnit: parseFloat(s.pricePerUnit as unknown as string),
@@ -132,8 +133,8 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   if (role === "supplier") {
     /* Seller can only sell what they've been allocated minus what they've sold */
     const [allocations, myPastSales] = await Promise.all([
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.sellerId, userId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
-      db.select().from(salesTable).where(and(eq(salesTable.cashierId, userId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.sellerId, userId), eq(sellerAllocationsTable.productId, product.id), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(salesTable).where(and(eq(salesTable.cashierId, userId), eq(salesTable.productId, product.id), isNull(salesTable.deletedAt))),
     ]);
 
     const totalAllocated = allocations.reduce((s, a) => s + a.quantity, 0);
@@ -151,9 +152,9 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   } else {
     /* Receptionists/managers: check overall stock (produced - allocated - direct sales) */
     const [allProduction, allSales, allAllocations] = await Promise.all([
-      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, effectiveBranchId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${breadType}))`, isNull(productionBatchesTable.deletedAt))),
-      db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, effectiveBranchId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${breadType}))`, isNull(salesTable.deletedAt))),
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, effectiveBranchId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${breadType}))`, isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
+      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, effectiveBranchId), eq(productionBatchesTable.productId, product.id), isNull(productionBatchesTable.deletedAt))),
+      db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, effectiveBranchId), eq(salesTable.productId, product.id), isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, effectiveBranchId), eq(sellerAllocationsTable.productId, product.id), isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
     ]);
 
     const totalProduced = allProduction.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);

@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
+import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, productIdentityBackfillIssuesTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
 import { eq, and, or, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
@@ -115,6 +115,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
   const productKey = (value: string) => value.trim().toLowerCase();
+  const transactionProductKey = (productId: number | null, name: string) =>
+    productId == null ? `legacy:${productKey(name)}` : `product:${productId}`;
 
   /* Total allocations ever made that are still UNCLEARED (bread currently with suppliers) */
   const allocConds = [
@@ -139,7 +141,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const productionByType = new Map<string, number>();
   for (const b of allProduction) {
-    const key = productKey(b.breadType);
+    const key = transactionProductKey(b.productId, b.breadType);
     productionByType.set(key, (productionByType.get(key) ?? 0) + b.quantityProduced - b.wasteQuantity);
   }
 
@@ -148,7 +150,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const supplierSalesByType = new Map<string, number>();
   const allSalesByType      = new Map<string, number>(); // for today/week display
   for (const { sale: s, cashierRole } of allSalesEver) {
-    const key = productKey(s.breadType);
+    const key = transactionProductKey(s.productId, s.breadType);
     allSalesByType.set(key, (allSalesByType.get(key) ?? 0) + s.quantity);
     if (cashierRole === "supplier") {
       supplierSalesByType.set(key, (supplierSalesByType.get(key) ?? 0) + s.quantity);
@@ -162,7 +164,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const damagedByType    = new Map<string, number>();
   const allReturnsByType = new Map<string, number>(); // all approved returns (restorable + damaged)
   for (const r of allReturns) {
-    const key = productKey(r.breadType);
+    const key = transactionProductKey(r.productId, r.breadType);
     allReturnsByType.set(key, (allReturnsByType.get(key) ?? 0) + r.quantity);
     if (RESTORABLE.includes(r.reason)) {
       restorableByType.set(key, (restorableByType.get(key) ?? 0) + r.quantity);
@@ -173,12 +175,12 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const totalAllocatedByType = new Map<string, number>();
   for (const a of activeAllocations) {
-    const key = productKey(a.breadType);
+    const key = transactionProductKey(a.productId, a.breadType);
     totalAllocatedByType.set(key, (totalAllocatedByType.get(key) ?? 0) + a.quantity);
   }
 
   const remaining = activeProducts.map(p => {
-    const key = productKey(p.name);
+    const key = `product:${p.id}`;
     const produced      = productionByType.get(key) ?? 0;
     const totalAllocated = totalAllocatedByType.get(key) ?? 0;
     const directSold    = directSalesByType.get(key) ?? 0;
@@ -203,6 +205,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     const withSuppliers = Math.max(0, totalAllocated - supplierSold - allReturned);
 
     return {
+      productId: p.id,
       name: p.name,
       produced,
       sold: totalSold,        // all sales (for display as "X sold total")
@@ -212,6 +215,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       remaining: inStore,       // how many are in the store right now
     };
   });
+
+  const backfillIssues = await db
+    .select()
+    .from(productIdentityBackfillIssuesTable)
+    .where(eq(productIdentityBackfillIssuesTable.companyId, companyId));
 
   res.json({
     activeProductCount: activeProducts.length,
@@ -233,6 +241,10 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       totalAmount: allSalesEver.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
       totalQuantity: allSalesEver.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
       salesCount: allSalesEver.length,
+    },
+    stockIdentityReview: {
+      count: backfillIssues.length,
+      issues: backfillIssues,
     },
     remaining,
   });

@@ -16,3 +16,4 @@ export * from "./workers";
 export * from "./expenses";
 export * from "./push-subscriptions";
 export * from "./daily-closings";
+export * from "./product-identity";
