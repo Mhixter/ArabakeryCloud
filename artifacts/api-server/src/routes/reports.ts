@@ -17,8 +17,42 @@ const identityReviewTables = {
 type IdentityReviewType = keyof typeof identityReviewTables;
 type IdentityReviewTable = typeof productionBatchesTable;
 
-function isIdentityReviewType(value: string): value is IdentityReviewType {
+export function isIdentityReviewType(value: string): value is IdentityReviewType {
   return value in identityReviewTables;
+}
+
+export function isUnresolvedIdentityReviewRow(productId: number | null): boolean {
+  return productId == null;
+}
+
+type IdentityCandidate = {
+  id: number;
+  name: string;
+  branchId: number | null;
+  companyId?: number;
+  isActive?: boolean;
+};
+
+/**
+ * Candidate matching is deliberately based on the historical display name,
+ * not on a product id that may be missing or stale in the old transaction.
+ * Company and active checks are repeated here as a defensive boundary for
+ * callers that already have a candidate list.
+ */
+export function isValidIdentityCandidate(
+  candidate: IdentityCandidate,
+  historicalName: string,
+  historicalBranchId: number | null,
+  companyId: number,
+): boolean {
+  return (
+    (candidate.companyId === undefined || candidate.companyId === companyId) &&
+    (candidate.isActive === undefined || candidate.isActive) &&
+    candidate.name.trim().toLowerCase() === historicalName.trim().toLowerCase() &&
+    (historicalBranchId === null
+      ? candidate.branchId === null
+      : candidate.branchId === null || candidate.branchId === historicalBranchId)
+  );
 }
 
 async function getIdentityReviewRow(type: IdentityReviewType, transactionId: number, companyId: number) {
@@ -28,7 +62,7 @@ async function getIdentityReviewRow(type: IdentityReviewType, transactionId: num
 }
 
 async function getIdentityCandidates(breadType: string, branchId: number | null, companyId: number) {
-  return db.select({
+  const candidates = await db.select({
     id: productsTable.id,
     name: productsTable.name,
     branchId: productsTable.branchId,
@@ -38,6 +72,16 @@ async function getIdentityCandidates(breadType: string, branchId: number | null,
     sql`lower(trim(${productsTable.name})) = lower(trim(${breadType}))`,
     branchId == null ? isNull(productsTable.branchId) : or(isNull(productsTable.branchId), eq(productsTable.branchId, branchId)),
   ));
+  return candidates.filter(candidate =>
+    isValidIdentityCandidate(candidate, breadType, branchId, companyId),
+  );
+}
+
+export function isSelectableIdentityProduct(
+  productId: number,
+  candidateIds: readonly number[],
+): boolean {
+  return candidateIds.includes(productId);
 }
 
 /* ── Historical product identity review ── */
@@ -50,7 +94,7 @@ router.get("/reports/stock-identity-review", authenticate, requireRole("manager"
   const reviewRows = await Promise.all(issues.map(async (issue) => {
     if (!isIdentityReviewType(issue.transactionType)) return null;
     const row = await getIdentityReviewRow(issue.transactionType, issue.transactionId, companyId);
-    if (!row || row.productId != null) return null;
+    if (!row || !isUnresolvedIdentityReviewRow(row.productId)) return null;
     const candidates = await getIdentityCandidates(row.breadType, row.branchId, companyId);
     return {
       id: issue.id,
@@ -94,7 +138,7 @@ router.patch("/reports/stock-identity-review/:transactionType/:transactionId", a
     return;
   }
   const candidates = await getIdentityCandidates(row.breadType, row.branchId, companyId);
-  if (!candidates.some((candidate: { id: number }) => candidate.id === productId)) {
+  if (!isSelectableIdentityProduct(productId, candidates.map(candidate => candidate.id))) {
     res.status(400).json({ error: "Selected product is not an active candidate for this transaction" });
     return;
   }
