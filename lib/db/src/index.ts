@@ -64,7 +64,7 @@ try {
       ALTER TABLE product_returns
         ADD COLUMN IF NOT EXISTS product_id integer;
       ALTER TABLE daily_closing_lines
-        ADD COLUMN IF NOT EXISTS counted integer NOT NULL DEFAULT 0
+        ADD COLUMN IF NOT EXISTS counted boolean NOT NULL DEFAULT false
     `).then(() => undefined);
   } else {
     console.warn("[AI Studio] DATABASE_URL missing — using mock DB proxy");

@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { companiesTable } from "./companies";
 import { branchesTable } from "./branches";
 import { usersTable } from "./users";
@@ -31,7 +31,7 @@ export const dailyClosingLinesTable = pgTable("daily_closing_lines", {
   returned: integer("returned").notNull().default(0),
   recordedSales: integer("recorded_sales").notNull().default(0),
   closingStock: integer("closing_stock").notNull().default(0),
-  counted: integer("counted").notNull().default(0),
+  counted: boolean("counted").notNull().default(false),
   calculatedSales: integer("calculated_sales").notNull().default(0),
   variance: integer("variance").notNull().default(0),
   varianceReason: text("variance_reason"),

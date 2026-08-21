@@ -7,7 +7,8 @@ export interface ClosingLineInput {
   returned: number;
   allocated: number;
   recordedSales: number;
-  closingStock: number;
+  closingStock: number | null;
+  counted?: boolean;
   varianceReason?: string | null;
 }
 
@@ -28,8 +29,8 @@ export function isDirectStoreSale(sale: SaleForClosing, cashierRole?: string | n
 }
 
 export function calculateClosingLine(line: ClosingLineInput): ClosingLineCalculation {
-  const closingStock = Math.max(0, Number.parseInt(String(line.closingStock), 10) || 0);
-  const calculatedSales = line.openingStock + line.produced + line.returned - line.allocated - closingStock;
+  const closingStock = Math.max(0, Number.parseInt(String(line.closingStock ?? 0), 10) || 0);
+  const calculatedSales = Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - closingStock);
   return {
     closingStock,
     calculatedSales,
@@ -42,6 +43,7 @@ export function calculateClosingLine(line: ClosingLineInput): ClosingLineCalcula
 
 export function validateSubmission(lines: Array<ClosingLineInput & { id?: number }>): string | null {
   for (const line of lines) {
+    if (!line.counted) return `A physical closing count is required for ${line.productName}`;
     const calculation = calculateClosingLine(line);
     if (calculation.variance !== 0 && !calculation.varianceReason) {
       return `A reason is required for the ${line.productName} variance`;

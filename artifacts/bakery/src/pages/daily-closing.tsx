@@ -13,7 +13,7 @@ import { ClipboardCheck, Save, CheckCircle2 } from "lucide-react";
 type Line = {
   id?: number; productId?: number; productName: string; openingStock: number; produced: number;
   allocated: number; returned: number; recordedSales: number; closingStock: number;
-  calculatedSales: number; variance: number; varianceReason?: string | null;
+  calculatedSales: number; variance: number; counted?: boolean; varianceReason?: string | null;
 };
 type Closing = { id: number; status: "draft" | "submitted" | "approved"; businessDate: string; branchId: number };
 
@@ -72,7 +72,7 @@ export default function DailyClosingPage() {
     toast({ title: "Closing approved" }); await load();
   }
   const editable = !closing || closing.status === "draft";
-  const totalVariance = lines.reduce((sum, line) => sum + line.variance, 0);
+  const totalVariance = lines.reduce((sum, line) => sum + (line.counted ? line.variance : 0), 0);
 
   return (
     <div className="space-y-6" data-testid="page-daily-closing">
@@ -105,15 +105,16 @@ export default function DailyClosingPage() {
                     <th className="p-3">Product</th><th className="p-3 text-right">Recorded sales</th><th className="p-3 w-[150px]">Count left</th><th className="p-3 text-right">Expected sales</th><th className="p-3 text-right">Difference</th><th className="p-3 min-w-[210px]">Why different?</th>
                   </tr></thead>
                   <tbody>{lines.map((line, index) => {
+                    const counted = line.counted === true;
                     const closingStock = Number.isFinite(line.closingStock) ? line.closingStock : 0;
-                    const expected = line.openingStock + line.produced + line.returned - line.allocated - closingStock;
-                    const variance = expected - line.recordedSales;
+                    const expected = counted ? Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - closingStock) : null;
+                    const variance = expected === null ? null : expected - line.recordedSales;
                     return <tr key={line.id ?? line.productName} className="border-b last:border-0">
                       <td className="p-3 font-medium">{line.productName}<div className="text-[11px] text-muted-foreground">{line.openingStock} opening · +{line.produced} baked · -{line.allocated} allocated</div></td>
                       <td className="p-3 text-right">{line.recordedSales}</td>
-                      <td className="p-3"><Input type="number" min="0" disabled={!editable} value={line.closingStock} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, closingStock: Math.max(0, parseInt(e.target.value) || 0), calculatedSales: expected, variance } : item))} /></td>
-                      <td className="p-3 text-right font-semibold">{expected}</td><td className={`p-3 text-right font-semibold ${variance === 0 ? "text-emerald-600" : "text-rose-600"}`}>{variance > 0 ? "+" : ""}{variance}</td>
-                      <td className="p-3"><Input disabled={!editable || variance === 0} placeholder={variance === 0 ? "No variance" : "Required before submit"} value={line.varianceReason ?? ""} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, varianceReason: e.target.value } : item))} /></td>
+                      <td className="p-3"><Input type="number" min="0" disabled={!editable} placeholder="Enter count" value={counted ? line.closingStock : ""} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, counted: true, closingStock: Math.max(0, parseInt(e.target.value) || 0), calculatedSales: Math.max(0, item.openingStock + item.produced + item.returned - item.allocated - (parseInt(e.target.value) || 0)), variance: Math.max(0, item.openingStock + item.produced + item.returned - item.allocated - (parseInt(e.target.value) || 0)) - item.recordedSales } : item))} /></td>
+                      <td className="p-3 text-right font-semibold">{expected === null ? "—" : expected}</td><td className={`p-3 text-right font-semibold ${variance === null ? "text-muted-foreground" : variance === 0 ? "text-emerald-600" : "text-rose-600"}`}>{variance === null ? "—" : `${variance > 0 ? "+" : ""}${variance}`}</td>
+                      <td className="p-3"><Input disabled={!editable || variance === null || variance === 0} placeholder={variance === null ? "Count required" : variance === 0 ? "No variance" : "Required before submit"} value={line.varianceReason ?? ""} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, varianceReason: e.target.value } : item))} /></td>
                     </tr>;
                   })}</tbody>
                 </table>

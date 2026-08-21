@@ -143,6 +143,7 @@ async function movementSummary(companyId: number, branchId: number, date: string
     lines.push({
       productId: product.id, productName: product.name, openingStock: Math.max(0, openingStock),
       ...movements, closingStock: 0,
+      counted: false,
       calculatedSales: openingStock + movements.produced + movements.returned - movements.allocated,
       variance: 0, varianceReason: null,
     });
@@ -185,9 +186,10 @@ router.patch("/daily-closings/:id", authenticate, requireRole(...editableRoles),
   const reasonError = req.body.submit ? validateSubmission(lines) : null;
   if (reasonError) { res.status(400).json({ error: reasonError }); return; }
   for (const input of lines) {
+    if (!input.counted) continue;
     const { closingStock, calculatedSales, variance, varianceReason } = calculateClosingLine(input);
     await db.update(dailyClosingLinesTable).set({
-      closingStock, calculatedSales, variance, varianceReason, updatedAt: new Date(),
+      closingStock, counted: true, calculatedSales, variance, varianceReason, updatedAt: new Date(),
     }).where(and(eq(dailyClosingLinesTable.id, Number(input.id)), eq(dailyClosingLinesTable.closingId, id)));
   }
   const status = nextClosingStatus(closing.status as "draft" | "submitted" | "approved", Boolean(req.body.submit));

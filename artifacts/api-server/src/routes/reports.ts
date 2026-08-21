@@ -129,7 +129,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     const map = new Map<string, { quantity: number; amount: number }>();
     for (const { sale: s } of rows) {
       const p = map.get(s.breadType) ?? { quantity: 0, amount: 0 };
-      map.set(s.breadType, { quantity: p.quantity + s.quantity, amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
+      const isQuickSale = s.breadType.trim().toLowerCase() === "quick sale";
+      map.set(s.breadType, { quantity: p.quantity + (isQuickSale ? 0 : s.quantity), amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
     }
     return Array.from(map.entries())
       .map(([name, d]) => ({ name, quantity: d.quantity, amount: d.amount }))
@@ -216,21 +217,21 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     activeProductCount: activeProducts.length,
     today: {
       totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: todaySales.reduce((s, x) => s + x.sale.quantity, 0),
+      totalQuantity: todaySales.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
       salesCount: todaySales.length,
       totalExpenses: todayExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(todaySales),
     },
     week: {
       totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: weekSales.reduce((s, x) => s + x.sale.quantity, 0),
+      totalQuantity: weekSales.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
       salesCount: weekSales.length,
       totalExpenses: weekExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(weekSales),
     },
     allTime: {
       totalAmount: allSalesEver.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: allSalesEver.reduce((s, x) => s + x.sale.quantity, 0),
+      totalQuantity: allSalesEver.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
       salesCount: allSalesEver.length,
     },
     remaining,
