@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
 import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable } from "@workspace/db";
-import { eq, and, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { notifyManagers } from "../lib/push";
@@ -85,12 +85,20 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   }
 
   const qty = parseInt(quantity);
+  const effectiveBranchId = parseInt(branchId) || userBranchId;
+  if (!effectiveBranchId) {
+    res.status(400).json({ error: "Select a branch before recording a sale" });
+    return;
+  }
 
   /* 1. Validate product exists and is active */
   const [product] = await db
     .select()
     .from(productsTable)
-    .where(and(eq(productsTable.companyId, companyId), eq(productsTable.name, breadType), eq(productsTable.isActive, true)));
+    .where(and(
+      eq(productsTable.companyId, companyId), eq(productsTable.name, breadType), eq(productsTable.isActive, true),
+      or(eq(productsTable.branchId, effectiveBranchId), isNull(productsTable.branchId)),
+    ));
 
   if (!product) {
     res.status(400).json({ error: `"${breadType}" is not an active product. Ask your admin to add it.` });
@@ -143,13 +151,13 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   } else {
     /* Receptionists/managers: check overall stock (produced - allocated - direct sales) */
     const [allProduction, allSales, allAllocations] = await Promise.all([
-      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.breadType, breadType), isNull(productionBatchesTable.deletedAt))),
-      db.select().from(salesTable).where(and(eq(salesTable.companyId, companyId), eq(salesTable.breadType, breadType), isNull(salesTable.deletedAt))),
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.breadType, breadType), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, effectiveBranchId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${breadType}))`, isNull(productionBatchesTable.deletedAt))),
+      db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, effectiveBranchId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${breadType}))`, isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, effectiveBranchId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${breadType}))`, isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
     ]);
 
     const totalProduced = allProduction.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
-    const totalSold = allSales.reduce((s, s2) => s + s2.quantity, 0);
+    const totalSold = allSales.reduce((s, s2) => s + (s2.cashierRole === "supplier" ? 0 : s2.sale.quantity), 0);
     const totalAllocated = allAllocations.reduce((s, a) => s + a.quantity, 0);
     const remaining = totalProduced - totalSold - totalAllocated;
 
@@ -169,7 +177,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
 
   /* Resolve branchId: use request body value, else user's branchId.
      For suppliers without a branchId, fall back to their most recent allocation's branch. */
-  let effectiveBranchId = parseInt(branchId) || userBranchId;
+  // effectiveBranchId was resolved before stock validation so every check is branch-scoped.
   if (!effectiveBranchId && role === "supplier") {
     const [recentAlloc] = await db
       .select()
