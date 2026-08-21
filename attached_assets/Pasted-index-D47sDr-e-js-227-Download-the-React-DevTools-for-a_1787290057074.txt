@@ -1,0 +1,54 @@
+index-D47sDr_e.js:227 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+allocations:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/reports/product-dashboard:1  Failed to load resource: the server responded with a status of 500 ()
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/products?branchId=14
+sw.js:1 workbox Using je to respond to '/api/products?branchId=14'
+sw.js:1 workbox Router is responding to: /api/sales?branchId=14
+sw.js:1 workbox Router is responding to: /api/branches
+sw.js:1 workbox Using je to respond to '/api/branches'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/sales?branchId=14'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Router is responding to: /api/production?branchId=14
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/production?branchId=14'
+sw.js:1 workbox Router is responding to: /api/notifications
+sw.js:1 workbox Using ee to respond to '/api/notifications'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Router is responding to: /api/production?branchId=14
+sw.js:1 workbox Using ee to respond to '/api/production?branchId=14'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/allocations?branchId=14
+sw.js:1 workbox Router is responding to: /api/returns?branchId=14
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Using ee to respond to '/api/returns?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/allocations?branchId=14'
+sw.js:1 workbox Router is responding to: /api/allocations/sellers
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard'
+api/reports/product-dashboard:1  Failed to load resource: the server responded with a status of 500 ()
+sw.js:1 workbox Using ee to respond to '/api/allocations/sellers'
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
+sw.js:1 workbox Router is responding to: /assets/index-Hltj-ykp.css
