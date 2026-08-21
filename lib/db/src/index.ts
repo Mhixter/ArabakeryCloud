@@ -54,7 +54,15 @@ try {
       ALTER TABLE seller_allocations
         ADD COLUMN IF NOT EXISTS is_cleared boolean NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS cleared_at timestamptz,
-        ADD COLUMN IF NOT EXISTS cleared_by_id integer
+         ADD COLUMN IF NOT EXISTS cleared_by_id integer;
+      ALTER TABLE production_batches
+        ADD COLUMN IF NOT EXISTS product_id integer;
+      ALTER TABLE sales
+        ADD COLUMN IF NOT EXISTS product_id integer;
+      ALTER TABLE seller_allocations
+        ADD COLUMN IF NOT EXISTS product_id integer;
+      ALTER TABLE product_returns
+        ADD COLUMN IF NOT EXISTS product_id integer
     `).then(() => undefined);
   } else {
     console.warn("[AI Studio] DATABASE_URL missing — using mock DB proxy");
