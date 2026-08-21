@@ -84,8 +84,14 @@ try {
         notes text,
         accepted_by_id integer NOT NULL REFERENCES users(id),
         accepted_at timestamptz NOT NULL DEFAULT now(),
+        stock_cleared_at timestamptz,
+        stock_cleared_products integer NOT NULL DEFAULT 0,
         created_at timestamptz NOT NULL DEFAULT now()
       );
+      ALTER TABLE quick_sale_settlements
+        ADD COLUMN IF NOT EXISTS stock_cleared_at timestamptz,
+        ADD COLUMN IF NOT EXISTS stock_cleared_products integer NOT NULL DEFAULT 0
+      ;
       CREATE UNIQUE INDEX IF NOT EXISTS quick_sale_settlements_company_branch_week_idx
         ON quick_sale_settlements(company_id, branch_id, week_start);
       ALTER TABLE daily_closing_lines

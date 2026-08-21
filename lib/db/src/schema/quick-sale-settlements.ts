@@ -14,6 +14,8 @@ export const quickSaleSettlementsTable = pgTable("quick_sale_settlements", {
   notes: text("notes"),
   acceptedById: integer("accepted_by_id").notNull().references(() => usersTable.id),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+  stockClearedAt: timestamp("stock_cleared_at", { withTimezone: true }),
+  stockClearedProducts: integer("stock_cleared_products").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => ({
   companyBranchWeek: uniqueIndex("quick_sale_settlements_company_branch_week_idx").on(table.companyId, table.branchId, table.weekStart),

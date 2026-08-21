@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable, quickSaleSettlementsTable } from "@workspace/db";
+import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable, productReturnsTable, quickSaleSettlementsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -121,13 +121,119 @@ router.post("/quick-sale-settlements/accept", authenticate, requireRole("managin
     const [existing] = await db.select().from(quickSaleSettlementsTable).where(and(
       eq(quickSaleSettlementsTable.companyId, req.user!.companyId), eq(quickSaleSettlementsTable.branchId, branchId), eq(quickSaleSettlementsTable.weekStart, weekStart),
     ));
-    if (existing) { res.status(400).json({ error: "This week has already been accepted" }); return; }
-    const [accepted] = await db.insert(quickSaleSettlementsTable).values({
-      companyId: req.user!.companyId, branchId, weekStart, weekEnd, amount: totalAmount.toFixed(2),
-      paymentMethod, notes: req.body.notes ? String(req.body.notes).trim() : null, acceptedById: req.user!.userId,
-    }).returning();
+    if (existing?.stockClearedAt) { res.status(400).json({ error: "This week has already been accepted and stock was cleared" }); return; }
+
+    /*
+     * A weekly Quick Sale acceptance also hands over all remaining physical
+     * stock in the selected branch. Quick Sale itself is amount-only, so the
+     * stock handover is represented by zero-revenue product sales. This keeps
+     * the stock ledger balanced without counting the accepted cash twice as
+     * revenue, and supplier allocations remain untouched.
+     */
+    const [activeProducts, production, stockSales, approvedReturns, activeAllocations] = await Promise.all([
+      db.select().from(productsTable).where(and(
+        eq(productsTable.companyId, req.user!.companyId),
+        eq(productsTable.isActive, true),
+        or(eq(productsTable.branchId, branchId), isNull(productsTable.branchId)),
+      )),
+      db.select().from(productionBatchesTable).where(and(
+        eq(productionBatchesTable.companyId, req.user!.companyId),
+        eq(productionBatchesTable.branchId, branchId),
+        isNull(productionBatchesTable.deletedAt),
+      )),
+      db.select({ sale: salesTable, cashierRole: usersTable.role })
+        .from(salesTable)
+        .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+        .where(and(
+          eq(salesTable.companyId, req.user!.companyId),
+          eq(salesTable.branchId, branchId),
+          isNull(salesTable.deletedAt),
+        )),
+      db.select().from(productReturnsTable).where(and(
+        eq(productReturnsTable.companyId, req.user!.companyId),
+        eq(productReturnsTable.branchId, branchId),
+        eq(productReturnsTable.status, "approved" as const),
+      )),
+      db.select().from(sellerAllocationsTable).where(and(
+        eq(sellerAllocationsTable.companyId, req.user!.companyId),
+        eq(sellerAllocationsTable.branchId, branchId),
+        isNull(sellerAllocationsTable.deletedAt),
+        eq(sellerAllocationsTable.isCleared, false),
+      )),
+    ]);
+
+    const nameKey = (value: string) => value.trim().toLowerCase();
+    const addToMap = (map: Map<string, number>, productId: number | null, breadType: string, quantity: number) => {
+      const key = productId == null ? `legacy:${nameKey(breadType)}` : `product:${productId}`;
+      map.set(key, (map.get(key) ?? 0) + quantity);
+    };
+    const sumForProduct = (map: Map<string, number>, product: typeof productsTable.$inferSelect) =>
+      (map.get(`product:${product.id}`) ?? 0) + (map.get(`legacy:${nameKey(product.name)}`) ?? 0);
+
+    const producedByProduct = new Map<string, number>();
+    for (const row of production) addToMap(producedByProduct, row.productId, row.breadType, row.quantityProduced - row.wasteQuantity);
+
+    const directSalesByProduct = new Map<string, number>();
+    for (const { sale, cashierRole } of stockSales) {
+      if (cashierRole !== "supplier" && sale.breadType.trim().toLowerCase() !== "quick sale") {
+        addToMap(directSalesByProduct, sale.productId, sale.breadType, sale.quantity);
+      }
+    }
+
+    const restoredByProduct = new Map<string, number>();
+    for (const row of approvedReturns) {
+      if (["not_sold", "wrong_item", "other"].includes(row.reason)) {
+        addToMap(restoredByProduct, row.productId, row.breadType, row.quantity);
+      }
+    }
+
+    const allocatedByProduct = new Map<string, number>();
+    for (const row of activeAllocations) addToMap(allocatedByProduct, row.productId, row.breadType, row.quantity);
+
+    const stockClearingRows = activeProducts.flatMap(product => {
+      const remaining = Math.max(0,
+        sumForProduct(producedByProduct, product)
+        + sumForProduct(restoredByProduct, product)
+        - sumForProduct(directSalesByProduct, product)
+        - sumForProduct(allocatedByProduct, product),
+      );
+      if (remaining <= 0) return [];
+      return [{
+        companyId: req.user!.companyId,
+        receiptNumber: generateReceiptNumber(),
+        productId: product.id,
+        breadType: product.name,
+        quantity: remaining,
+        pricePerUnit: "0",
+        totalAmount: "0",
+        costAmount: "0",
+        profitAmount: "0",
+        paymentMethod,
+        cashierId: req.user!.userId,
+        branchId,
+        notes: `[Quick Sale stock settlement] ${req.body.notes ? String(req.body.notes).trim() : "Remaining in-store stock cleared"}`,
+        saleDate: new Date(),
+      }];
+    });
+
+    const [accepted] = await db.transaction(async tx => {
+      let settlement = existing;
+      if (!settlement) {
+        [settlement] = await tx.insert(quickSaleSettlementsTable).values({
+          companyId: req.user!.companyId, branchId, weekStart, weekEnd, amount: totalAmount.toFixed(2),
+          paymentMethod, notes: req.body.notes ? String(req.body.notes).trim() : null, acceptedById: req.user!.userId,
+        }).returning();
+      }
+      if (stockClearingRows.length > 0) await tx.insert(salesTable).values(stockClearingRows);
+      const [updated] = await tx.update(quickSaleSettlementsTable).set({
+        stockClearedAt: new Date(),
+        stockClearedProducts: stockClearingRows.length,
+      }).where(eq(quickSaleSettlementsTable.id, settlement.id)).returning();
+      return [updated];
+    });
     await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "QUICK_SALE_WEEK_ACCEPTED", entityType: "quick_sale_settlement", entityId: accepted.id, details: `Accepted ₦${totalAmount.toLocaleString()} manager Quick Sales for ${weekStart} to ${weekEnd}`, branchId });
-    res.json({ success: true, settlement: { ...accepted, amount: Number(accepted.amount) } });
+    await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "IN_STOCK_SETTLED", entityType: "quick_sale_settlement", entityId: accepted.id, details: `Cleared ${stockClearingRows.length} product stock balances for ${weekStart} to ${weekEnd}; supplier allocations unchanged`, branchId });
+    res.json({ success: true, settlement: { ...accepted, amount: Number(accepted.amount) }, stockClearedProducts: stockClearingRows.length });
   } catch (err) {
     console.error("POST /quick-sale-settlements/accept error:", err);
     res.status(500).json({ error: "Failed to accept weekly Quick Sale settlement" });
