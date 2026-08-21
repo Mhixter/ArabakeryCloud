@@ -9,12 +9,12 @@ import {
 
 const BUSINESS_DATE = "2026-08-21";
 
-test("business day boundaries are the exact inclusive Africa/Lagos range", () => {
+test("business day boundaries are the exact inclusive America/Los_Angeles range", () => {
   const { start, end } = businessDateRange(BUSINESS_DATE);
 
-  assert.equal(BUSINESS_TIMEZONE, "Africa/Lagos");
-  assert.equal(start.toISOString(), "2026-08-20T23:00:00.000Z");
-  assert.equal(end.toISOString(), "2026-08-21T22:59:59.999Z");
+  assert.equal(BUSINESS_TIMEZONE, "America/Los_Angeles");
+  assert.equal(start.toISOString(), "2026-08-21T07:00:00.000Z");
+  assert.equal(end.toISOString(), "2026-08-22T06:59:59.999Z");
 
   assert.equal(businessDateFor(new Date(start.getTime() - 1)), "2026-08-20");
   assert.equal(businessDateFor(start), BUSINESS_DATE);
@@ -36,7 +36,7 @@ test("date-only API filters include both boundary instants", () => {
   assert.equal(justAfterEnd <= endRange.end, false);
 });
 
-test("records around UTC midnight keep the same Lagos business date across reports", () => {
+test("records around UTC midnight keep the same Los Angeles business date across reports", () => {
   const nearMidnightRecords = [
     { kind: "sale", recordedAt: new Date("2026-08-20T23:59:59.999Z") },
     { kind: "production", recordedAt: new Date("2026-08-21T00:00:00.001Z") },
