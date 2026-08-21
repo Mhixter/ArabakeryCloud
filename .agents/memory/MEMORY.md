@@ -4,3 +4,4 @@
 - [Render Forwarded Origins](render-forwarded-origin.md) — same-origin requests may require X-Forwarded-Host or RENDER_EXTERNAL_URL behind Render's proxy
 - [Business Date Rule](business-date-rule.md) — operational day boundaries use the explicit Africa/Lagos timezone across API filters and UI grouping
 - [Daily Closing Settlement](daily-closing-settlement.md) — physical closing counts are settled as separate manager stock sales; supplier allocations remain unchanged
+- [Quick Sale Weekly Acceptance](quick-sale-weekly-acceptance.md) — Managing Directors review manager Quick Sales by day and accept one immutable weekly total

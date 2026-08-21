@@ -1165,8 +1165,6 @@ function ManagerDashboard() {
         </Button>
       </div>}
 
-      {isOwner && <StockSettlementPanel branchId={activeBranch?.id} />}
-
       {/* All-time totals — always visible regardless of period */}
       <div className="grid grid-cols-3 gap-3">
         <KpiCard title="Total Revenue" value={loading ? "—" : formatCurrency(data?.allTime?.totalAmount ?? 0)} sub="all time" icon={TrendingUp} loading={loading} accent="green" />

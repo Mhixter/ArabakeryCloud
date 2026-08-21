@@ -680,12 +680,6 @@ export default function SalesPage() {
               Quick Sale
             </Button>
           )}
-          {!isLimitedRole && (
-            <Button variant="outline" onClick={openBulkSale} disabled={isExpired || activeProducts.length === 0} data-testid="button-bulk-sale">
-              <Plus size={16} className="mr-2" />
-              Daily Entry
-            </Button>
-          )}
           <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
             <Plus size={16} className="mr-2" />
             New Sale
