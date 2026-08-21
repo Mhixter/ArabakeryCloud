@@ -1,0 +1,217 @@
+ workbox Router is responding to: /api/notifications
+ workbox Using ee to respond to '/api/notifications'
+ workbox Router is responding to: /api/returns/pending-count
+ workbox Router is responding to: /api/inventory/low-stock
+ workbox Router is responding to: /api/push/vapid-public-key
+ workbox Using ee to respond to '/api/push/vapid-public-key'
+ workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+ workbox Using ee to respond to '/api/returns/pending-count'
+ workbox Using ee to respond to '/api/inventory/low-stock'
+ workbox Router is responding to: /api/push/vapid-public-key
+ workbox Using ee to respond to '/api/push/vapid-public-key'
+ workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+ workbox Router is responding to: /dashboard
+ workbox Router is responding to: /assets/index-BDDLnGIH.js
+ workbox Router is responding to: /assets/index-DyPtNYOF.css
+ workbox Router is responding to: /registerSW.js
+ Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+ workbox Router is responding to: /api/push/vapid-public-key
+ workbox Router is responding to: /api/notifications
+ workbox Router is responding to: /api/reports/product-dashboard?branchId=15
+ workbox Router is responding to: /api/allocations?branchId=15
+ workbox Router is responding to: /api/products
+ workbox Router is responding to: /api/returns/pending-count
+ workbox Router is responding to: /api/subscription
+ workbox Using je to respond to '/api/products'
+ workbox Router is responding to: /api/inventory/low-stock
+ workbox Router is responding to: /favicon.svg
+ workbox Using ee to respond to '/api/push/vapid-public-key'
+ workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+ workbox Router is responding to: /icons/icon.svg
+ workbox Router is responding to: /api/push/vapid-public-key
+dashboard:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ workbox Using ee to respond to '/api/notifications'
+ workbox Using ee to respond to '/api/subscription'
+ workbox Using ee to respond to '/api/returns/pending-count'
+ workbox Using ee to respond to '/api/inventory/low-stock'
+ workbox Using ee to respond to '/api/push/vapid-public-key'
+ workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+ workbox Using ee to respond to '/api/allocations?branchId=15'
+ workbox Router is responding to: /api/push/vapid-public-key
+vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+ workbox Router is responding to: /api/push/vapid-public-key
+ workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=15'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Router is responding to: /api/branches
+sw.js:1 workbox Using je to respond to '/api/branches'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/notifications
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard?branchId=14
+sw.js:1 workbox Router is responding to: /api/allocations?branchId=14
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+sw.js:1 workbox Router is responding to: /api/inventory/low-stock
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/inventory/low-stock'
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Using ee to respond to '/api/allocations?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/notifications'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=14'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/notifications
+sw.js:1 workbox Router is responding to: /api/products?branchId=14
+sw.js:1 workbox Using je to respond to '/api/products?branchId=14'
+sw.js:1 workbox Router is responding to: /api/sales?branchId=14
+sw.js:1 workbox Router is responding to: /api/branches
+sw.js:1 workbox Using je to respond to '/api/branches'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/sales?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/notifications'
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard?branchId=14
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=14'
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+api/sales:1  Failed to load resource: the server responded with a status of 400 ()
+sw.js:1 workbox Router is responding to: /api/sales?branchId=14
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
+sw.js:1 workbox Using ee to respond to '/api/sales?branchId=14'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/allocations?branchId=14
+sw.js:1 workbox Router is responding to: /api/returns?branchId=14
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/returns?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/allocations?branchId=14'
+sw.js:1 workbox Router is responding to: /assets/index-DyPtNYOF.css
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
+sw.js:1 workbox Router is responding to: /api/notifications
+sw.js:1 workbox Using ee to respond to '/api/notifications'
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+index-BDDLnGIH.js:464  GET https://arabakerycloud.onrender.com/api/push/vapid-public-key 503 (Service Unavailable)
+t @ index-BDDLnGIH.js:464
+(anonymous) @ index-BDDLnGIH.js:464
+react-stack-bottom-frame @ index-BDDLnGIH.js:220
+ar @ index-BDDLnGIH.js:36
+Cp @ index-BDDLnGIH.js:141
+Lx @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+md @ index-BDDLnGIH.js:154
+jC @ index-BDDLnGIH.js:154
+UC @ index-BDDLnGIH.js:154
+By @ index-BDDLnGIH.js:154
+qC @ index-BDDLnGIH.js:154
+M2 @ index-BDDLnGIH.js:154
+CC @ index-BDDLnGIH.js:154
+TC @ index-BDDLnGIH.js:154
+ZC @ index-BDDLnGIH.js:176
+zy @ index-BDDLnGIH.js:176
+B2 @ index-BDDLnGIH.js:176
+(anonymous) @ index-BDDLnGIH.js:176
+<FX>
+PJ.WN.jsxDEV @ index-BDDLnGIH.js:18
+x @ index-BDDLnGIH.js:464
+react-stack-bottom-frame @ index-BDDLnGIH.js:220
+ko @ index-BDDLnGIH.js:111
+Sp @ index-BDDLnGIH.js:132
+Vy @ index-BDDLnGIH.js:141
+ar @ index-BDDLnGIH.js:36
+LC @ index-BDDLnGIH.js:154
+MC @ index-BDDLnGIH.js:154
+R2 @ index-BDDLnGIH.js:154
+TC @ index-BDDLnGIH.js:154
+ZC @ index-BDDLnGIH.js:176
+zy @ index-BDDLnGIH.js:176
+B2 @ index-BDDLnGIH.js:176
+(anonymous) @ index-BDDLnGIH.js:176
+<x>
+PJ.WN.jsxDEV @ index-BDDLnGIH.js:18
+v_e @ index-BDDLnGIH.js:464
+react-stack-bottom-frame @ index-BDDLnGIH.js:220
+ko @ index-BDDLnGIH.js:111
+Sp @ index-BDDLnGIH.js:132
+Vy @ index-BDDLnGIH.js:141
+ar @ index-BDDLnGIH.js:36
+LC @ index-BDDLnGIH.js:154
+MC @ index-BDDLnGIH.js:154
+R2 @ index-BDDLnGIH.js:154
+TC @ index-BDDLnGIH.js:154
+ZC @ index-BDDLnGIH.js:176
+zy @ index-BDDLnGIH.js:176
+B2 @ index-BDDLnGIH.js:176
+(anonymous) @ index-BDDLnGIH.js:176
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Router is responding to: /api/returns/pending-count
+sw.js:1 workbox Using ee to respond to '/api/returns/pending-count'
