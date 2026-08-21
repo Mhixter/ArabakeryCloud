@@ -426,9 +426,10 @@ export default function SalesPage() {
   };
 
   const handleBulkCreate = async () => {
-    // For each line, soldQty = (allocatedQty + inStoreQty) - remaining
+    // Daily Entry records direct store sales only. Supplier stock is settled/sold
+    // separately and must never be included in a manager's direct-sale quantity.
     const lines = bulkLines.map(l => {
-      const totalStock = l.allocatedQty + l.inStoreQty;
+      const totalStock = l.inStoreQty;
       const remainingQty = l.remaining !== "" ? Math.max(0, parseInt(l.remaining) || 0) : null;
       const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : 0;
       return { ...l, soldQty };
@@ -442,6 +443,7 @@ export default function SalesPage() {
     setBulkSubmitting(true);
     let succeeded = 0;
     let failed = 0;
+    const failureReasons: string[] = [];
     for (const line of lines) {
       try {
         const res = await fetch(`${API_BASE}/api/sales`, {
@@ -473,8 +475,15 @@ export default function SalesPage() {
             saleDate: sale.saleDate,
           }, branchParam);
           succeeded++;
-        } else { failed++; }
-      } catch { failed++; }
+        } else {
+          failed++;
+          const error = await res.json().catch(() => ({}));
+          failureReasons.push(`${line.breadType}: ${error.error ?? `server rejected (${res.status})`}`);
+        }
+      } catch {
+        failed++;
+        failureReasons.push(`${line.breadType}: network error`);
+      }
     }
     setBulkSubmitting(false);
     queryClient.invalidateQueries({ queryKey: getListSalesQueryKey({}) });
@@ -482,7 +491,7 @@ export default function SalesPage() {
     if (succeeded > 0) {
       toast({ title: `${succeeded} product${succeeded > 1 ? "s" : ""} recorded`, description: failed > 0 ? `${failed} failed — check stock` : undefined });
     } else {
-      toast({ title: "All entries failed", description: "Check stock availability", variant: "destructive" });
+      toast({ title: "No sales were recorded", description: failureReasons[0] ?? "Check the selected branch and stock count", variant: "destructive" });
     }
     setShowBulkSale(false);
   };
@@ -1079,7 +1088,7 @@ export default function SalesPage() {
               Daily Sales Entry
             </DialogTitle>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Enter how many units remain for each product. The system calculates what was sold automatically.
+              Enter what is left in the store. Supplier stock is not included here.
             </p>
           </div>
 
@@ -1106,7 +1115,7 @@ export default function SalesPage() {
           {/* Column headers */}
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-6 py-2 border-b border-border/50 bg-muted/20">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Product</p>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-20">Allocated</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-20">With suppliers</p>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Remaining</p>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-right w-24">Sold / Total</p>
           </div>
@@ -1120,7 +1129,7 @@ export default function SalesPage() {
             ) : (
               <div className="divide-y divide-border/50">
                 {bulkLines.map((line, idx) => {
-                  const totalStock = line.allocatedQty + line.inStoreQty;
+                  const totalStock = line.inStoreQty;
                   const remainingQty = line.remaining !== "" ? Math.max(0, parseInt(line.remaining) || 0) : null;
                   const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : null;
                   const price = parseFloat(line.pricePerUnit) || 0;
