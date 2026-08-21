@@ -31,6 +31,7 @@ export const dailyClosingLinesTable = pgTable("daily_closing_lines", {
   returned: integer("returned").notNull().default(0),
   recordedSales: integer("recorded_sales").notNull().default(0),
   closingStock: integer("closing_stock").notNull().default(0),
+  counted: integer("counted").notNull().default(0),
   calculatedSales: integer("calculated_sales").notNull().default(0),
   variance: integer("variance").notNull().default(0),
   varianceReason: text("variance_reason"),

@@ -189,7 +189,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   effectiveBranchId = effectiveBranchId || 1;
 
   const [sale] = await db.insert(salesTable).values({
-    companyId, receiptNumber, breadType, quantity: qty,
+    companyId, receiptNumber, productId: product.id, breadType: product.name, quantity: qty,
     pricePerUnit: price.toString(), totalAmount: totalAmount.toString(),
     costAmount: "0", profitAmount: totalAmount.toString(),
     paymentMethod, cashierId: userId, branchId: effectiveBranchId,
@@ -243,6 +243,7 @@ router.post("/sales/quick", authenticate, requireRole("manager", "managing_direc
   const [sale] = await db.insert(salesTable).values({
     companyId,
     receiptNumber,
+    productId: null,
     breadType: "Quick Sale",
     quantity: 1,
     pricePerUnit: totalAmount.toString(),
