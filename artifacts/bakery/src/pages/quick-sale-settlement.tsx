@@ -23,7 +23,7 @@ type SettlementData = {
   weekEnd: string;
   days: Day[];
   totalAmount: number;
-  accepted: { amount: number; paymentMethod: string; acceptedAt: string } | null;
+  accepted: { amount: number; paymentMethod: string; acceptedAt: string; stockClearedAt: string | null; stockClearedProducts: number } | null;
 };
 
 function mondayOf(date: string) {
@@ -68,7 +68,7 @@ export default function QuickSaleSettlementPage() {
   useEffect(() => { load(); }, [load]);
 
   async function acceptWeek() {
-    if (!data || data.totalAmount <= 0 || data.accepted) return;
+    if (!data || data.totalAmount <= 0 || (data.accepted?.stockClearedAt)) return;
     setAccepting(true);
     try {
       const res = await fetch(`${API_BASE}/api/quick-sale-settlements/accept`, {
@@ -120,14 +120,14 @@ export default function QuickSaleSettlementPage() {
               ))}
             </CardContent>
           </Card>
-          <Card className="border-amber-200">
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} />Accept weekly settlement</CardTitle><CardDescription>Accept the full weekly total collected from the manager. This does not change product allocations or bread quantities.</CardDescription></CardHeader>
+           <Card className="border-amber-200">
+             <CardHeader><CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} />Accept weekly settlement</CardTitle><CardDescription>Accept the weekly amount and clear all remaining in-store stock for this branch. Supplier allocations remain unchanged.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              {data?.accepted ? <div className="flex items-center gap-2 text-emerald-700 font-medium"><CheckCircle2 size={18} />Accepted {currency(data.accepted.amount)} by {data.accepted.paymentMethod}.</div> : (
+               {data?.accepted?.stockClearedAt ? <div className="flex items-center gap-2 text-emerald-700 font-medium"><CheckCircle2 size={18} />Accepted {currency(data.accepted.amount)} by {data.accepted.paymentMethod}; cleared {data.accepted.stockClearedProducts} product stock balances.</div> : (
                 <div className="flex flex-wrap items-end gap-3">
                   <div><Label>Payment method</Label><select className="h-10 rounded-md border bg-background px-3 text-sm" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as "cash" | "transfer")}><option value="cash">Cash</option><option value="transfer">Transfer</option></select></div>
                   <div><Label htmlFor="weekly-notes">Notes / reference</Label><Input id="weekly-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" /></div>
-                  <Button onClick={acceptWeek} disabled={accepting || !data || data.totalAmount <= 0}><HandCoins size={15} className="mr-2" />{accepting ? "Accepting…" : `Accept ${currency(data?.totalAmount ?? 0)}`}</Button>
+                   <Button onClick={acceptWeek} disabled={accepting || !data || data.totalAmount <= 0}><HandCoins size={15} className="mr-2" />{accepting ? "Processing…" : data?.accepted ? "Clear remaining stock" : `Accept ${currency(data?.totalAmount ?? 0)}`}</Button>
                 </div>
               )}
             </CardContent>
