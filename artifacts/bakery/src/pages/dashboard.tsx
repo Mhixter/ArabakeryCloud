@@ -894,9 +894,7 @@ function ManagerDashboard() {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const params = new URLSearchParams();
-    if (isOwner) {
-      params.set("scope", "company");
-    } else if (activeBranch?.id) {
+    if (activeBranch?.id) {
       params.set("branchId", activeBranch.id.toString());
     }
     if (date) params.set("date", date);

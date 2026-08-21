@@ -53,7 +53,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     : role !== "managing_director" ? userBranchId : null;
   /* For the stock (remaining) calculation the MD always sees company-wide bread,
      not just a single branch. Period KPIs (revenue, expenses) still respect branchFilter. */
-  const stockBranchFilter = companyWide || role === "managing_director" ? null : branchFilter;
+  const stockBranchFilter = companyWide ? null : branchFilter;
   /* Support custom date for "view by date" filter — fallback to today */
   const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
   const now = new Date();
