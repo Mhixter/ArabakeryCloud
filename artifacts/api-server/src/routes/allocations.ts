@@ -150,13 +150,13 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
      * Supplier sales are already part of allocated stock and must not reduce store stock.
      */
     const [production, sales, existingAllocations, approvedReturns] = await Promise.all([
-      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${breadType}))`, isNull(productionBatchesTable.deletedAt))),
+      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, branchId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${breadType}))`, isNull(productionBatchesTable.deletedAt))),
       db.select({ sale: salesTable, cashierRole: usersTable.role })
         .from(salesTable)
         .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
-        .where(and(eq(salesTable.companyId, companyId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${breadType}))`, isNull(salesTable.deletedAt))),
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${breadType}))`, isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
-      db.select().from(productReturnsTable).where(and(eq(productReturnsTable.companyId, companyId), sql`lower(trim(${productReturnsTable.breadType})) = lower(trim(${breadType}))`, eq(productReturnsTable.status, "approved" as const))),
+         .where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, branchId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${breadType}))`, isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, branchId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${breadType}))`, isNull(sellerAllocationsTable.deletedAt), eq(sellerAllocationsTable.isCleared, false))),
+      db.select().from(productReturnsTable).where(and(eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.branchId, branchId), sql`lower(trim(${productReturnsTable.breadType})) = lower(trim(${breadType}))`, eq(productReturnsTable.status, "approved" as const))),
     ]);
 
     const totalProduced = production.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);
