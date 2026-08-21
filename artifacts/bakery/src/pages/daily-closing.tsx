@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardCheck, Save, Send, CheckCircle2 } from "lucide-react";
+import { ClipboardCheck, Save, CheckCircle2 } from "lucide-react";
 
 type Line = {
   id?: number; productId?: number; productName: string; openingStock: number; produced: number;
@@ -97,20 +97,20 @@ export default function DailyClosingPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle className="text-base">Physical closing count</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Count what is left</CardTitle></CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {loading ? <p className="p-6 text-sm text-muted-foreground">Loading movements…</p> : lines.length === 0 ? <p className="p-6 text-sm text-muted-foreground">No active products are assigned to this branch.</p> : (
                 <table className="w-full text-sm">
                   <thead><tr className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
-                    <th className="p-3">Product</th><th className="p-3 text-right">Opening</th><th className="p-3 text-right">Produced</th><th className="p-3 text-right">Allocated</th><th className="p-3 text-right">Known sales</th><th className="p-3 w-[130px]">Physical close</th><th className="p-3 text-right">Expected sales</th><th className="p-3 text-right">Variance</th><th className="p-3 min-w-[190px]">Reason if different</th>
+                    <th className="p-3">Product</th><th className="p-3 text-right">Recorded sales</th><th className="p-3 w-[150px]">Count left</th><th className="p-3 text-right">Expected sales</th><th className="p-3 text-right">Difference</th><th className="p-3 min-w-[210px]">Why different?</th>
                   </tr></thead>
                   <tbody>{lines.map((line, index) => {
                     const closingStock = Number.isFinite(line.closingStock) ? line.closingStock : 0;
                     const expected = line.openingStock + line.produced + line.returned - line.allocated - closingStock;
                     const variance = expected - line.recordedSales;
                     return <tr key={line.id ?? line.productName} className="border-b last:border-0">
-                      <td className="p-3 font-medium">{line.productName}</td>
-                      <td className="p-3 text-right">{line.openingStock}</td><td className="p-3 text-right text-emerald-700">+{line.produced}</td><td className="p-3 text-right text-orange-700">-{line.allocated}</td><td className="p-3 text-right">{line.recordedSales}</td>
+                      <td className="p-3 font-medium">{line.productName}<div className="text-[11px] text-muted-foreground">{line.openingStock} opening · +{line.produced} baked · -{line.allocated} allocated</div></td>
+                      <td className="p-3 text-right">{line.recordedSales}</td>
                       <td className="p-3"><Input type="number" min="0" disabled={!editable} value={line.closingStock} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, closingStock: Math.max(0, parseInt(e.target.value) || 0), calculatedSales: expected, variance } : item))} /></td>
                       <td className="p-3 text-right font-semibold">{expected}</td><td className={`p-3 text-right font-semibold ${variance === 0 ? "text-emerald-600" : "text-rose-600"}`}>{variance > 0 ? "+" : ""}{variance}</td>
                       <td className="p-3"><Input disabled={!editable || variance === 0} placeholder={variance === 0 ? "No variance" : "Required before submit"} value={line.varianceReason ?? ""} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, varianceReason: e.target.value } : item))} /></td>
@@ -126,7 +126,7 @@ export default function DailyClosingPage() {
             </p>
             <div className="flex gap-2">
               {closing?.status === "submitted" && <Button onClick={approve}><CheckCircle2 size={15} className="mr-2" />Approve reconciliation</Button>}
-              {editable && <><Button variant="outline" onClick={() => save(false)} disabled={saving}><Save size={15} className="mr-2" />Save draft</Button><Button onClick={() => save(true)} disabled={saving || !lines.length}><Send size={15} className="mr-2" />Submit closing</Button></>}
+              {editable && <Button onClick={() => save(true)} disabled={saving || !lines.length}><Save size={15} className="mr-2" />{saving ? "Saving…" : "Save closing"}</Button>}
             </div>
           </div>
         </>
