@@ -1227,7 +1227,7 @@ export default function SalesPage() {
           {/* Grand total summary */}
           {(() => {
             const entries = bulkLines.map(l => {
-              const totalStock = l.allocatedQty + l.inStoreQty;
+              const totalStock = l.inStoreQty;
               const remainingQty = l.remaining !== "" ? Math.max(0, parseInt(l.remaining) || 0) : null;
               const soldQty = remainingQty !== null ? Math.max(0, totalStock - remainingQty) : 0;
               const price = parseFloat(l.pricePerUnit) || 0;
