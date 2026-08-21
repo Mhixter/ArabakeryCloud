@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
-import { db, inventoryItemsTable, subscriptionsTable, sellerAllocationsTable, usersTable, branchesTable } from "@workspace/db";
-import { eq, and, isNull, gte } from "drizzle-orm";
+import { db, inventoryItemsTable, subscriptionsTable, sellerAllocationsTable, usersTable, branchesTable, auditLogsTable } from "@workspace/db";
+import { eq, and, isNull, gte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -8,7 +8,7 @@ const router: IRouter = Router();
 interface Notification {
   id: string;
   type: "warning" | "info" | "danger" | "success";
-  category: "inventory" | "subscription" | "allocation";
+  category: "inventory" | "subscription" | "allocation" | "activity";
   title: string;
   message: string;
   link?: string;
@@ -84,9 +84,29 @@ router.get("/notifications", authenticate, async (req: AuthenticatedRequest, res
           }
         }
       }
+
+      /* ── 3. Recent activity feed (MD only) ── */
+      const recentActivity = await db
+        .select()
+        .from(auditLogsTable)
+        .where(eq(auditLogsTable.companyId, companyId))
+        .orderBy(desc(auditLogsTable.createdAt))
+        .limit(30);
+
+      for (const activity of recentActivity) {
+        notifications.push({
+          id: `audit-${activity.id}`,
+          type: "info",
+          category: "activity",
+          title: activity.action.replaceAll("_", " "),
+          message: `${activity.userName ? `${activity.userName}: ` : ""}${activity.details || "Activity recorded"}`,
+          link: "/audit-logs",
+          createdAt: activity.createdAt.toISOString(),
+        });
+      }
     }
 
-    /* ── 3. Recent allocations assigned to me today (supplier, receptionist) ── */
+    /* ── 4. Recent allocations assigned to me today (supplier, receptionist) ── */
     if (["supplier", "receptionist", "manager", "managing_director"].includes(role)) {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

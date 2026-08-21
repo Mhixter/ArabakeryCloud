@@ -9,7 +9,7 @@ import { API_BASE } from "@/lib/api";
 interface AppNotification {
   id: string;
   type: "warning" | "info" | "danger" | "success";
-  category: "inventory" | "subscription" | "allocation";
+  category: "inventory" | "subscription" | "allocation" | "activity";
   title: string;
   message: string;
   link?: string;
@@ -47,6 +47,7 @@ const CATEGORY_ICON: Record<string, React.ElementType> = {
   inventory:    Package,
   subscription: CreditCard,
   allocation:   PackageCheck,
+  activity:     Bell,
 };
 
 export default function NotificationsDropdown({ themeClass }: { themeClass?: string }) {
