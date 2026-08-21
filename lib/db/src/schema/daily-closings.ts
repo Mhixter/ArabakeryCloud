@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, uniqueIndex, boolean, numeric } from "drizzle-orm/pg-core";
 import { companiesTable } from "./companies";
 import { branchesTable } from "./branches";
 import { usersTable } from "./users";
@@ -14,6 +14,11 @@ export const dailyClosingsTable = pgTable("daily_closings", {
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   approvedById: integer("approved_by_id").references(() => usersTable.id),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
+  stockSettledAmount: numeric("stock_settled_amount", { precision: 12, scale: 2 }),
+  stockSettlementPaymentMethod: text("stock_settlement_payment_method"),
+  stockSettlementNotes: text("stock_settlement_notes"),
+  stockSettledById: integer("stock_settled_by_id").references(() => usersTable.id),
+  stockSettledAt: timestamp("stock_settled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => ({

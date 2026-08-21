@@ -66,6 +66,13 @@ try {
       ALTER TABLE daily_closing_lines
         ADD COLUMN IF NOT EXISTS counted boolean NOT NULL DEFAULT false
       ;
+      ALTER TABLE daily_closings
+        ADD COLUMN IF NOT EXISTS stock_settled_amount numeric(12, 2),
+        ADD COLUMN IF NOT EXISTS stock_settlement_payment_method text,
+        ADD COLUMN IF NOT EXISTS stock_settlement_notes text,
+        ADD COLUMN IF NOT EXISTS stock_settled_by_id integer,
+        ADD COLUMN IF NOT EXISTS stock_settled_at timestamptz
+      ;
       CREATE TABLE IF NOT EXISTS product_identity_backfill_issues (
         id serial PRIMARY KEY,
         company_id integer NOT NULL REFERENCES companies(id),
