@@ -30,7 +30,7 @@ export function businessDateRange(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   const utcGuess = Date.UTC(year, month - 1, day);
   const wall = partsInBusinessTimezone(new Date(utcGuess));
-  const offset = utcGuess - Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
+  const offset = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second) - utcGuess;
   const start = new Date(utcGuess - offset);
   const next = new Date(Date.UTC(year, month - 1, day + 1) - offset);
   return { start, end: new Date(next.getTime() - 1) };
