@@ -79,6 +79,16 @@ try {
       );
       CREATE INDEX IF NOT EXISTS product_identity_backfill_issues_company_idx
         ON product_identity_backfill_issues(company_id);
+      /* Older deployments may have the table without its newer UNIQUE
+         constraint. Remove duplicate legacy issue rows before restoring the
+         idempotency index used by the backfill below. */
+      DELETE FROM product_identity_backfill_issues a
+      USING product_identity_backfill_issues b
+      WHERE a.id > b.id
+        AND a.transaction_type = b.transaction_type
+        AND a.transaction_id = b.transaction_id;
+      CREATE UNIQUE INDEX IF NOT EXISTS product_identity_backfill_issues_tx_idx
+        ON product_identity_backfill_issues(transaction_type, transaction_id);
 
       /* Only assign an active product when the company/branch/name match is
          unique. Rows with zero or multiple candidates stay untouched and are

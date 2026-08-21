@@ -2,6 +2,7 @@ import { Router, IRouter } from "express";
 import { db, salesTable, productionBatchesTable, productsTable, productReturnsTable, sellerAllocationsTable, productIdentityBackfillIssuesTable, usersTable, auditLogsTable, branchesTable, expensesTable, expenseCategoriesTable } from "@workspace/db";
 import { eq, and, or, isNull, gte, lte, desc } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
+import { calculateInStoreStock, calculateSupplierStock, countBreadUnits } from "../lib/stock-calculations";
 
 const router: IRouter = Router();
 
@@ -131,8 +132,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     const map = new Map<string, { quantity: number; amount: number }>();
     for (const { sale: s } of rows) {
       const p = map.get(s.breadType) ?? { quantity: 0, amount: 0 };
-      const isQuickSale = s.breadType.trim().toLowerCase() === "quick sale";
-      map.set(s.breadType, { quantity: p.quantity + (isQuickSale ? 0 : s.quantity), amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
+      map.set(s.breadType, { quantity: p.quantity + countBreadUnits(s.breadType, s.quantity), amount: p.amount + parseFloat(s.totalAmount as unknown as string) });
     }
     return Array.from(map.entries())
       .map(([name, d]) => ({ name, quantity: d.quantity, amount: d.amount }))
@@ -201,8 +201,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
      * With-suppliers = total_allocated - supplier_sales - all_approved_returns
      *   (what suppliers currently hold, net of what they sold or gave back)
      */
-    const inStore       = Math.max(0, produced + restored - directSold - totalAllocated);
-    const withSuppliers = Math.max(0, totalAllocated - supplierSold - allReturned);
+     const inStore       = calculateInStoreStock({ produced, restorableReturns: restored, directSales: directSold, allocated: totalAllocated });
+     const withSuppliers = calculateSupplierStock(totalAllocated, supplierSold, allReturned);
 
     return {
       productId: p.id,
@@ -225,21 +225,21 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     activeProductCount: activeProducts.length,
     today: {
       totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: todaySales.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
+      totalQuantity: todaySales.reduce((s, x) => s + countBreadUnits(x.sale.breadType, x.sale.quantity), 0),
       salesCount: todaySales.length,
       totalExpenses: todayExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(todaySales),
     },
     week: {
       totalAmount: weekSales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: weekSales.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
+      totalQuantity: weekSales.reduce((s, x) => s + countBreadUnits(x.sale.breadType, x.sale.quantity), 0),
       salesCount: weekSales.length,
       totalExpenses: weekExpenses.reduce((s, x) => s + parseFloat(x.amount as unknown as string), 0),
       byProduct: aggregateByProduct(weekSales),
     },
     allTime: {
       totalAmount: allSalesEver.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: allSalesEver.reduce((s, x) => s + (x.sale.breadType.trim().toLowerCase() === "quick sale" ? 0 : x.sale.quantity), 0),
+      totalQuantity: allSalesEver.reduce((s, x) => s + countBreadUnits(x.sale.breadType, x.sale.quantity), 0),
       salesCount: allSalesEver.length,
     },
     stockIdentityReview: {
