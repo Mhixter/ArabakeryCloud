@@ -48,12 +48,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const { companyId, role, branchId: userBranchId } = req.user!;
   const { branchId: queryBranchId, date: queryDate, scope } = req.query as { branchId?: string; date?: string; scope?: string };
-  const companyWide = role === "managing_director" && scope === "company";
-  const branchFilter = companyWide ? null : queryBranchId && !isNaN(parseInt(queryBranchId))
+  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
-    : role !== "managing_director" ? userBranchId : null;
+    : userBranchId;
   /* Stock and KPI calculations use the selected branch for MDs too. */
-  const stockBranchFilter = companyWide ? null : branchFilter;
+  const stockBranchFilter = branchFilter;
   /* Support custom date for "view by date" filter — fallback to today */
   const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
   const now = new Date();
