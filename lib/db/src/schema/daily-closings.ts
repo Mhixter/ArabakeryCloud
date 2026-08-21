@@ -40,6 +40,11 @@ export const dailyClosingLinesTable = pgTable("daily_closing_lines", {
   calculatedSales: integer("calculated_sales").notNull().default(0),
   variance: integer("variance").notNull().default(0),
   varianceReason: text("variance_reason"),
+  stockSettledAmount: numeric("stock_settled_amount", { precision: 12, scale: 2 }),
+  stockSettlementPaymentMethod: text("stock_settlement_payment_method"),
+  stockSettlementNotes: text("stock_settlement_notes"),
+  stockSettledById: integer("stock_settled_by_id").references(() => usersTable.id),
+  stockSettledAt: timestamp("stock_settled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

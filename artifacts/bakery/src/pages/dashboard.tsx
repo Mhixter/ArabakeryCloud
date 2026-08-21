@@ -15,6 +15,8 @@ import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
 import { businessDateFor } from "@/lib/business-date";
 import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 /* ── PWA Install Prompt ── */
 interface BeforeInstallPromptEvent extends Event {
@@ -108,6 +110,117 @@ function KpiCard({
           <div className={`w-10 h-10 rounded-xl ${iconBg[accent]} flex items-center justify-center flex-shrink-0`}>
             <Icon size={18} className="text-white" />
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type StockSettlementLine = {
+  productId: number;
+  productName: string;
+  remaining: number;
+  status: "cleared" | "uncleared";
+  settledAmount: string | null;
+};
+
+function StockSettlementPanel({ branchId }: { branchId?: number }) {
+  const { toast } = useToast();
+  const [date, setDate] = useState(businessDateFor());
+  const [lines, setLines] = useState<StockSettlementLine[]>([]);
+  const [history, setHistory] = useState<{ date: string; status: string }[]>([]);
+  const [amounts, setAmounts] = useState<Record<number, string>>({});
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [paymentMethods, setPaymentMethods] = useState<Record<number, "cash" | "transfer">>({});
+  const [loading, setLoading] = useState(true);
+  const [settlingId, setSettlingId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (!branchId) return;
+    setLoading(true);
+    const token = getStoredUser() ? localStorage.getItem("nmb_token") : null;
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const [currentRes, historyRes] = await Promise.all([
+        fetch(`${API_BASE}/api/stock-settlements?branchId=${branchId}&date=${date}`, { headers, credentials: "include" }),
+        fetch(`${API_BASE}/api/stock-settlements/history?branchId=${branchId}`, { headers, credentials: "include" }),
+      ]);
+      const current = await currentRes.json();
+      const historyData = await historyRes.json();
+      if (!currentRes.ok) throw new Error(current.error ?? "Could not load stock settlement");
+      setLines(current.lines ?? []);
+      setHistory(historyData.history ?? []);
+    } catch (error) {
+      toast({ title: "Could not load stock settlement", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [branchId, date, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function settle(line: StockSettlementLine) {
+    const amount = Number(amounts[line.productId]);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast({ title: "Enter the amount collected from the manager", variant: "destructive" });
+      return;
+    }
+    setSettlingId(line.productId);
+    try {
+      const res = await fetch(`${API_BASE}/api/stock-settlements`, {
+        method: "POST",
+        headers: { ...({ "Content-Type": "application/json" } as HeadersInit), Authorization: `Bearer ${localStorage.getItem("nmb_token") ?? ""}` },
+        credentials: "include",
+        body: JSON.stringify({
+          branchId, businessDate: date, productId: line.productId, amountSettled: amount,
+          paymentMethod: paymentMethods[line.productId] ?? "cash", notes: notes[line.productId]?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not settle stock");
+      toast({ title: "Stock cleared", description: `${data.quantity} ${data.productName} settled for ${date}.` });
+      await load();
+    } catch (error) {
+      toast({ title: "Stock settlement failed", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+    } finally {
+      setSettlingId(null);
+    }
+  }
+
+  return (
+    <Card className="rounded-2xl border-0 shadow-sm overflow-hidden">
+      <CardHeader className="pb-3 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} className="text-emerald-700" />In-stock settlement</CardTitle>
+            <CardDescription>Managing Director only. Clear remaining product stock by date; supplier allocations are unchanged.</CardDescription>
+          </div>
+          <Input type="date" value={date} max={businessDateFor()} onChange={e => setDate(e.target.value)} className="w-[155px]" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        {loading ? <p className="text-sm text-muted-foreground">Loading stock…</p> : lines.length === 0 ? <p className="text-sm text-muted-foreground">No product movement for this date.</p> : (
+          <div className="space-y-3">
+            {lines.map(line => (
+              <div key={line.productId} className="rounded-xl border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-semibold text-sm">{line.productName}</p><p className="text-xs text-muted-foreground">{line.remaining.toLocaleString()} units remaining · <span className={line.status === "cleared" ? "text-emerald-700" : "text-amber-700"}>{line.status === "cleared" ? "Cleared" : "Uncleared"}</span></p></div>
+                  {line.status === "cleared" ? <Badge variant="default">Cleared {line.settledAmount ? `₦${Number(line.settledAmount).toLocaleString()}` : ""}</Badge> : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input type="number" min="0" step="any" placeholder="Amount collected" value={amounts[line.productId] ?? ""} onChange={e => setAmounts(prev => ({ ...prev, [line.productId]: e.target.value }))} className="w-[145px]" />
+                      <select className="h-10 rounded-md border bg-background px-2 text-sm" value={paymentMethods[line.productId] ?? "cash"} onChange={e => setPaymentMethods(prev => ({ ...prev, [line.productId]: e.target.value as "cash" | "transfer" }))}><option value="cash">Cash</option><option value="transfer">Transfer</option></select>
+                      <Input placeholder="Note (optional)" value={notes[line.productId] ?? ""} onChange={e => setNotes(prev => ({ ...prev, [line.productId]: e.target.value }))} className="w-[170px]" />
+                      <Button size="sm" onClick={() => settle(line)} disabled={settlingId === line.productId || line.remaining <= 0}>{settlingId === line.productId ? "Clearing…" : "Clear stock"}</Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="border-t pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Settlement history</p>
+          <div className="flex flex-wrap gap-2">{history.map(item => <button key={item.date} onClick={() => setDate(item.date)} className="rounded-full border px-3 py-1 text-xs hover:bg-muted"><span className="font-semibold">{item.date}</span> · <span className={item.status === "cleared" ? "text-emerald-700" : "text-amber-700"}>{item.status === "cleared" ? "Cleared" : "Uncleared"}</span></button>)}</div>
         </div>
       </CardContent>
     </Card>
@@ -1051,6 +1164,8 @@ function ManagerDashboard() {
           Open settlements
         </Button>
       </div>}
+
+      {isOwner && <StockSettlementPanel branchId={activeBranch?.id} />}
 
       {/* All-time totals — always visible regardless of period */}
       <div className="grid grid-cols-3 gap-3">

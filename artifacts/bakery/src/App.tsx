@@ -20,7 +20,6 @@ import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
 import ProductsPage from "@/pages/products";
 import AllocationsPage from "@/pages/allocations";
-import DailyClosingPage from "@/pages/daily-closing";
 import ExpensesPage from "@/pages/expenses";
 import WorkersPage from "@/pages/workers";
 import StockIdentityReviewPage from "@/pages/stock-identity-review";
@@ -172,7 +171,6 @@ function Router() {
       <Route path="/user-activity"><ProtectedRole roles={["managing_director"]}><UserActivityPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
-      <Route path="/daily-closing"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><DailyClosingPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/expenses"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><ExpensesPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/workers"><ProtectedRole roles={["managing_director","manager","receptionist"]}><WorkersPage /></ProtectedRole></Route>
       <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>

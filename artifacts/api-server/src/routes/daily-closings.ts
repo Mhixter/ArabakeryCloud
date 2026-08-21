@@ -167,6 +167,128 @@ router.get("/daily-closings", authenticate, async (req: AuthenticatedRequest, re
   res.json({ closing, lines, branchId, date });
 });
 
+/* Managing Director stock settlement: separate from supplier allocations and product allocation history. */
+router.get("/stock-settlements", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const branchId = effectiveBranch(req, req.query.branchId as string | undefined);
+  const date = String(req.query.date ?? businessDateFor());
+  if (!branchId) { res.status(400).json({ error: "A branch is required" }); return; }
+  try {
+    const movementLines = await movementSummary(req.user!.companyId, branchId, date);
+    const [closing] = await db.select().from(dailyClosingsTable).where(and(
+      eq(dailyClosingsTable.companyId, req.user!.companyId),
+      eq(dailyClosingsTable.branchId, branchId),
+      eq(dailyClosingsTable.businessDate, date),
+    ));
+    const settledLines = closing
+      ? await db.select().from(dailyClosingLinesTable).where(eq(dailyClosingLinesTable.closingId, closing.id))
+      : [];
+    const settledByProduct = new Map(settledLines.map(line => [movementKey(line.productId, line.productName), line]));
+    res.json({
+      branchId,
+      date,
+      lines: movementLines.map(line => {
+        const settled = settledByProduct.get(movementKey(line.productId, line.productName));
+        const remaining = Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - line.recordedSales);
+        return {
+          productId: line.productId,
+          productName: line.productName,
+          remaining,
+          status: settled?.stockSettledAt ? "cleared" : "uncleared",
+          settledAmount: settled?.stockSettledAmount ?? null,
+          settledAt: settled?.stockSettledAt ?? null,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error("GET /stock-settlements error:", err);
+    res.status(500).json({ error: "Failed to load stock settlements" });
+  }
+});
+
+router.get("/stock-settlements/history", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const branchId = effectiveBranch(req, req.query.branchId as string | undefined);
+  if (!branchId) { res.status(400).json({ error: "A branch is required" }); return; }
+  try {
+    const [production, sales, allocations, closings] = await Promise.all([
+      db.select({ date: productionBatchesTable.productionDate }).from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, req.user!.companyId), eq(productionBatchesTable.branchId, branchId), isNull(productionBatchesTable.deletedAt))),
+      db.select({ date: salesTable.saleDate }).from(salesTable).where(and(eq(salesTable.companyId, req.user!.companyId), eq(salesTable.branchId, branchId), isNull(salesTable.deletedAt))),
+      db.select({ date: sellerAllocationsTable.allocationDate }).from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, req.user!.companyId), eq(sellerAllocationsTable.branchId, branchId), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(dailyClosingsTable).where(and(eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId))),
+    ]);
+    const dates = new Set<string>([businessDateFor()]);
+    for (const row of production) dates.add(businessDateFor(row.date));
+    for (const row of sales) dates.add(businessDateFor(row.date));
+    for (const row of allocations) dates.add(businessDateFor(row.date));
+    for (const row of closings) dates.add(row.businessDate);
+    const history = [...dates].filter(date => date <= businessDateFor()).sort().reverse().map(date => {
+      const closing = closings.find(row => row.businessDate === date);
+      return { date, status: closing?.stockSettledAt ? "cleared" : "uncleared", settledAt: closing?.stockSettledAt ?? null };
+    });
+    res.json({ history });
+  } catch (err) {
+    console.error("GET /stock-settlements/history error:", err);
+    res.status(500).json({ error: "Failed to load stock settlement history" });
+  }
+});
+
+router.post("/stock-settlements", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const branchId = effectiveBranch(req, req.body.branchId);
+  const date = String(req.body.businessDate ?? businessDateFor());
+  const productId = Number(req.body.productId);
+  const amountSettled = Number(req.body.amountSettled);
+  const paymentMethod = req.body.paymentMethod === "transfer" ? "transfer" : "cash";
+  if (!branchId || !Number.isInteger(productId) || !Number.isFinite(amountSettled) || amountSettled < 0) {
+    res.status(400).json({ error: "branch, product, and a valid amount collected are required" }); return;
+  }
+  try {
+    const movementLines = await movementSummary(req.user!.companyId, branchId, date);
+    const movement = movementLines.find(line => line.productId === productId);
+    if (!movement) { res.status(404).json({ error: "Product movement not found for this date" }); return; }
+    const remaining = Math.max(0, movement.openingStock + movement.produced + movement.returned - movement.allocated - movement.recordedSales);
+    if (remaining <= 0) { res.status(400).json({ error: "There is no remaining in-store stock for this product on this date" }); return; }
+
+    let [closing] = await db.select().from(dailyClosingsTable).where(and(
+      eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId), eq(dailyClosingsTable.businessDate, date),
+    ));
+    if (!closing) {
+      [closing] = await db.insert(dailyClosingsTable).values({ companyId: req.user!.companyId, branchId, businessDate: date, status: "approved", approvedById: req.user!.userId, approvedAt: new Date() }).returning();
+      await db.insert(dailyClosingLinesTable).values(movementLines.map(line => ({
+        closingId: closing.id, productId: line.productId, productName: line.productName,
+        openingStock: line.openingStock, produced: line.produced, allocated: line.allocated, returned: line.returned,
+        recordedSales: line.recordedSales, closingStock: Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - line.recordedSales),
+        counted: true, calculatedSales: 0, variance: 0,
+      })));
+    }
+    const [line] = await db.select().from(dailyClosingLinesTable).where(and(eq(dailyClosingLinesTable.closingId, closing.id), eq(dailyClosingLinesTable.productId, productId)));
+    if (!line) { res.status(404).json({ error: "Settlement line not found" }); return; }
+    if (line.stockSettledAt) { res.status(400).json({ error: "This product is already cleared for the selected date" }); return; }
+
+    const product = (await db.select().from(productsTable).where(and(eq(productsTable.companyId, req.user!.companyId), eq(productsTable.id, productId))))[0];
+    const unitPrice = amountSettled / remaining;
+    const { end } = businessDateRange(date);
+    await db.transaction(async tx => {
+      await tx.insert(salesTable).values({
+        companyId: req.user!.companyId, receiptNumber: closingReceiptNumber(), productId,
+        breadType: movement.productName, quantity: remaining, pricePerUnit: unitPrice.toFixed(2),
+        totalAmount: amountSettled.toFixed(2), costAmount: "0", profitAmount: amountSettled.toFixed(2),
+        paymentMethod, cashierId: req.user!.userId, branchId,
+        notes: req.body.notes ? `[In-stock settlement] ${String(req.body.notes).trim()}` : "In-stock settlement",
+        saleDate: end,
+      });
+      await tx.update(dailyClosingLinesTable).set({
+        closingStock: remaining, counted: true, stockSettledAmount: amountSettled.toFixed(2),
+        stockSettlementPaymentMethod: paymentMethod, stockSettlementNotes: req.body.notes ? String(req.body.notes).trim() : null,
+        stockSettledById: req.user!.userId, stockSettledAt: new Date(), updatedAt: new Date(),
+      }).where(eq(dailyClosingLinesTable.id, line.id));
+    });
+    await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "IN_STOCK_SETTLED", entityType: "daily_closing_line", entityId: line.id, details: `Settled ${remaining} ${movement.productName} for ${date}; allocations unchanged`, branchId });
+    res.json({ success: true, productId, productName: movement.productName, quantity: remaining, settledAmount: amountSettled, date });
+  } catch (err) {
+    console.error("POST /stock-settlements error:", err);
+    res.status(500).json({ error: "Failed to settle in-store stock" });
+  }
+});
+
 router.post("/daily-closings", authenticate, requireRole(...editableRoles), async (req: AuthenticatedRequest, res): Promise<void> => {
   const branchId = effectiveBranch(req, req.body.branchId);
   const date = String(req.body.businessDate ?? businessDateFor());
