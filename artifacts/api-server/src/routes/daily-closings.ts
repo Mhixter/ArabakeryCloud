@@ -11,9 +11,14 @@ import {
   isDirectStoreSale, latestPriorClosingLine, nextClosingStatus, validateSubmission,
 } from "./daily-closing-logic";
 import { businessDateFor, businessDateRange } from "../lib/business-date";
+import crypto from "crypto";
 
 const router: IRouter = Router();
 const editableRoles = ["managing_director", "manager", "receptionist"] as const;
+
+function closingReceiptNumber() {
+  return `NMB-CLOSE-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
 
 function dayRange(date: string) {
   return businessDateRange(date);
@@ -207,6 +212,104 @@ router.patch("/daily-closings/:id/approve", authenticate, requireRole("managing_
   const [updated] = await db.update(dailyClosingsTable).set({ status: "approved", approvedById: req.user!.userId, approvedAt: new Date(), updatedAt: new Date() }).where(eq(dailyClosingsTable.id, id)).returning();
   await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "DAILY_CLOSING_APPROVED", entityType: "daily_closing", entityId: id, details: `${closing.businessDate} branch ${closing.branchId}`, branchId: closing.branchId });
   res.json(updated);
+});
+
+/* POST /daily-closings/:id/settle-stock — settle counted remaining stock without changing allocations */
+router.post("/daily-closings/:id/settle-stock", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid closing ID" }); return; }
+
+  const amountSettled = Number(req.body.amountSettled);
+  const paymentMethod = req.body.paymentMethod === "transfer" ? "transfer" : "cash";
+  if (!Number.isFinite(amountSettled) || amountSettled < 0) {
+    res.status(400).json({ error: "A valid non-negative settled amount is required" }); return;
+  }
+
+  try {
+    const [closing] = await db.select().from(dailyClosingsTable).where(and(
+      eq(dailyClosingsTable.id, id),
+      eq(dailyClosingsTable.companyId, req.user!.companyId),
+    ));
+    if (!closing) { res.status(404).json({ error: "Closing not found" }); return; }
+    if (closing.stockSettledAt) { res.status(400).json({ error: "Remaining stock for this closing is already settled" }); return; }
+    if (closing.status !== "submitted" && closing.status !== "approved") {
+      res.status(400).json({ error: "The manager must submit the physical count before settlement" }); return;
+    }
+
+    const lines = await db.select().from(dailyClosingLinesTable).where(eq(dailyClosingLinesTable.closingId, id));
+    if (lines.length === 0 || lines.some(line => !line.counted)) {
+      res.status(400).json({ error: "Every product must have a physical count before settlement" }); return;
+    }
+    const settledLines = lines.filter(line => line.closingStock > 0);
+    const totalUnits = settledLines.reduce((sum, line) => sum + line.closingStock, 0);
+    if (totalUnits === 0) {
+      res.status(400).json({ error: "There is no remaining stock to settle" }); return;
+    }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.companyId, req.user!.companyId));
+    const productMap = new Map(products.map(product => [product.id, product]));
+    const standardTotal = settledLines.reduce((sum, line) => {
+      const product = line.productId ? productMap.get(line.productId) : products.find(p => p.name.trim().toLowerCase() === line.productName.trim().toLowerCase());
+      return sum + (Number(product?.pricePerUnit ?? 0) * line.closingStock);
+    }, 0);
+    const cashierId = closing.submittedById ?? req.user!.userId;
+    const { end } = businessDateRange(closing.businessDate);
+
+    await db.transaction(async tx => {
+      for (const line of settledLines) {
+        const product = line.productId ? productMap.get(line.productId) : products.find(p => p.name.trim().toLowerCase() === line.productName.trim().toLowerCase());
+        const standardLineTotal = Number(product?.pricePerUnit ?? 0) * line.closingStock;
+        const lineAmount = standardTotal > 0
+          ? Math.round(amountSettled * (standardLineTotal / standardTotal) * 100) / 100
+          : Math.round(amountSettled * (line.closingStock / totalUnits) * 100) / 100;
+        const unitPrice = line.closingStock > 0 ? lineAmount / line.closingStock : 0;
+        await tx.insert(salesTable).values({
+          companyId: req.user!.companyId,
+          receiptNumber: closingReceiptNumber(),
+          productId: product?.id ?? line.productId ?? null,
+          breadType: line.productName,
+          quantity: line.closingStock,
+          pricePerUnit: unitPrice.toFixed(2),
+          totalAmount: lineAmount.toFixed(2),
+          costAmount: "0",
+          profitAmount: lineAmount.toFixed(2),
+          paymentMethod,
+          cashierId,
+          branchId: closing.branchId,
+          notes: req.body.notes ? `[Daily Closing settlement] ${String(req.body.notes).trim()}` : "Daily Closing settlement",
+          saleDate: end,
+        });
+      }
+
+      await tx.update(dailyClosingsTable).set({
+        stockSettledAmount: amountSettled.toFixed(2),
+        stockSettlementPaymentMethod: paymentMethod,
+        stockSettlementNotes: req.body.notes ? String(req.body.notes).trim() : null,
+        stockSettledById: req.user!.userId,
+        stockSettledAt: new Date(),
+        status: "approved",
+        approvedById: req.user!.userId,
+        approvedAt: closing.approvedAt ?? new Date(),
+        updatedAt: new Date(),
+      }).where(eq(dailyClosingsTable.id, id));
+    });
+
+    await logAudit({
+      req,
+      userId: req.user!.userId,
+      companyId: req.user!.companyId,
+      action: "DAILY_CLOSING_STOCK_SETTLED",
+      entityType: "daily_closing",
+      entityId: id,
+      details: `Settled ${totalUnits} remaining units for ${closing.businessDate} (₦${amountSettled.toLocaleString()}); allocations unchanged`,
+      branchId: closing.branchId,
+    });
+
+    res.json({ success: true, settledAmount: amountSettled, totalUnits, closingId: id });
+  } catch (err) {
+    console.error("POST /daily-closings/:id/settle-stock error:", err);
+    res.status(500).json({ error: "Failed to settle remaining stock" });
+  }
 });
 
 export default router;
