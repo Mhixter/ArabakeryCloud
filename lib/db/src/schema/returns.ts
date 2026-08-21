@@ -2,6 +2,7 @@ import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { companiesTable } from "./companies";
 import { branchesTable } from "./branches";
 import { usersTable } from "./users";
+import { productsTable } from "./products";
 
 export const RETURN_REASONS = ["not_sold", "damaged", "expired", "wrong_item", "other"] as const;
 export type ReturnReason = typeof RETURN_REASONS[number];
@@ -14,6 +15,7 @@ export const productReturnsTable = pgTable("product_returns", {
   branchId: integer("branch_id").references(() => branchesTable.id),
   sellerId: integer("seller_id").notNull().references(() => usersTable.id),
   receptionistId: integer("receptionist_id").references(() => usersTable.id),
+  productId: integer("product_id").references(() => productsTable.id),
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),
   reason: text("reason").$type<ReturnReason>().notNull().default("not_sold"),

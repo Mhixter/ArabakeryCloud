@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, productionBatchesTable, usersTable, branchesTable } from "@workspace/db";
+import { db, productionBatchesTable, usersTable, branchesTable, productsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -8,6 +8,7 @@ const router: IRouter = Router();
 
 const formatBatch = (b: typeof productionBatchesTable.$inferSelect, staffName: string, branchName: string) => ({
   id: b.id,
+  productId: b.productId,
   breadType: b.breadType,
   quantityProduced: b.quantityProduced,
   wasteQuantity: b.wasteQuantity,
@@ -35,10 +36,15 @@ router.get("/production", authenticate, async (req: AuthenticatedRequest, res): 
 
 router.post("/production", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const companyId = req.user!.companyId;
-  const { breadType, quantityProduced, wasteQuantity, branchId, notes, productionDate } = req.body;
+  const { breadType, productId: requestedProductId, quantityProduced, wasteQuantity, branchId, notes, productionDate } = req.body;
   const user = req.user!;
-  if (!breadType || !quantityProduced || branchId == null) { res.status(400).json({ error: "breadType, quantityProduced, and branchId are required" }); return; }
-  const [batch] = await db.insert(productionBatchesTable).values({ companyId, breadType, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: parseInt(branchId), notes: notes ?? null, productionDate: productionDate ? new Date(productionDate) : new Date() }).returning();
+  if ((!breadType && !requestedProductId) || !quantityProduced || branchId == null) { res.status(400).json({ error: "productId or breadType, quantityProduced, and branchId are required" }); return; }
+  const [product] = await db.select().from(productsTable).where(and(
+    eq(productsTable.companyId, companyId),
+    requestedProductId ? eq(productsTable.id, parseInt(requestedProductId)) : eq(productsTable.name, breadType),
+  ));
+  if (!product || !product.isActive) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
+  const [batch] = await db.insert(productionBatchesTable).values({ companyId, productId: product.id, breadType: product.name, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: parseInt(branchId), notes: notes ?? null, productionDate: productionDate ? new Date(productionDate) : new Date() }).returning();
   const [staff] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, batch.branchId));
   await logAudit({ req, userId: user.userId, companyId, action: "PRODUCTION_RECORDED", entityType: "production", entityId: batch.id, details: `${breadType}: produced ${quantityProduced}, waste ${wasteQuantity ?? 0}`, branchId: batch.branchId });

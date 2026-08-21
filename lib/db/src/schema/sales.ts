@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { branchesTable } from "./branches";
 import { companiesTable } from "./companies";
+import { productsTable } from "./products";
 
 export const paymentMethodEnum = ["cash", "transfer"] as const;
 export type PaymentMethod = typeof paymentMethodEnum[number];
@@ -12,6 +13,7 @@ export const salesTable = pgTable("sales", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companiesTable.id),
   receiptNumber: text("receipt_number").notNull().unique(),
+  productId: integer("product_id").references(() => productsTable.id),
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),
   pricePerUnit: numeric("price_per_unit", { precision: 10, scale: 2 }).notNull(),

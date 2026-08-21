@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { branchesTable } from "./branches";
 import { companiesTable } from "./companies";
+import { productsTable } from "./products";
 
 export const sellerAllocationsTable = pgTable("seller_allocations", {
   id: serial("id").primaryKey(),
@@ -11,6 +12,7 @@ export const sellerAllocationsTable = pgTable("seller_allocations", {
   branchId: integer("branch_id").notNull().references(() => branchesTable.id),
   sellerId: integer("seller_id").notNull().references(() => usersTable.id),
   issuedById: integer("issued_by_id").notNull().references(() => usersTable.id),
+  productId: integer("product_id").references(() => productsTable.id),
   breadType: text("bread_type").notNull(),
   quantity: integer("quantity").notNull(),
   notes: text("notes"),

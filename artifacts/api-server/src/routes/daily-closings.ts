@@ -30,6 +30,10 @@ function key(value: string) {
   return value.trim().toLowerCase();
 }
 
+function movementKey(productId: number | null | undefined, name: string) {
+  return productId != null ? `id:${productId}` : `name:${key(name)}`;
+}
+
 async function movementSummary(companyId: number, branchId: number, date: string) {
   const { start, end } = dayRange(date);
   const products = await db.select().from(productsTable).where(and(
@@ -82,31 +86,31 @@ async function movementSummary(companyId: number, branchId: number, date: string
       row.line.productName,
       date,
     );
-    const k = key(row.line.productName);
+    const k = movementKey(row.line.productId, row.line.productName);
     if (prior && !previousByProduct.has(k)) previousByProduct.set(k, prior.closingStock);
   }
 
-  const cumulativeBefore = async (name: string) => {
+  const cumulativeBefore = async (productId: number, name: string) => {
     const [prod, sold, alloc, returned] = await Promise.all([
       db.select().from(productionBatchesTable).where(and(
         eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, branchId),
-        isNull(productionBatchesTable.deletedAt), sql`lower(trim(${productionBatchesTable.breadType})) = ${key(name)}`,
+        isNull(productionBatchesTable.deletedAt), or(eq(productionBatchesTable.productId, productId), and(isNull(productionBatchesTable.productId), sql`lower(trim(${productionBatchesTable.breadType})) = ${key(name)}`)),
         sql`${productionBatchesTable.productionDate} < ${start}`,
       )),
       db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable)
         .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
         .where(and(
           eq(salesTable.companyId, companyId), eq(salesTable.branchId, branchId), isNull(salesTable.deletedAt),
-          sql`lower(trim(${salesTable.breadType})) = ${key(name)}`, sql`${salesTable.saleDate} < ${start}`,
+          or(eq(salesTable.productId, productId), and(isNull(salesTable.productId), sql`lower(trim(${salesTable.breadType})) = ${key(name)}`)), sql`${salesTable.saleDate} < ${start}`,
         )),
       db.select().from(sellerAllocationsTable).where(and(
         eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, branchId),
-        isNull(sellerAllocationsTable.deletedAt), sql`lower(trim(${sellerAllocationsTable.breadType})) = ${key(name)}`,
+        isNull(sellerAllocationsTable.deletedAt), or(eq(sellerAllocationsTable.productId, productId), and(isNull(sellerAllocationsTable.productId), sql`lower(trim(${sellerAllocationsTable.breadType})) = ${key(name)}`)),
         sql`${sellerAllocationsTable.allocationDate} < ${start}`,
       )),
       db.select().from(productReturnsTable).where(and(
         eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.branchId, branchId),
-        eq(productReturnsTable.status, "approved" as const), sql`lower(trim(${productReturnsTable.breadType})) = ${key(name)}`,
+        eq(productReturnsTable.status, "approved" as const), or(eq(productReturnsTable.productId, productId), and(isNull(productReturnsTable.productId), sql`lower(trim(${productReturnsTable.breadType})) = ${key(name)}`)),
         sql`${productReturnsTable.returnDate} < ${start}`,
       )),
     ]);
@@ -117,20 +121,25 @@ async function movementSummary(companyId: number, branchId: number, date: string
   };
 
   const todayMap = new Map<string, { produced: number; allocated: number; returned: number; recordedSales: number }>();
-  const add = (name: string, field: keyof Omit<NonNullable<typeof todayMap extends Map<string, infer V> ? V : never>, never>, amount: number) => {
-    const row = todayMap.get(key(name)) ?? { produced: 0, allocated: 0, returned: 0, recordedSales: 0 };
+  const add = (productId: number | null | undefined, name: string, field: keyof Omit<NonNullable<typeof todayMap extends Map<string, infer V> ? V : never>, never>, amount: number) => {
+    const movementId = movementKey(productId, name);
+    const row = todayMap.get(movementId) ?? { produced: 0, allocated: 0, returned: 0, recordedSales: 0 };
     row[field] += amount;
-    todayMap.set(key(name), row);
+    todayMap.set(movementId, row);
   };
-  for (const row of production) add(row.breadType, "produced", row.quantityProduced - row.wasteQuantity);
-  for (const row of allocations) add(row.breadType, "allocated", row.quantity);
-  for (const row of returns) if (["not_sold", "wrong_item", "other"].includes(row.reason)) add(row.breadType, "returned", row.quantity);
-  for (const row of sales) if (isDirectStoreSale(row.sale, row.cashierRole)) add(row.sale.breadType, "recordedSales", row.sale.quantity);
+  for (const row of production) add(row.productId, row.breadType, "produced", row.quantityProduced - row.wasteQuantity);
+  for (const row of allocations) add(row.productId, row.breadType, "allocated", row.quantity);
+  for (const row of returns) if (["not_sold", "wrong_item", "other"].includes(row.reason)) add(row.productId, row.breadType, "returned", row.quantity);
+  for (const row of sales) if (isDirectStoreSale(row.sale, row.cashierRole)) add(row.sale.productId, row.sale.breadType, "recordedSales", row.sale.quantity);
 
   const lines = [];
   for (const product of products) {
-    const movements = todayMap.get(key(product.name)) ?? { produced: 0, allocated: 0, returned: 0, recordedSales: 0 };
-    const openingStock = previousByProduct.get(key(product.name)) ?? await cumulativeBefore(product.name);
+    const movements = todayMap.get(movementKey(product.id, product.name))
+      ?? todayMap.get(movementKey(null, product.name))
+      ?? { produced: 0, allocated: 0, returned: 0, recordedSales: 0 };
+    const openingStock = previousByProduct.get(movementKey(product.id, product.name))
+      ?? previousByProduct.get(movementKey(null, product.name))
+      ?? await cumulativeBefore(product.id, product.name);
     lines.push({
       productId: product.id, productName: product.name, openingStock: Math.max(0, openingStock),
       ...movements, closingStock: 0,

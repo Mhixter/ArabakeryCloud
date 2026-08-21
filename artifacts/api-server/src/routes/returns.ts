@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, productReturnsTable, usersTable, branchesTable } from "@workspace/db";
+import { db, productReturnsTable, usersTable, branchesTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -22,6 +22,7 @@ const formatReturn = (
   branchName: string,
 ) => ({
   id: r.id,
+  productId: r.productId,
   companyId: r.companyId,
   branchId: r.branchId,
   branchName,
@@ -106,9 +107,9 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
     res.status(403).json({ error: "Only suppliers can submit returns" }); return;
   }
 
-  const { breadType, quantity, reason, notes, branchId: bodyBranchId } = req.body;
-  if (!breadType || !quantity || !reason) {
-    res.status(400).json({ error: "breadType, quantity, and reason are required" }); return;
+  const { breadType, productId: requestedProductId, quantity, reason, notes, branchId: bodyBranchId } = req.body;
+  if ((!breadType && !requestedProductId) || !quantity || !reason) {
+    res.status(400).json({ error: "productId or breadType, quantity, and reason are required" }); return;
   }
 
   const validReasons = ["not_sold", "damaged", "expired", "wrong_item", "other"];
@@ -117,13 +118,19 @@ router.post("/returns", authenticate, async (req: AuthenticatedRequest, res): Pr
   }
 
   const branchId = bodyBranchId ? parseInt(bodyBranchId) : userBranchId;
+  const [product] = await db.select().from(productsTable).where(and(
+    eq(productsTable.companyId, companyId),
+    requestedProductId ? eq(productsTable.id, parseInt(requestedProductId)) : eq(productsTable.name, breadType),
+  ));
+  if (!product) { res.status(400).json({ error: `"${breadType}" is not a valid product.` }); return; }
 
   const [ret] = await db.insert(productReturnsTable).values({
     companyId,
     branchId: branchId ?? null,
     sellerId: userId,
     receptionistId: null,
-    breadType,
+    productId: product.id,
+    breadType: product.name,
     quantity: parseInt(quantity),
     reason,
     status: "pending",
