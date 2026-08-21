@@ -17,3 +17,4 @@ export * from "./expenses";
 export * from "./push-subscriptions";
 export * from "./daily-closings";
 export * from "./product-identity";
+export * from "./quick-sale-settlements";

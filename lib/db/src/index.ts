@@ -73,6 +73,21 @@ try {
         ADD COLUMN IF NOT EXISTS stock_settled_by_id integer,
         ADD COLUMN IF NOT EXISTS stock_settled_at timestamptz
       ;
+      CREATE TABLE IF NOT EXISTS quick_sale_settlements (
+        id serial PRIMARY KEY,
+        company_id integer NOT NULL REFERENCES companies(id),
+        branch_id integer NOT NULL REFERENCES branches(id),
+        week_start text NOT NULL,
+        week_end text NOT NULL,
+        amount numeric(12, 2) NOT NULL,
+        payment_method text NOT NULL,
+        notes text,
+        accepted_by_id integer NOT NULL REFERENCES users(id),
+        accepted_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS quick_sale_settlements_company_branch_week_idx
+        ON quick_sale_settlements(company_id, branch_id, week_start);
       ALTER TABLE daily_closing_lines
         ADD COLUMN IF NOT EXISTS stock_settled_amount numeric(12, 2),
         ADD COLUMN IF NOT EXISTS stock_settlement_payment_method text,

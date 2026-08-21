@@ -1,5 +1,5 @@
 import { Router, IRouter } from "express";
-import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable } from "@workspace/db";
+import { db, salesTable, usersTable, branchesTable, productsTable, productionBatchesTable, sellerAllocationsTable, quickSaleSettlementsTable } from "@workspace/db";
 import { eq, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
@@ -8,6 +8,21 @@ import { businessDateFor, businessDateRange, queryDateRange } from "../lib/busin
 import crypto from "crypto";
 
 const router: IRouter = Router();
+
+function normalizeWeekStart(value?: string) {
+  const date = value ? new Date(`${value}T12:00:00Z`) : new Date();
+  if (isNaN(date.getTime())) return null;
+  const day = date.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + mondayOffset);
+  return date.toISOString().slice(0, 10);
+}
+
+function addBusinessDays(date: string, days: number) {
+  const result = new Date(`${date}T12:00:00Z`);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result.toISOString().slice(0, 10);
+}
 
 const formatSale = (
   s: typeof salesTable.$inferSelect,
@@ -45,6 +60,79 @@ function generateReceiptNumber(): string {
   const random = crypto.randomBytes(3).toString("hex").toUpperCase();
   return `NMB-${dateStr}-${random}`;
 }
+
+router.get("/quick-sale-settlements", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const weekStart = normalizeWeekStart(req.query.weekStart as string | undefined);
+  const branchId = req.query.branchId && !isNaN(parseInt(String(req.query.branchId))) ? parseInt(String(req.query.branchId)) : req.user!.branchId;
+  if (!weekStart || !branchId) { res.status(400).json({ error: "A valid week and branch are required" }); return; }
+  const weekEnd = addBusinessDays(weekStart, 6);
+  try {
+    const range = { start: businessDateRange(weekStart).start, end: businessDateRange(weekEnd).end };
+    const rows = await db.select({ sale: salesTable, cashierName: usersTable.fullName })
+      .from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+      .where(and(
+        eq(salesTable.companyId, req.user!.companyId), eq(salesTable.branchId, branchId),
+        eq(usersTable.role, "manager" as const), isNull(salesTable.deletedAt),
+        sql`lower(trim(${salesTable.breadType})) = 'quick sale'`,
+        gte(salesTable.saleDate, range.start), lte(salesTable.saleDate, range.end),
+      ));
+    const byDate = new Map<string, { amount: number; count: number; entries: { id: number; amount: number; paymentMethod: string; recordedBy: string; saleDate: string; notes: string | null }[] }>();
+    for (let i = 0; i < 7; i++) byDate.set(addBusinessDays(weekStart, i), { amount: 0, count: 0, entries: [] });
+    for (const row of rows) {
+      const date = businessDateFor(row.sale.saleDate);
+      const day = byDate.get(date);
+      if (!day) continue;
+      const amount = Number(row.sale.totalAmount);
+      day.amount += amount;
+      day.count += 1;
+      day.entries.push({ id: row.sale.id, amount, paymentMethod: row.sale.paymentMethod, recordedBy: row.cashierName ?? "Manager", saleDate: row.sale.saleDate.toISOString(), notes: row.sale.notes });
+    }
+    const [accepted] = await db.select().from(quickSaleSettlementsTable).where(and(
+      eq(quickSaleSettlementsTable.companyId, req.user!.companyId),
+      eq(quickSaleSettlementsTable.branchId, branchId),
+      eq(quickSaleSettlementsTable.weekStart, weekStart),
+    ));
+    const days = [...byDate.entries()].map(([date, day]) => ({ date, ...day }));
+    res.json({ weekStart, weekEnd, branchId, days, totalAmount: days.reduce((sum, day) => sum + day.amount, 0), accepted: accepted ? { ...accepted, amount: Number(accepted.amount) } : null });
+  } catch (err) {
+    console.error("GET /quick-sale-settlements error:", err);
+    res.status(500).json({ error: "Failed to load quick sale settlements" });
+  }
+});
+
+router.post("/quick-sale-settlements/accept", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+  const weekStart = normalizeWeekStart(req.body.weekStart);
+  const branchId = req.body.branchId ? parseInt(String(req.body.branchId)) : req.user!.branchId;
+  const paymentMethod = req.body.paymentMethod === "transfer" ? "transfer" : "cash";
+  if (!weekStart || !branchId) { res.status(400).json({ error: "A valid week and branch are required" }); return; }
+  try {
+    const weekEnd = addBusinessDays(weekStart, 6);
+    const range = { start: businessDateRange(weekStart).start, end: businessDateRange(weekEnd).end };
+    const quickSales = await db.select({ sale: salesTable }).from(salesTable)
+      .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+      .where(and(
+        eq(salesTable.companyId, req.user!.companyId), eq(salesTable.branchId, branchId),
+        eq(usersTable.role, "manager" as const), isNull(salesTable.deletedAt),
+        sql`lower(trim(${salesTable.breadType})) = 'quick sale'`,
+        gte(salesTable.saleDate, range.start), lte(salesTable.saleDate, range.end),
+      ));
+    const totalAmount = quickSales.reduce((sum, row) => sum + Number(row.sale.totalAmount), 0);
+    if (totalAmount <= 0) { res.status(400).json({ error: "There are no manager Quick Sales to accept for this week" }); return; }
+    const [existing] = await db.select().from(quickSaleSettlementsTable).where(and(
+      eq(quickSaleSettlementsTable.companyId, req.user!.companyId), eq(quickSaleSettlementsTable.branchId, branchId), eq(quickSaleSettlementsTable.weekStart, weekStart),
+    ));
+    if (existing) { res.status(400).json({ error: "This week has already been accepted" }); return; }
+    const [accepted] = await db.insert(quickSaleSettlementsTable).values({
+      companyId: req.user!.companyId, branchId, weekStart, weekEnd, amount: totalAmount.toFixed(2),
+      paymentMethod, notes: req.body.notes ? String(req.body.notes).trim() : null, acceptedById: req.user!.userId,
+    }).returning();
+    await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "QUICK_SALE_WEEK_ACCEPTED", entityType: "quick_sale_settlement", entityId: accepted.id, details: `Accepted ₦${totalAmount.toLocaleString()} manager Quick Sales for ${weekStart} to ${weekEnd}`, branchId });
+    res.json({ success: true, settlement: { ...accepted, amount: Number(accepted.amount) } });
+  } catch (err) {
+    console.error("POST /quick-sale-settlements/accept error:", err);
+    res.status(500).json({ error: "Failed to accept weekly Quick Sale settlement" });
+  }
+});
 
 router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
