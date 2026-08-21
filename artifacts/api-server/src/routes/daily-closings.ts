@@ -6,6 +6,10 @@ import {
 import { eq, and, or, isNull, gte, lte, desc, sql } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import {
+  calculateClosingLine, canApproveClosing, canEditClosing,
+  isDirectStoreSale, latestPriorClosingLine, nextClosingStatus, validateSubmission,
+} from "./daily-closing-logic";
 
 const router: IRouter = Router();
 const editableRoles = ["managing_director", "manager", "receptionist"] as const;
@@ -52,7 +56,7 @@ async function movementSummary(companyId: number, branchId: number, date: string
       eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.branchId, branchId),
       eq(productReturnsTable.status, "approved" as const), gte(productReturnsTable.returnDate, start), lte(productReturnsTable.returnDate, end),
     )),
-    db.select({ line: dailyClosingLinesTable })
+    db.select({ line: dailyClosingLinesTable, closing: dailyClosingsTable })
       .from(dailyClosingLinesTable)
       .innerJoin(dailyClosingsTable, eq(dailyClosingLinesTable.closingId, dailyClosingsTable.id))
       .where(and(
@@ -65,8 +69,21 @@ async function movementSummary(companyId: number, branchId: number, date: string
 
   const previousByProduct = new Map<string, number>();
   for (const row of previous) {
+    const prior = latestPriorClosingLine(
+      [{
+        companyId: row.closing.companyId,
+        branchId: row.closing.branchId,
+        businessDate: row.closing.businessDate,
+        status: row.closing.status as "draft" | "submitted" | "approved",
+        line: row.line,
+      }],
+      companyId,
+      branchId,
+      row.line.productName,
+      date,
+    );
     const k = key(row.line.productName);
-    if (!previousByProduct.has(k)) previousByProduct.set(k, row.line.closingStock);
+    if (prior && !previousByProduct.has(k)) previousByProduct.set(k, prior.closingStock);
   }
 
   const cumulativeBefore = async (name: string) => {
@@ -108,7 +125,7 @@ async function movementSummary(companyId: number, branchId: number, date: string
   for (const row of production) add(row.breadType, "produced", row.quantityProduced - row.wasteQuantity);
   for (const row of allocations) add(row.breadType, "allocated", row.quantity);
   for (const row of returns) if (["not_sold", "wrong_item", "other"].includes(row.reason)) add(row.breadType, "returned", row.quantity);
-  for (const row of sales) if (row.cashierRole !== "supplier" && row.sale.breadType !== "Quick Sale") add(row.sale.breadType, "recordedSales", row.sale.quantity);
+  for (const row of sales) if (isDirectStoreSale(row.sale, row.cashierRole)) add(row.sale.breadType, "recordedSales", row.sale.quantity);
 
   const lines = [];
   for (const product of products) {
@@ -154,20 +171,17 @@ router.patch("/daily-closings/:id", authenticate, requireRole(...editableRoles),
   const id = parseInt(String(req.params.id), 10);
   const [closing] = await db.select().from(dailyClosingsTable).where(and(eq(dailyClosingsTable.id, id), eq(dailyClosingsTable.companyId, req.user!.companyId)));
   if (!closing) { res.status(404).json({ error: "Closing not found" }); return; }
-  if (closing.status !== "draft") { res.status(400).json({ error: "Only draft closings can be edited" }); return; }
+  if (!canEditClosing(closing.status as "draft" | "submitted" | "approved")) { res.status(400).json({ error: "Only draft closings can be edited" }); return; }
   const lines = Array.isArray(req.body.lines) ? req.body.lines : [];
+  const reasonError = req.body.submit ? validateSubmission(lines) : null;
+  if (reasonError) { res.status(400).json({ error: reasonError }); return; }
   for (const input of lines) {
-    const closingStock = Math.max(0, parseInt(input.closingStock) || 0);
-    const calculatedSales = input.openingStock + input.produced + input.returned - input.allocated - closingStock;
-    const variance = calculatedSales - input.recordedSales;
-    if (req.body.submit && variance !== 0 && !String(input.varianceReason ?? "").trim()) {
-      res.status(400).json({ error: `A reason is required for the ${input.productName} variance` }); return;
-    }
+    const { closingStock, calculatedSales, variance, varianceReason } = calculateClosingLine(input);
     await db.update(dailyClosingLinesTable).set({
-      closingStock, calculatedSales, variance, varianceReason: input.varianceReason ? String(input.varianceReason).trim() : null, updatedAt: new Date(),
+      closingStock, calculatedSales, variance, varianceReason, updatedAt: new Date(),
     }).where(and(eq(dailyClosingLinesTable.id, Number(input.id)), eq(dailyClosingLinesTable.closingId, id)));
   }
-  const status = req.body.submit ? "submitted" : "draft";
+  const status = nextClosingStatus(closing.status as "draft" | "submitted" | "approved", Boolean(req.body.submit));
   const [updated] = await db.update(dailyClosingsTable).set({
     status, submittedById: req.user!.userId, submittedAt: req.body.submit ? new Date() : closing.submittedAt, notes: req.body.notes ?? closing.notes, updatedAt: new Date(),
   }).where(eq(dailyClosingsTable.id, id)).returning();
@@ -178,7 +192,7 @@ router.patch("/daily-closings/:id", authenticate, requireRole(...editableRoles),
 router.patch("/daily-closings/:id/approve", authenticate, requireRole("managing_director", "manager"), async (req: AuthenticatedRequest, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   const [closing] = await db.select().from(dailyClosingsTable).where(and(eq(dailyClosingsTable.id, id), eq(dailyClosingsTable.companyId, req.user!.companyId)));
-  if (!closing || closing.status !== "submitted") { res.status(400).json({ error: "Only submitted closings can be approved" }); return; }
+  if (!closing || !canApproveClosing(closing.status as "draft" | "submitted" | "approved")) { res.status(400).json({ error: "Only submitted closings can be approved" }); return; }
   if (req.user!.role !== "managing_director" && req.user!.branchId !== closing.branchId) { res.status(403).json({ error: "You can only approve closings for your branch" }); return; }
   const [updated] = await db.update(dailyClosingsTable).set({ status: "approved", approvedById: req.user!.userId, approvedAt: new Date(), updatedAt: new Date() }).where(eq(dailyClosingsTable.id, id)).returning();
   await logAudit({ req, userId: req.user!.userId, companyId: req.user!.companyId, action: "DAILY_CLOSING_APPROVED", entityType: "daily_closing", entityId: id, details: `${closing.businessDate} branch ${closing.branchId}`, branchId: closing.branchId });
