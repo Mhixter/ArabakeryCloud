@@ -18,6 +18,7 @@ import notificationsRouter from "./notifications";
 import pushRouter from "./push";
 import workersRouter from "./workers";
 import expensesRouter from "./expenses";
+import dailyClosingsRouter from "./daily-closings";
 import { verifyToken } from "../lib/auth";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -118,6 +119,7 @@ router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(workersRouter);
 router.use(expensesRouter);
+router.use(dailyClosingsRouter);
 router.use(adminRouter);
 
 export default router;
