@@ -209,11 +209,14 @@ router.get("/stock-settlements/history", authenticate, requireRole("managing_dir
   const branchId = effectiveBranch(req, req.query.branchId as string | undefined);
   if (!branchId) { res.status(400).json({ error: "A branch is required" }); return; }
   try {
-    const [production, sales, allocations, closings] = await Promise.all([
+    const [production, sales, allocations, closings, closingLines] = await Promise.all([
       db.select({ date: productionBatchesTable.productionDate }).from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, req.user!.companyId), eq(productionBatchesTable.branchId, branchId), isNull(productionBatchesTable.deletedAt))),
       db.select({ date: salesTable.saleDate }).from(salesTable).where(and(eq(salesTable.companyId, req.user!.companyId), eq(salesTable.branchId, branchId), isNull(salesTable.deletedAt))),
       db.select({ date: sellerAllocationsTable.allocationDate }).from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, req.user!.companyId), eq(sellerAllocationsTable.branchId, branchId), isNull(sellerAllocationsTable.deletedAt))),
       db.select().from(dailyClosingsTable).where(and(eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId))),
+      db.select({ line: dailyClosingLinesTable, closing: dailyClosingsTable }).from(dailyClosingLinesTable)
+        .innerJoin(dailyClosingsTable, eq(dailyClosingLinesTable.closingId, dailyClosingsTable.id))
+        .where(and(eq(dailyClosingsTable.companyId, req.user!.companyId), eq(dailyClosingsTable.branchId, branchId))),
     ]);
     const dates = new Set<string>([businessDateFor()]);
     for (const row of production) dates.add(businessDateFor(row.date));
@@ -222,7 +225,11 @@ router.get("/stock-settlements/history", authenticate, requireRole("managing_dir
     for (const row of closings) dates.add(row.businessDate);
     const history = [...dates].filter(date => date <= businessDateFor()).sort().reverse().map(date => {
       const closing = closings.find(row => row.businessDate === date);
-      return { date, status: closing?.stockSettledAt ? "cleared" : "uncleared", settledAt: closing?.stockSettledAt ?? null };
+      const linesForDate = closingLines.filter(row => row.closing.businessDate === date).map(row => row.line);
+      const positiveLines = linesForDate.filter(line => line.closingStock > 0);
+      const cleared = positiveLines.length > 0 && positiveLines.every(line => Boolean(line.stockSettledAt));
+      const settledAt = positiveLines.length > 0 ? positiveLines.find(line => line.stockSettledAt)?.stockSettledAt ?? null : null;
+      return { date, status: cleared || Boolean(closing?.stockSettledAt) ? "cleared" : "uncleared", settledAt };
     });
     res.json({ history });
   } catch (err) {
