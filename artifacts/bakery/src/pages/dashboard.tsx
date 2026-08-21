@@ -894,7 +894,11 @@ function ManagerDashboard() {
     const token = localStorage.getItem("nmb_token");
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const params = new URLSearchParams();
-    if (activeBranch?.id) params.set("branchId", activeBranch.id.toString());
+    if (isOwner) {
+      params.set("scope", "company");
+    } else if (activeBranch?.id) {
+      params.set("branchId", activeBranch.id.toString());
+    }
     if (date) params.set("date", date);
     const qs = params.toString();
     const url = `${API_BASE}/api/reports/product-dashboard${qs ? `?${qs}` : ""}`;
@@ -930,7 +934,7 @@ function ManagerDashboard() {
         setLoading(false);
         setAllocLoading(false);
       });
-  }, [activeBranch?.id]);
+  }, [activeBranch?.id, isOwner]);
 
   useEffect(() => {
     fetchDashboard();

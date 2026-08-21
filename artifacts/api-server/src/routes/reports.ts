@@ -46,13 +46,14 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
 /* ── Product-focused dashboard (new) ── */
 router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { companyId, role, branchId: userBranchId } = req.user!;
-  const { branchId: queryBranchId, date: queryDate } = req.query as { branchId?: string; date?: string };
-  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
+  const { branchId: queryBranchId, date: queryDate, scope } = req.query as { branchId?: string; date?: string; scope?: string };
+  const companyWide = role === "managing_director" && scope === "company";
+  const branchFilter = companyWide ? null : queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
     : role !== "managing_director" ? userBranchId : null;
   /* For the stock (remaining) calculation the MD always sees company-wide bread,
      not just a single branch. Period KPIs (revenue, expenses) still respect branchFilter. */
-  const stockBranchFilter = role !== "managing_director" ? branchFilter : null;
+  const stockBranchFilter = companyWide || role === "managing_director" ? null : branchFilter;
   /* Support custom date for "view by date" filter — fallback to today */
   const baseDate = queryDate ? new Date(queryDate + "T12:00:00") : new Date();
   const now = new Date();
