@@ -53,11 +53,31 @@ test("submission requires a reason only when a line has a variance", () => {
     allocated: 0,
     recordedSales: 35,
     closingStock: 4,
+    counted: true,
   };
   assert.equal(validateSubmission([line]), "A reason is required for the Milk Bread variance");
   assert.equal(validateSubmission([{ ...line, varianceReason: "one damaged loaf" }]), null);
-  assert.equal(validateSubmission([{ ...line, recordedSales: 35, closingStock: 4, varianceReason: null }]), "A reason is required for the Milk Bread variance");
-  assert.equal(validateSubmission([{ ...line, recordedSales: 35, closingStock: 5 }]), null);
+  assert.equal(validateSubmission([{ ...line, recordedSales: 35, closingStock: 4, counted: true, varianceReason: null }]), "A reason is required for the Milk Bread variance");
+  assert.equal(validateSubmission([{ ...line, recordedSales: 35, closingStock: 5, counted: true }]), null);
+});
+
+test("untouched counts cannot be submitted and negative expected sales clamp to zero", () => {
+  const line = {
+    productName: "5 in 1",
+    openingStock: 1001,
+    produced: 0,
+    returned: 0,
+    allocated: 1017,
+    recordedSales: 0,
+    closingStock: 0,
+  };
+  assert.equal(validateSubmission([line]), "A physical closing count is required for 5 in 1");
+  assert.deepEqual(calculateClosingLine({ ...line, counted: true }), {
+    closingStock: 0,
+    calculatedSales: 0,
+    variance: 0,
+    varianceReason: null,
+  });
 });
 
 test("draft save and submission transitions are explicit, approval requires submitted", () => {
