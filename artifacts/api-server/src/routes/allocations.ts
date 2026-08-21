@@ -143,6 +143,13 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
       .limit(1);
     const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId ?? defaultBranch?.id;
     if (!branchId) { res.status(400).json({ error: "branchId could not be determined — please select a branch" }); return; }
+    const [product] = await db.select().from(productsTable).where(and(
+      eq(productsTable.companyId, companyId),
+      eq(productsTable.name, breadType),
+      eq(productsTable.isActive, true),
+      sql`(${productsTable.branchId} = ${branchId} OR ${productsTable.branchId} IS NULL)`,
+    ));
+    if (!product) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
 
     /*
      * Stock check mirrors the product dashboard:
@@ -178,7 +185,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
 
     const [allocation] = await db.insert(sellerAllocationsTable).values({
       companyId, branchId, sellerId: parseInt(sellerId), issuedById,
-      breadType, quantity: parseInt(quantity), notes: notes ?? null,
+      productId: product.id, breadType: product.name, quantity: parseInt(quantity), notes: notes ?? null,
       allocationDate: new Date(),
     }).returning();
 
@@ -453,6 +460,7 @@ router.post("/allocations/settle-supplier", authenticate, requireRole("managing_
         const [sale] = await tx.insert(salesTable).values({
           companyId,
           receiptNumber,
+          productId: products.find(p => p.name === breadType)?.id ?? null,
           breadType,
           quantity: data.quantity,
           pricePerUnit: itemPricePerUnit.toFixed(2),
@@ -549,6 +557,7 @@ router.post("/allocations/:id/settle", authenticate, requireRole("managing_direc
     const [sale] = await db.insert(salesTable).values({
       companyId,
       receiptNumber,
+      productId: product?.id ?? null,
       breadType: allocation.breadType,
       quantity: allocation.quantity,
       pricePerUnit: unitPrice.toFixed(2),
