@@ -225,7 +225,9 @@ export async function getOfflineFallback(url: string): Promise<Response | null> 
 
     /* ── Reports / dashboard (blob cache) ── */
     else if (/\/api\/reports\b/.test(path) || /\/api\/dashboard\b/.test(path)) {
-      const cacheKey = path.replace(/.*\/api\//, "api/");
+      // Keep query parameters (especially branchId) so one branch cannot
+      // reuse another branch's dashboard response while offline.
+      const cacheKey = url.replace(/.*\/api\//, "api/");
       data = await getCachedApiResponse(cacheKey);
     }
 
