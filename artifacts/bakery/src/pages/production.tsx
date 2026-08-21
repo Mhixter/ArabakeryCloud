@@ -117,7 +117,7 @@ export default function ProductionPage() {
 
   /* Filter by selected date (client-side) */
   const visibleBatches = filterDate
-    ? sorted.filter(b => b.productionDate.slice(0, 10) === filterDate)
+    ? sorted.filter(b => format(new Date(b.productionDate), "yyyy-MM-dd") === filterDate)
     : sorted;
 
   /* Stats from visible (filtered) batches */
