@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
   Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich, Download,
-  PackageCheck, Activity, Receipt, Users2, DoorOpen,
+  PackageCheck, Activity, Receipt, Users2, DoorOpen, ClipboardCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff","supplier"] },
   { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist","supplier"] },
   { href: "/allocations",      label: "Allocations",   icon: PackageCheck,    roles: ["managing_director","manager","receptionist","supplier"] },
+  { href: "/daily-closing",    label: "Daily Closing",  icon: ClipboardCheck,  roles: ["managing_director","manager","receptionist"] },
   { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
   { href: "/products",         label: "Products",      icon: Sandwich,        roles: ["managing_director","manager","receptionist"] },
   { href: "/inventory",        label: "Inventory",     icon: Package,         roles: ["managing_director","manager"] },
