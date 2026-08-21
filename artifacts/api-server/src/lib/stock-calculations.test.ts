@@ -10,13 +10,13 @@ test("shared branch-scoped fixture reconciles dashboard stock and closing openin
   // Branch 1 only: opening 100, then production +10, return +3, direct sale -8,
   // and allocation -20 leaves 85 in store. Branch 2's production is excluded.
   const branchOne = {
-    produced: 10,
+    produced: 110,
     restorableReturns: 3,
     directSales: 8,
     allocated: 20,
   };
-  const dashboardRemaining = 100 + calculateInStoreStock(branchOne) - 100;
-  const closingOpening = calculateInStoreStock({ ...branchOne, produced: 100 + branchOne.produced });
+  const dashboardRemaining = calculateInStoreStock(branchOne);
+  const closingOpening = calculateInStoreStock(branchOne);
   assert.equal(dashboardRemaining, 85);
   assert.equal(closingOpening, 85);
 });
