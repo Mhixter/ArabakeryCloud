@@ -248,12 +248,12 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const sellersUrl = `${API_BASE}/api/allocations/sellers`;
-    /* Always fetch company-wide stock (no branch filter) — the API validates per-company not per-branch,
-       and branch-filtered dashboard can show 0 when production was logged to a different branch. */
+    /* Stock must match the branch selected for this allocation. The API
+       validates the same branch again when the allocation is submitted. */
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(API_BASE + "/api/reports/product-dashboard", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/api/reports/product-dashboard${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
