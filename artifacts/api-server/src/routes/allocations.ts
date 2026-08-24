@@ -3,7 +3,7 @@ import {
   db, sellerAllocationsTable, usersTable, branchesTable,
   salesTable, productionBatchesTable, productsTable, productReturnsTable,
 } from "@workspace/db";
-import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, inArray, or, sql } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import crypto from "crypto";
@@ -135,6 +135,11 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
 
     if (!seller) { res.status(404).json({ error: "Supplier not found" }); return; }
     if (seller.role !== "supplier") { res.status(400).json({ error: "Selected user is not a supplier" }); return; }
+    const sellerIdNumber = parseInt(String(sellerId), 10);
+    const quantityNumber = parseInt(String(quantity), 10);
+    if (!Number.isInteger(sellerIdNumber) || !Number.isInteger(quantityNumber) || quantityNumber < 1) {
+      res.status(400).json({ error: "sellerId and quantity must be valid positive numbers" }); return;
+    }
 
     /* Resolve branchId: explicit body > seller's branch > issuer's branch > company default */
     const [defaultBranch] = await db
@@ -144,6 +149,11 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
       .limit(1);
     const branchId = (bodyBranchId ? parseInt(bodyBranchId) : null) ?? seller.branchId ?? userBranchId ?? defaultBranch?.id;
     if (!branchId) { res.status(400).json({ error: "branchId could not be determined — please select a branch" }); return; }
+    const [branch] = await db
+      .select({ id: branchesTable.id })
+      .from(branchesTable)
+      .where(and(eq(branchesTable.id, branchId), eq(branchesTable.companyId, companyId)));
+    if (!branch) { res.status(400).json({ error: "Selected branch is not available for this company" }); return; }
     const [product] = await db.select().from(productsTable).where(and(
       eq(productsTable.companyId, companyId),
       eq(productsTable.isActive, true),
@@ -176,7 +186,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     );
     const remaining = totalProduced + restorableReturned - directSold - totalAllocated;
 
-    if (parseInt(quantity) > remaining) {
+    if (quantityNumber > remaining) {
       res.status(400).json({
         error: remaining <= 0
           ? `No stock available for "${breadType}". Record production first.`
@@ -185,8 +195,8 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     }
 
     const [allocation] = await db.insert(sellerAllocationsTable).values({
-      companyId, branchId, sellerId: parseInt(sellerId), issuedById,
-      productId: product.id, breadType: product.name, quantity: parseInt(quantity), notes: notes ?? null,
+      companyId, branchId, sellerId: sellerIdNumber, issuedById,
+      productId: product.id, breadType: product.name, quantity: quantityNumber, notes: notes ?? null,
       allocationDate: new Date(),
     }).returning();
 
@@ -200,7 +210,15 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     res.status(201).json(formatAllocation(allocation, sellerRow?.fullName ?? "Unknown", issuerRow?.fullName ?? "Unknown", branchRow?.name ?? "Unknown"));
   } catch (err) {
     console.error("POST /allocations error:", err);
-    res.status(500).json({ error: "Failed to create allocation" });
+    const code = typeof err === "object" && err !== null && "code" in err
+      ? String((err as { code?: unknown }).code)
+      : "";
+    const error = code === "23503"
+      ? "Allocation references a missing supplier, branch, or product"
+      : code === "23502"
+        ? "Allocation is missing a required field"
+        : "Failed to create allocation";
+    res.status(500).json({ error });
   }
 });
 
