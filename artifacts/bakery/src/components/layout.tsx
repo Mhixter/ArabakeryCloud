@@ -27,6 +27,7 @@ interface NavItem { href: string; label: string; icon: React.ElementType; roles:
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff","supplier"] },
   { href: "/quick-sale-settlement", label: "Quick Sale Settlement", icon: HandCoins, roles: ["managing_director"] },
+  { href: "/supplier-settlements", label: "Supplier Settlements", icon: HandCoins, roles: ["managing_director"] },
   { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist","supplier"] },
   { href: "/allocations",      label: "Allocations",   icon: PackageCheck,    roles: ["managing_director","manager","receptionist","supplier"] },
   { href: "/production",       label: "Production",    icon: Factory,         roles: ["managing_director","manager","production_staff"] },
