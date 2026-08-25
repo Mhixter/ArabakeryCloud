@@ -67,10 +67,10 @@ export default function StockByProductPage() {
 
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="space-y-1.5"><Label className="text-xs">From</Label><Input type="datetime-local" value={start} onChange={e => setStart(e.target.value)} className="h-9 text-sm" /></div>
-            <div className="space-y-1.5"><Label className="text-xs">To</Label><Input type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} className="h-9 text-sm" /></div>
-            <button onClick={load} className="h-9 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Apply period</button>
+          <div className="grid grid-cols-1 gap-3 items-end sm:flex sm:flex-wrap">
+            <div className="space-y-1.5 sm:min-w-[220px]"><Label className="text-xs">From</Label><Input type="datetime-local" value={start} onChange={e => setStart(e.target.value)} className="h-9 w-full text-sm" /></div>
+            <div className="space-y-1.5 sm:min-w-[220px]"><Label className="text-xs">To</Label><Input type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} className="h-9 w-full text-sm" /></div>
+            <button onClick={load} className="h-9 w-full rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">Apply period</button>
           </div>
           <p className="text-xs text-muted-foreground mt-3">Times are applied to the selected branch. Date-only operational records use the Africa/Lagos business-day boundary.</p>
         </CardContent>
