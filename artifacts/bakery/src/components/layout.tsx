@@ -158,7 +158,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
                     )}
                   />
                   <span className={cn(
-                    "text-[10px] font-semibold leading-none tracking-tight transition-colors",
+                    "max-w-[72px] truncate text-center text-[10px] font-semibold leading-none tracking-tight transition-colors",
                     isActive ? "text-amber-500" : "text-slate-400"
                   )}>
                     {item.label}
@@ -396,7 +396,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-20 lg:p-6 lg:pb-6">{children}</main>
 
       {/* Mobile bottom tabs */}
       <MobileBottomNav ls={ls} />
@@ -545,7 +545,7 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">{children}</main>
       </div>
 
       {/* Mobile bottom tabs */}
