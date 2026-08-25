@@ -237,6 +237,28 @@ router.get("/reports/stock-reconciliation", authenticate, async (req: Authentica
     eq(table.companyId, companyId), isNull(table.deletedAt), gte(column, new Date(0)),
     sql`${column} < ${rangeStart}`, branchCondition(table),
   ].filter(Boolean);
+  /* Returns predate the soft-delete and return_date columns in some deployed
+     databases. Select only the stable fields needed for reconciliation. */
+  const returnInRange = [
+    eq(productReturnsTable.companyId, companyId),
+    gte(productReturnsTable.createdAt, rangeStart),
+    lte(productReturnsTable.createdAt, rangeEnd),
+    branchFilter ? eq(productReturnsTable.branchId, branchFilter) : undefined,
+    eq(productReturnsTable.status, "approved" as const),
+  ].filter(Boolean);
+  const returnBeforeStart = [
+    eq(productReturnsTable.companyId, companyId),
+    gte(productReturnsTable.createdAt, new Date(0)),
+    sql`${productReturnsTable.createdAt} < ${rangeStart}`,
+    branchFilter ? eq(productReturnsTable.branchId, branchFilter) : undefined,
+    eq(productReturnsTable.status, "approved" as const),
+  ].filter(Boolean);
+  const returnSelect = {
+    productId: productReturnsTable.productId,
+    breadType: productReturnsTable.breadType,
+    quantity: productReturnsTable.quantity,
+    reason: productReturnsTable.reason,
+  };
 
   const products = await db.select().from(productsTable).where(
     branchFilter
@@ -254,15 +276,12 @@ router.get("/reports/stock-reconciliation", authenticate, async (req: Authentica
       db.select().from(productionBatchesTable).where(and(...inRange(productionBatchesTable, productionBatchesTable.productionDate))),
       db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...inRange(salesTable, salesTable.saleDate))),
       db.select().from(sellerAllocationsTable).where(and(...inRange(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
-      /* Older deployed databases may not have the later return_date column.
-         created_at is the durable timestamp available in both schemas and is
-         equivalent for legacy returns because return_date defaulted to now(). */
-      db.select().from(productReturnsTable).where(and(...inRange(productReturnsTable, productReturnsTable.createdAt), eq(productReturnsTable.status, "approved" as const))),
+      db.select(returnSelect).from(productReturnsTable).where(and(...returnInRange)),
       db.select().from(expensesTable).where(and(...inRange(expensesTable, expensesTable.expenseDate))),
       db.select().from(productionBatchesTable).where(and(...beforeStart(productionBatchesTable, productionBatchesTable.productionDate))),
       db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...beforeStart(salesTable, salesTable.saleDate))),
       db.select().from(sellerAllocationsTable).where(and(...beforeStart(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
-      db.select().from(productReturnsTable).where(and(...beforeStart(productReturnsTable, productReturnsTable.createdAt), eq(productReturnsTable.status, "approved" as const))),
+      db.select(returnSelect).from(productReturnsTable).where(and(...returnBeforeStart)),
     ]);
   const directSales = (rows: { sale: typeof salesTable.$inferSelect; cashierRole: string | null }[]) =>
     rows.filter(r => r.cashierRole !== "supplier" && !isStockClearingSale(r.sale));
