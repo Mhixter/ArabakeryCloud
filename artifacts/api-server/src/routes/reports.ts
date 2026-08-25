@@ -7,6 +7,11 @@ import { businessDateFor, businessDateRange, queryDateRange } from "../lib/busin
 
 const router: IRouter = Router();
 
+function isStockClearingSale(sale: typeof salesTable.$inferSelect) {
+  return sale.notes?.startsWith("[Quick Sale stock settlement]") ||
+    sale.notes?.startsWith("[In-stock settlement]");
+}
+
 const identityReviewTables = {
   production: productionBatchesTable,
   sale: salesTable,
@@ -234,7 +239,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds));
+  const todaySales = (await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds)))
+    .filter(({ sale }) => !isStockClearingSale(sale));
 
   const todayExpConds = [isNull(expensesTable.deletedAt), eq(expensesTable.companyId, companyId), gte(expensesTable.expenseDate, todayStart), lte(expensesTable.expenseDate, todayEnd)];
   if (branchFilter) todayExpConds.push(eq(expensesTable.branchId, branchFilter));
@@ -246,7 +252,8 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds));
+  const weekSales = (await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds)))
+    .filter(({ sale }) => !isStockClearingSale(sale));
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -645,6 +652,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   const salesByType: Record<string, { breadType: string; revenue: number; profit: number; qty: number }> = {};
   let totalRevenue = 0, totalProfit = 0, totalQty = 0;
   sales.forEach(s => {
+    if (isStockClearingSale(s as typeof salesTable.$inferSelect)) return;
     totalRevenue += parseFloat(s.totalAmount as unknown as string ?? "0");
     totalProfit  += parseFloat(s.profitAmount as unknown as string ?? "0");
     totalQty     += Number(s.quantity ?? 0);
