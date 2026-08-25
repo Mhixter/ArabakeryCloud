@@ -1340,44 +1340,6 @@ function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Remaining stock per bread type — in store only */}
-      <Card className="rounded-2xl border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center">
-              <Factory size={15} className="text-amber-400" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
-              <CardDescription className="text-xs">Current in-store stock</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          ) : !data?.remaining?.length ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <Factory size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No products found.</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setLocation("/products")}>Add Products</Button>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/50">
-              {data.remaining.map(item => {
-                const inStore = item.remaining;
-                return (
-                  <div key={item.name} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                    <p className="text-sm font-bold tabular-nums">{inStore.toLocaleString()} units in store</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Quick links */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="rounded-2xl border-0 shadow-sm cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setLocation("/production")}>
