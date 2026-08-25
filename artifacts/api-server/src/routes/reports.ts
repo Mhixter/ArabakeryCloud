@@ -254,12 +254,15 @@ router.get("/reports/stock-reconciliation", authenticate, async (req: Authentica
       db.select().from(productionBatchesTable).where(and(...inRange(productionBatchesTable, productionBatchesTable.productionDate))),
       db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...inRange(salesTable, salesTable.saleDate))),
       db.select().from(sellerAllocationsTable).where(and(...inRange(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
-      db.select().from(productReturnsTable).where(and(...inRange(productReturnsTable, productReturnsTable.returnDate), eq(productReturnsTable.status, "approved" as const))),
+      /* Older deployed databases may not have the later return_date column.
+         created_at is the durable timestamp available in both schemas and is
+         equivalent for legacy returns because return_date defaulted to now(). */
+      db.select().from(productReturnsTable).where(and(...inRange(productReturnsTable, productReturnsTable.createdAt), eq(productReturnsTable.status, "approved" as const))),
       db.select().from(expensesTable).where(and(...inRange(expensesTable, expensesTable.expenseDate))),
       db.select().from(productionBatchesTable).where(and(...beforeStart(productionBatchesTable, productionBatchesTable.productionDate))),
       db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...beforeStart(salesTable, salesTable.saleDate))),
       db.select().from(sellerAllocationsTable).where(and(...beforeStart(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
-      db.select().from(productReturnsTable).where(and(...beforeStart(productReturnsTable, productReturnsTable.returnDate), eq(productReturnsTable.status, "approved" as const))),
+      db.select().from(productReturnsTable).where(and(...beforeStart(productReturnsTable, productReturnsTable.createdAt), eq(productReturnsTable.status, "approved" as const))),
     ]);
   const directSales = (rows: { sale: typeof salesTable.$inferSelect; cashierRole: string | null }[]) =>
     rows.filter(r => r.cashierRole !== "supplier" && !isStockClearingSale(r.sale));
