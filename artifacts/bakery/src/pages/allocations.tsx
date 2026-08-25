@@ -17,6 +17,7 @@ import { getStoredUser, getStoredCompany } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE } from "@/lib/api";
 import { generatePdf } from "@/lib/pdf";
+import { businessDateFor } from "@/lib/business-date";
 import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 
 function formatDate(iso: string) {
@@ -786,12 +787,13 @@ export default function AllocationsPage() {
                         </div>
                         <div className="space-y-2">
                           {Array.from(sellerAllocs.reduce((dates, allocation) => {
-                            const key = format(new Date(allocation.allocationDate), "yyyy-MM-dd");
+                             const key = businessDateFor(new Date(allocation.allocationDate));
                             dates.set(key, [...(dates.get(key) ?? []), allocation]);
                             return dates;
                           }, new Map<string, Allocation[]>())).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, dateAllocations]) => {
                             const active = dateAllocations.filter(a => !a.isCleared);
                             const units = dateAllocations.reduce((s, a) => s + a.quantity, 0);
+                             const totalValue = dateAllocations.reduce((s, a) => s + (productPrices.get(a.breadType) ?? 0) * a.quantity, 0);
                             const products = Array.from(dateAllocations.reduce((types, a) => {
                               types.set(a.breadType, (types.get(a.breadType) ?? 0) + a.quantity);
                               return types;
@@ -815,7 +817,10 @@ export default function AllocationsPage() {
                                   </div>
                                   <p className="text-xs text-muted-foreground truncate">{products.length} product{products.length !== 1 ? "s" : ""} · {active.length ? `${active.length} open item${active.length !== 1 ? "s" : ""}` : "Fully settled"}</p>
                                 </div>
-                                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">{units} units</span>
+                                 <div className="text-right whitespace-nowrap">
+                                   <p className="text-xs font-semibold text-muted-foreground">{units} units</p>
+                                   <p className="text-xs font-bold text-foreground">{totalValue > 0 ? `₦${totalValue.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "Value unavailable"}</p>
+                                 </div>
                                 <ChevronRight size={15} className={`text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
                                 {canSettle && active.length > 0 && (
                                   <Button size="sm" className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-1.5 flex-shrink-0" onClick={(event) => {

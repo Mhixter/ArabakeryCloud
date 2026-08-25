@@ -208,6 +208,109 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
   });
 });
 
+/* ── Date/time stock reconciliation ── */
+router.get("/reports/stock-reconciliation", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  const { companyId, branchId: userBranchId } = req.user!;
+  const { branchId: queryBranchId, startAt, endAt, startDate, endDate } = req.query as {
+    branchId?: string; startAt?: string; endAt?: string; startDate?: string; endDate?: string;
+  };
+  const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId)) ? parseInt(queryBranchId) : userBranchId;
+  const fallbackDate = businessDateFor();
+  const rangeStart = startAt ? new Date(startAt) : queryDateRange(startDate ?? fallbackDate).start;
+  const rangeEnd = endAt ? new Date(endAt) : queryDateRange(endDate ?? startDate ?? fallbackDate).end;
+  if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime()) || rangeStart > rangeEnd) {
+    res.status(400).json({ error: "A valid start and end date/time are required" });
+    return;
+  }
+  const branchCondition = (table: any) => branchFilter ? eq(table.branchId, branchFilter) : undefined;
+  const inRange = (table: any, column: any) => [
+    eq(table.companyId, companyId), isNull(table.deletedAt),
+    gte(column, rangeStart), lte(column, rangeEnd),
+    branchCondition(table),
+  ].filter(Boolean);
+  const throughEnd = (table: any, column: any) => [
+    eq(table.companyId, companyId), isNull(table.deletedAt), lte(column, rangeEnd),
+    branchCondition(table),
+  ].filter(Boolean);
+  const beforeStart = (table: any, column: any) => [
+    eq(table.companyId, companyId), isNull(table.deletedAt), gte(column, new Date(0)),
+    sql`${column} < ${rangeStart}`, branchCondition(table),
+  ].filter(Boolean);
+
+  const products = await db.select().from(productsTable).where(
+    branchFilter
+      ? and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true), or(eq(productsTable.branchId, branchFilter), isNull(productsTable.branchId)))
+      : and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)),
+  );
+  const priceMap = new Map(products.map(p => [p.id, parseFloat(p.pricePerUnit as unknown as string) || 0]));
+  const namePriceMap = new Map(products.map(p => [p.name.trim().toLowerCase(), parseFloat(p.pricePerUnit as unknown as string) || 0]));
+  const keyFor = (id: number | null, name: string) => id == null ? `legacy:${name.trim().toLowerCase()}` : `product:${id}`;
+  const productFor = (id: number | null, name: string) => id != null ? products.find(p => p.id === id) : products.find(p => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const priceFor = (id: number | null, name: string) => id != null ? (priceMap.get(id) ?? 0) : (namePriceMap.get(name.trim().toLowerCase()) ?? 0);
+
+  const [periodProduction, periodSales, periodAllocations, periodReturns, periodExpenses,
+    previousProduction, previousSales, previousAllocations, previousReturns] = await Promise.all([
+      db.select().from(productionBatchesTable).where(and(...inRange(productionBatchesTable, productionBatchesTable.productionDate))),
+      db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...inRange(salesTable, salesTable.saleDate))),
+      db.select().from(sellerAllocationsTable).where(and(...inRange(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
+      db.select().from(productReturnsTable).where(and(...inRange(productReturnsTable, productReturnsTable.returnDate), eq(productReturnsTable.status, "approved" as const))),
+      db.select().from(expensesTable).where(and(...inRange(expensesTable, expensesTable.expenseDate))),
+      db.select().from(productionBatchesTable).where(and(...beforeStart(productionBatchesTable, productionBatchesTable.productionDate))),
+      db.select({ sale: salesTable, cashierRole: usersTable.role }).from(salesTable).leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id)).where(and(...beforeStart(salesTable, salesTable.saleDate))),
+      db.select().from(sellerAllocationsTable).where(and(...beforeStart(sellerAllocationsTable, sellerAllocationsTable.allocationDate))),
+      db.select().from(productReturnsTable).where(and(...beforeStart(productReturnsTable, productReturnsTable.returnDate), eq(productReturnsTable.status, "approved" as const))),
+    ]);
+  const directSales = (rows: { sale: typeof salesTable.$inferSelect; cashierRole: string | null }[]) =>
+    rows.filter(r => r.cashierRole !== "supplier" && !isStockClearingSale(r.sale));
+  const netProduction = (b: typeof productionBatchesTable.$inferSelect) => b.quantityProduced - b.wasteQuantity;
+  const restorable = (r: typeof productReturnsTable.$inferSelect) => ["not_sold", "wrong_item", "other"].includes(r.reason) ? r.quantity : 0;
+  const aggregate = () => new Map<string, { productId: number | null; name: string; produced: number; waste: number; allocated: number; returned: number; recordedUnits: number }>();
+  const add = (map: ReturnType<typeof aggregate>, id: number | null, name: string, field: "produced" | "waste" | "allocated" | "returned" | "recordedUnits", value: number) => {
+    const key = keyFor(id, name); const row = map.get(key) ?? { productId: id, name: productFor(id, name)?.name ?? name, produced: 0, waste: 0, allocated: 0, returned: 0, recordedUnits: 0 };
+    row[field] += value; map.set(key, row);
+  };
+  const period = aggregate(); const opening = aggregate();
+  for (const b of periodProduction) { add(period, b.productId, b.breadType, "produced", b.quantityProduced); add(period, b.productId, b.breadType, "waste", b.wasteQuantity); }
+  for (const a of periodAllocations) add(period, a.productId, a.breadType, "allocated", a.quantity);
+  for (const r of periodReturns) add(period, r.productId, r.breadType, "returned", restorable(r));
+  for (const { sale, cashierRole } of directSales(periodSales)) add(period, sale.productId, sale.breadType, "recordedUnits", sale.quantity);
+  for (const b of previousProduction) { add(opening, b.productId, b.breadType, "produced", netProduction(b)); }
+  for (const a of previousAllocations) add(opening, a.productId, a.breadType, "allocated", a.quantity);
+  for (const r of previousReturns) add(opening, r.productId, r.breadType, "returned", restorable(r));
+  for (const { sale } of directSales(previousSales)) add(opening, sale.productId, sale.breadType, "recordedUnits", sale.quantity);
+  const current = aggregate();
+  for (const b of [...previousProduction, ...periodProduction]) { add(current, b.productId, b.breadType, "produced", netProduction(b)); }
+  for (const a of [...previousAllocations, ...periodAllocations]) add(current, a.productId, a.breadType, "allocated", a.quantity);
+  for (const r of [...previousReturns, ...periodReturns]) add(current, r.productId, r.breadType, "returned", restorable(r));
+  for (const { sale } of directSales([...previousSales, ...periodSales])) add(current, sale.productId, sale.breadType, "recordedUnits", sale.quantity);
+  const rows = products.map(product => {
+    const key = `product:${product.id}`;
+    const p = period.get(key) ?? { productId: product.id, name: product.name, produced: 0, waste: 0, allocated: 0, returned: 0, recordedUnits: 0 };
+    const o = opening.get(key) ?? { productId: product.id, name: product.name, produced: 0, waste: 0, allocated: 0, returned: 0, recordedUnits: 0 };
+    const c = current.get(key) ?? { productId: product.id, name: product.name, produced: 0, waste: 0, allocated: 0, returned: 0, recordedUnits: 0 };
+    const openingStock = o.produced + o.returned - o.allocated - o.recordedUnits;
+    const endingInStore = Math.max(0, c.produced + c.returned - c.allocated - c.recordedUnits);
+    const expectedUnits = Math.max(0, openingStock + (p.produced - p.waste) + p.returned - p.allocated - endingInStore);
+    const recordedValue = p.recordedUnits * priceFor(product.id, product.name);
+    const expectedValue = expectedUnits * priceFor(product.id, product.name);
+    return { productId: product.id, name: product.name, produced: p.produced, waste: p.waste, netProduced: p.produced - p.waste, allocated: p.allocated, recordedUnits: p.recordedUnits, endingInStore, expectedUnits, expectedValue, recordedValue, unrecordedValue: expectedValue - recordedValue };
+  }).filter(row => row.produced || row.allocated || row.recordedUnits || row.endingInStore);
+  const expenses = periodExpenses.reduce((sum, e) => sum + parseFloat(e.amount as unknown as string), 0);
+  const total = rows.reduce((t, r) => ({
+    produced: t.produced + r.produced, waste: t.waste + r.waste, netProduced: t.netProduced + r.netProduced,
+    allocated: t.allocated + r.allocated, recordedUnits: t.recordedUnits + r.recordedUnits, endingInStore: t.endingInStore + r.endingInStore,
+    expectedUnits: t.expectedUnits + r.expectedUnits, expectedValue: t.expectedValue + r.expectedValue, recordedValue: t.recordedValue + r.recordedValue, unrecordedValue: t.unrecordedValue + r.unrecordedValue,
+  }), { produced: 0, waste: 0, netProduced: 0, allocated: 0, recordedUnits: 0, endingInStore: 0, expectedUnits: 0, expectedValue: 0, recordedValue: 0, unrecordedValue: 0 });
+  const allocationDays = new Map<string, { date: string; units: number; expectedValue: number }>();
+  for (const a of periodAllocations) {
+    const date = businessDateFor(a.allocationDate);
+    const row = allocationDays.get(date) ?? { date, units: 0, expectedValue: 0 };
+    row.units += a.quantity; row.expectedValue += a.quantity * priceFor(a.productId, a.breadType); allocationDays.set(date, row);
+  }
+  res.json({ startAt: rangeStart.toISOString(), endAt: rangeEnd.toISOString(), expenses, total, rows, allocationDays: Array.from(allocationDays.values()).sort((a, b) => b.date.localeCompare(a.date)), formulas: { expectedSales: "Opening in-store stock + net production + restorable returns − allocations − ending in-store stock", unrecorded: "Expected sales value − recorded direct sales value", netExpected: "Expected sales value − expenses" } });
+});
+
 /* ── Product-focused dashboard (new) ── */
 router.get("/reports/product-dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
