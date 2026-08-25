@@ -9,6 +9,7 @@ export const quickSaleSettlementsTable = pgTable("quick_sale_settlements", {
   branchId: integer("branch_id").notNull().references(() => branchesTable.id),
   weekStart: text("week_start").notNull(),
   weekEnd: text("week_end").notNull(),
+  businessDate: text("business_date"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   paymentMethod: text("payment_method").notNull(),
   notes: text("notes"),
@@ -19,4 +20,5 @@ export const quickSaleSettlementsTable = pgTable("quick_sale_settlements", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => ({
   companyBranchWeek: uniqueIndex("quick_sale_settlements_company_branch_week_idx").on(table.companyId, table.branchId, table.weekStart),
+  companyBranchDate: uniqueIndex("quick_sale_settlements_company_branch_date_idx").on(table.companyId, table.branchId, table.businessDate),
 }));

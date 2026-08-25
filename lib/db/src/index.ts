@@ -79,6 +79,7 @@ try {
         branch_id integer NOT NULL REFERENCES branches(id),
         week_start text NOT NULL,
         week_end text NOT NULL,
+        business_date text,
         amount numeric(12, 2) NOT NULL,
         payment_method text NOT NULL,
         notes text,
@@ -90,10 +91,14 @@ try {
       );
       ALTER TABLE quick_sale_settlements
         ADD COLUMN IF NOT EXISTS stock_cleared_at timestamptz,
-        ADD COLUMN IF NOT EXISTS stock_cleared_products integer NOT NULL DEFAULT 0
+        ADD COLUMN IF NOT EXISTS stock_cleared_products integer NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS business_date text
       ;
       CREATE UNIQUE INDEX IF NOT EXISTS quick_sale_settlements_company_branch_week_idx
         ON quick_sale_settlements(company_id, branch_id, week_start);
+      CREATE UNIQUE INDEX IF NOT EXISTS quick_sale_settlements_company_branch_date_idx
+        ON quick_sale_settlements(company_id, branch_id, business_date)
+        WHERE business_date IS NOT NULL;
       ALTER TABLE daily_closing_lines
         ADD COLUMN IF NOT EXISTS stock_settled_amount numeric(12, 2),
         ADD COLUMN IF NOT EXISTS stock_settlement_payment_method text,
