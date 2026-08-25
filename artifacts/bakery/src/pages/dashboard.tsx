@@ -1340,7 +1340,7 @@ function ManagerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Remaining stock per bread type — in store vs with suppliers */}
+      {/* Remaining stock per bread type — in store only */}
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2.5">
@@ -1349,7 +1349,7 @@ function ManagerDashboard() {
             </div>
             <div>
               <CardTitle className="text-sm font-bold tracking-tight">Remaining Bread by Type</CardTitle>
-              <CardDescription className="text-xs">In-store stock vs with suppliers</CardDescription>
+              <CardDescription className="text-xs">Current in-store stock</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -1366,28 +1366,10 @@ function ManagerDashboard() {
             <div className="divide-y divide-border/50">
               {data.remaining.map(item => {
                 const inStore = item.remaining;
-                const withSuppliers = item.allocated ?? 0;
-                const total = inStore + withSuppliers;
-                const inStorePct = total > 0 ? Math.round((inStore / total) * 100) : 0;
-                const supplierPct = total > 0 ? Math.round((withSuppliers / total) * 100) : 0;
-                const low = inStore < 10;
                 return (
-                  <div key={item.name} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                      {low && <Badge variant="destructive" className="text-xs">Low</Badge>}
-                    </div>
-                    {/* Stacked bar: amber = in store, slate = with suppliers */}
-                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden mb-1.5">
-                      <div className="flex h-full">
-                        <div className="bg-amber-400 h-full rounded-l-full" style={{ width: `${inStorePct}%` }} />
-                        <div className="bg-slate-400 h-full rounded-r-full" style={{ width: `${supplierPct}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />{inStore} in store</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />{withSuppliers} with suppliers</span>
-                    </div>
+                  <div key={item.name} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <p className="font-semibold text-sm text-foreground">{item.name}</p>
+                    <p className="text-sm font-bold tabular-nums">{inStore.toLocaleString()} units in store</p>
                   </div>
                 );
               })}
