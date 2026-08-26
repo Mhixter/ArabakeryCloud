@@ -9,6 +9,12 @@ import crypto from "crypto";
 
 const router: IRouter = Router();
 
+/* Director-created sales are private operational entries, not customer-facing
+ * sales. Keep this rule server-side so every client gets the same visibility. */
+function visibleSaleForUsers() {
+  return or(isNull(usersTable.role), sql`${usersTable.role} <> 'managing_director'`);
+}
+
 function normalizeWeekStart(value?: string) {
   const date = value ? new Date(`${value}T12:00:00Z`) : new Date();
   if (isNaN(date.getTime())) return null;
@@ -246,7 +252,7 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { branchId, startDate, endDate } = req.query as { branchId?: string; startDate?: string; endDate?: string };
 
-  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers()];
 
   if (role === "supplier") {
     /* Sellers only see their own sales */
@@ -477,7 +483,7 @@ router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedReques
   const { date, branchId } = req.query as { date?: string; branchId?: string };
   const targetDate = date ?? businessDateFor();
   const { start: startOfDay, end: endOfDay } = businessDateRange(targetDate);
-  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
+  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
   if (role === "supplier") {
     conditions.push(eq(salesTable.cashierId, userId));
   } else if (branchId && !isNaN(parseInt(branchId))) {
@@ -485,7 +491,10 @@ router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedReques
   } else if (role !== "managing_director" && userBranchId) {
     conditions.push(eq(salesTable.branchId, userBranchId));
   }
-  const sales = await db.select().from(salesTable).where(and(...conditions));
+  const sales = (await db.select({ sale: salesTable }).from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...conditions)))
+    .map(({ sale }) => sale);
   const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.totalAmount as unknown as string), 0);
   const totalProfit = sales.reduce((sum, s) => sum + parseFloat(s.profitAmount as unknown as string), 0);
   const cashSales = sales.filter(s => s.paymentMethod === "cash").reduce((sum, s) => sum + parseFloat(s.totalAmount as unknown as string), 0);
@@ -495,24 +504,24 @@ router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedReques
     const prev = breadTypeMap.get(s.breadType) ?? { quantity: 0, revenue: 0 };
     breadTypeMap.set(s.breadType, { quantity: prev.quantity + s.quantity, revenue: prev.revenue + parseFloat(s.totalAmount as unknown as string) });
   }
-  res.json({ date: targetDate.toISOString().split("T")[0], totalSales: sales.length, totalRevenue, totalProfit, totalCost: 0, cashSales, transferSales, breadTypes: Array.from(breadTypeMap.entries()).map(([breadType, data]) => ({ breadType, quantity: data.quantity, revenue: data.revenue })) });
+  res.json({ date: targetDate, totalSales: sales.length, totalRevenue, totalProfit, totalCost: 0, cashSales, transferSales, breadTypes: Array.from(breadTypeMap.entries()).map(([breadType, data]) => ({ breadType, quantity: data.quantity, revenue: data.revenue })) });
 });
 
 router.get("/sales/:id", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId } = req.user!;
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
+  const [result] = await db.select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
     .from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
     .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
-    .where(and(eq(salesTable.id, id), eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt)));
+    .where(and(eq(salesTable.id, id), eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt), visibleSaleForUsers()));
   if (!result) { res.status(404).json({ error: "Sale not found" }); return; }
   /* Sellers can only view their own sales */
   if (role === "supplier" && result.sale.cashierId !== userId) {
     res.status(403).json({ error: "Access denied" }); return;
   }
-  res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown", undefined, result.branchPhone, result.branchAddress));
+  res.json(formatSale(result.sale, result.cashierName ?? "Unknown", result.branchName ?? "Unknown", result.cashierRole ?? undefined, result.branchPhone, result.branchAddress));
 });
 
 export default router;

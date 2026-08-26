@@ -36,6 +36,19 @@ export function businessDateRange(date: string) {
   return { start, end: new Date(next.getTime() - 1) };
 }
 
+/** Parse a date-only business date and return its exact day start. */
+export function businessDateStart(value: unknown): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  if (!daysInMonth || day < 1 || day > daysInMonth) return null;
+  return businessDateRange(value).start;
+}
+
+function isLeapYear(year: number) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
 /** Treat date-only query values as business dates; preserve timestamp queries. */
 export function queryDateRange(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)

@@ -7,6 +7,12 @@ import { businessDateFor, businessDateRange, queryDateRange } from "../lib/busin
 
 const router: IRouter = Router();
 
+/* Keep Managing Director-created sales out of customer-facing reports while
+ * retaining the underlying rows for inventory and reconciliation calculations. */
+function visibleSaleForUsers() {
+  return or(isNull(usersTable.role), sql`${usersTable.role} <> 'managing_director'`);
+}
+
 function isStockClearingSale(sale: typeof salesTable.$inferSelect) {
   return sale.notes?.startsWith("[Quick Sale stock settlement]") ||
     sale.notes?.startsWith("[In-stock settlement]");
@@ -167,8 +173,8 @@ router.patch("/reports/stock-identity-review/:transactionType/:transactionId", a
 });
 
 router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
-  const companyId = req.user!.companyId;
-  const { branchId } = req.query as { branchId?: string };
+  const { companyId, branchId: userBranchId } = req.user!;
+  const { branchId: queryBranchId } = req.query as { branchId?: string };
 
   const today = businessDateFor();
   const { start: todayStart, end: todayEnd } = businessDateRange(today);
@@ -179,13 +185,17 @@ router.get("/reports/dashboard", authenticate, async (req: AuthenticatedRequest,
     ? parseInt(queryBranchId)
     : userBranchId;
 
-  const todaySalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
+  const todaySalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todaySalesConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = await db.select({ sale: salesTable }).from(salesTable).where(and(...todaySalesConds));
+  const todaySales = (await db.select({ sale: salesTable }).from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...todaySalesConds))).map(({ sale }) => sale);
 
-  const weekSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
+  const weekSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekSalesConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = await db.select({ sale: salesTable }).from(salesTable).where(and(...weekSalesConds));
+  const weekSales = (await db.select({ sale: salesTable }).from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...weekSalesConds))).map(({ sale }) => sale);
 
   const todayProdConds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId), gte(productionBatchesTable.productionDate, todayStart), lte(productionBatchesTable.productionDate, todayEnd)];
   if (branchFilter) todayProdConds.push(eq(productionBatchesTable.branchId, branchFilter));
@@ -362,9 +372,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
         : and(eq(productsTable.companyId, companyId), eq(productsTable.isActive, true)),
     );
 
-  const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
+  const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
-  const todaySales = (await db.select({ sale: salesTable }).from(salesTable).where(and(...todayConds)))
+  const todaySales = (await db.select({ sale: salesTable }).from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...todayConds)))
     .filter(({ sale }) => !isStockClearingSale(sale));
 
   const todayExpConds = [isNull(expensesTable.deletedAt), eq(expensesTable.companyId, companyId), gte(expensesTable.expenseDate, todayStart), lte(expensesTable.expenseDate, todayEnd)];
@@ -375,9 +387,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   if (branchFilter) weekExpConds.push(eq(expensesTable.branchId, branchFilter));
   const weekExpenses = await db.select({ amount: expensesTable.amount }).from(expensesTable).where(and(...weekExpConds));
 
-  const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), gte(salesTable.saleDate, weekStart)];
+  const weekConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, weekStart)];
   if (branchFilter) weekConds.push(eq(salesTable.branchId, branchFilter));
-  const weekSales = (await db.select({ sale: salesTable }).from(salesTable).where(and(...weekConds)))
+  const weekSales = (await db.select({ sale: salesTable }).from(salesTable)
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...weekConds)))
     .filter(({ sale }) => !isStockClearingSale(sale));
 
   const weekEnd = new Date(weekStart);
@@ -538,9 +552,13 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       byProduct: aggregateByProduct(weekSales),
     },
     allTime: {
-      totalAmount: allSalesEver.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
-      totalQuantity: allSalesEver.reduce((s, x) => s + countBreadUnits(x.sale.breadType, x.sale.quantity), 0),
-      salesCount: allSalesEver.length,
+      totalAmount: allSalesEver
+        .filter(x => x.cashierRole !== "managing_director")
+        .reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),
+      totalQuantity: allSalesEver
+        .filter(x => x.cashierRole !== "managing_director")
+        .reduce((s, x) => s + countBreadUnits(x.sale.breadType, x.sale.quantity), 0),
+      salesCount: allSalesEver.filter(x => x.cashierRole !== "managing_director").length,
     },
     stockIdentityReview: {
       count: backfillIssues.length,
@@ -556,16 +574,19 @@ router.get("/reports/sales-trend", authenticate, async (req: AuthenticatedReques
   const numDays = parseInt(days);
   const start = new Date(todayStart);
   const branchFilter = branchId && !isNaN(parseInt(branchId)) ? parseInt(branchId) : null;
-  const conds = [isNull(productionBatchesTable.deletedAt), eq(productionBatchesTable.companyId, companyId)];
+  const conds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers()];
   if (branchFilter) conds.push(eq(salesTable.branchId, branchFilter));
-  const sales = await db.select().from(salesTable).where(and(...conds)).orderBy(salesTable.saleDate);
+  const sales = await db.select({ sale: salesTable })
+    .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+    .where(and(...conds))
+    .orderBy(salesTable.saleDate);
   const dayMap = new Map<string, { revenue: number; profit: number; count: number }>();
   for (let i = numDays - 1; i >= 0; i--) {
     const d = new Date(todayStart);
     d.setUTCDate(d.getUTCDate() - i);
     dayMap.set(businessDateFor(d), { revenue: 0, profit: 0, count: 0 });
   }
-  for (const s of sales) {
+  for (const { sale: s } of sales) {
     const key = businessDateFor(s.saleDate);
     const prev = dayMap.get(key) ?? { revenue: 0, profit: 0, count: 0 };
     dayMap.set(key, { revenue: prev.revenue + parseFloat(s.totalAmount as unknown as string), profit: prev.profit + parseFloat(s.profitAmount as unknown as string), count: prev.count + 1 });
@@ -713,7 +734,8 @@ router.get("/reports/user-activity/:userId", authenticate, async (req: Authentic
       id: user.id, fullName: user.fullName, role: user.role, agentId: user.agentId,
       branchName: user.branchId ? branchMap.get(user.branchId) ?? null : null,
     },
-    sales: userSales.map(({ sale: s }) => ({
+    /* Managing Director sales are not exposed through activity detail either. */
+    sales: targetRole === "managing_director" ? [] : userSales.map(({ sale: s }) => ({
       id: s.id, breadType: s.breadType, quantity: s.quantity,
       totalAmount: parseFloat(s.totalAmount as unknown as string),
       paymentMethod: s.paymentMethod, saleDate: s.saleDate.toISOString(),
@@ -758,7 +780,7 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
 
   const effectiveBranchId = qBranch ? parseInt(qBranch) : role !== "managing_director" ? userBranchId : null;
 
-  const saleConds: any[] = [eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt), gte(salesTable.saleDate, weekStart), lte(salesTable.saleDate, weekEnd)];
+  const saleConds: any[] = [eq(salesTable.companyId, companyId), isNull(salesTable.deletedAt), visibleSaleForUsers(), gte(salesTable.saleDate, weekStart), lte(salesTable.saleDate, weekEnd)];
   if (effectiveBranchId) saleConds.push(eq(salesTable.branchId, effectiveBranchId));
 
   const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt), gte(productionBatchesTable.productionDate, weekStart), lte(productionBatchesTable.productionDate, weekEnd)];
@@ -768,8 +790,10 @@ router.get("/reports/weekly-summary", authenticate, async (req: AuthenticatedReq
   if (effectiveBranchId) expConds.push(eq(expensesTable.branchId, effectiveBranchId));
 
   const [sales, production, expenses] = await Promise.all([
-    db.select({ totalAmount: salesTable.totalAmount, profitAmount: salesTable.profitAmount, quantity: salesTable.quantity, breadType: salesTable.breadType, saleDate: salesTable.saleDate, branchId: salesTable.branchId })
-      .from(salesTable).where(and(...saleConds)),
+    db.select({ totalAmount: salesTable.totalAmount, profitAmount: salesTable.profitAmount, quantity: salesTable.quantity, breadType: salesTable.breadType, saleDate: salesTable.saleDate, branchId: salesTable.branchId, notes: salesTable.notes })
+      .from(salesTable)
+      .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
+      .where(and(...saleConds)),
     db.select({ breadType: productionBatchesTable.breadType, quantityProduced: productionBatchesTable.quantityProduced, wasteQuantity: productionBatchesTable.wasteQuantity, productionDate: productionBatchesTable.productionDate })
       .from(productionBatchesTable).where(and(...prodConds)),
     db.select({ amount: expensesTable.amount, categoryId: expensesTable.expenseCategoryId, note: expensesTable.note, expenseDate: expensesTable.expenseDate, categoryName: expenseCategoriesTable.name })
