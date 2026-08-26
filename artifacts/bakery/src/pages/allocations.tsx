@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useActiveBranch } from "@/lib/branch-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ interface Return {
   returnDate: string;
 }
 
-interface StockItem { name: string; remaining: number }
+interface StockItem { productId: number; name: string; remaining: number }
 interface Seller { id: number; fullName: string; agentId: string }
 interface Product { id: number; name: string; isActive: boolean }
 
@@ -246,18 +246,28 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { activeBranch } = useActiveBranch();
+  const stockRequestRef = useRef(0);
 
   useEffect(() => {
+    const requestId = ++stockRequestRef.current;
+    const controller = new AbortController();
     const token = localStorage.getItem("nmb_token");
     const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const sellersUrl = `${API_BASE}/api/allocations/sellers`;
     /* Stock must match the branch selected for this allocation. The API
-       validates the same branch again when the allocation is submitted. */
+       validates the same branch and allocation date again when submitted. */
+    setStockLoaded(false);
+    setStock([]);
     setStockError("");
+    const query = new URLSearchParams();
+    if (activeBranch?.id) query.set("branchId", String(activeBranch.id));
+    if (allocationDate) query.set("date", allocationDate);
+    const stockUrl = `${API_BASE}/api/reports/product-dashboard?${query.toString()}`;
+    const requestOptions: RequestInit = { headers: h, credentials: "include", signal: controller.signal };
     Promise.all([
-      fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`${API_BASE}/api/products${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`${API_BASE}/api/reports/product-dashboard${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(async r => {
+      fetch(sellersUrl, requestOptions).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/products${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, requestOptions).then(r => r.ok ? r.json() : []),
+      fetch(stockUrl, requestOptions).then(async r => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
           throw new Error(body.error ?? `Stock request failed (${r.status})`);
@@ -265,22 +275,30 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
         return r.json();
       }),
     ]).then(([s, p, dash]) => {
+      if (requestId !== stockRequestRef.current) return;
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
       setStock(Array.isArray(dash?.remaining) ? dash.remaining as StockItem[] : []);
     }).catch((error) => {
+      if (controller.signal.aborted || requestId !== stockRequestRef.current) return;
       setStock([]);
       setStockError(error instanceof Error ? error.message : "Could not load production stock");
       toast({ title: "Could not load production stock", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
-    }).finally(() => setStockLoaded(true));
-  }, [activeBranch, toast]);
+    }).finally(() => {
+      if (!controller.signal.aborted && requestId === stockRequestRef.current) setStockLoaded(true);
+    });
+    return () => controller.abort();
+  }, [activeBranch, allocationDate, toast]);
 
-  const selectedStock = stock.find(s => s.name.trim().toLowerCase() === breadType.trim().toLowerCase());
+  const selectedProduct = products.find(p => p.name.trim().toLowerCase() === breadType.trim().toLowerCase());
+  const selectedStock = stock.find(s => selectedProduct && s.productId === selectedProduct.id)
+    ?? stock.find(s => s.name.trim().toLowerCase() === breadType.trim().toLowerCase());
   const availableQty = selectedStock?.remaining ?? null;
   const enteredQty = quantity ? parseInt(quantity) : 0;
   const overStock = availableQty !== null && enteredQty > availableQty;
-  const stockForProduct = (name: string) =>
-    stock.find(s => s.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const stockForProduct = (product: Product) =>
+    stock.find(s => s.productId === product.id)
+    ?? stock.find(s => s.name.trim().toLowerCase() === product.name.trim().toLowerCase());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -356,8 +374,8 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
                 className="w-full appearance-none pl-3 pr-8 py-2.5 text-sm rounded-xl bg-muted border-0 text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" required>
                 <option value="">Select bread type…</option>
                 {products.map(p => {
-                  const s = stockForProduct(p.name);
-                  return <option key={p.id} value={p.name}>{p.name} — {s?.remaining ?? 0} available</option>;
+                  const s = stockForProduct(p);
+                  return <option key={p.id} value={p.name}>{p.name} — {stockLoaded ? `${s?.remaining ?? 0} available` : "Loading stock…"}</option>;
                 })}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />

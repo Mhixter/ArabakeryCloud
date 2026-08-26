@@ -8,3 +8,4 @@
 - [Legacy Return Schema](legacy-return-schema.md) — older deployments may lack return_date and deleted_at; reports must select stable return fields explicitly
 - [Managing Director Sales Visibility](director-sales-visibility.md) — hide director-created sales from user-facing reports while retaining them for stock flow
 - [Branch Product Identity](branch-product-identity.md) — resolve duplicate product names against the selected branch before calculating stock
+- [Allocation Stock Date Scope](allocation-stock-date-scope.md) — availability is the selected business-day ending balance, not an all-time total
