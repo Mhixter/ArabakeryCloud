@@ -1,6 +1,6 @@
 import { Router, IRouter } from "express";
 import { db, productionBatchesTable, usersTable, branchesTable, productsTable } from "@workspace/db";
-import { eq, and, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, or } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { queryDateRange } from "../lib/business-date";
@@ -55,7 +55,12 @@ router.post("/production", authenticate, async (req: AuthenticatedRequest, res):
   const product = productCandidates.find(candidate => candidate.branchId === productionBranchId)
     ?? productCandidates.find(candidate => candidate.branchId == null);
   if (!product || !product.isActive) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
-  const [batch] = await db.insert(productionBatchesTable).values({ companyId, productId: product.id, breadType: product.name, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: productionBranchId, notes: notes ?? null, productionDate: productionDate ? new Date(productionDate) : new Date() }).returning();
+  const parsedProductionDate = productionDate ? new Date(productionDate) : new Date();
+  if (Number.isNaN(parsedProductionDate.getTime())) {
+    res.status(400).json({ error: "productionDate must be a valid date" });
+    return;
+  }
+  const [batch] = await db.insert(productionBatchesTable).values({ companyId, productId: product.id, breadType: product.name, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: productionBranchId, notes: notes ?? null, productionDate: parsedProductionDate }).returning();
   const [staff] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, batch.branchId));
   await logAudit({ req, userId: user.userId, companyId, action: "PRODUCTION_RECORDED", entityType: "production", entityId: batch.id, details: `${breadType}: produced ${quantityProduced}, waste ${wasteQuantity ?? 0}`, branchId: batch.branchId });
