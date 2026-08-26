@@ -4,6 +4,7 @@ import {
   BUSINESS_TIMEZONE,
   businessDateFor,
   businessDateRange,
+  businessDateStart,
   queryDateRange,
 } from "./business-date";
 
@@ -59,4 +60,13 @@ test("timestamp query values preserve their instant instead of becoming calendar
 
   assert.equal(range.start.toISOString(), timestamp);
   assert.equal(range.end.toISOString(), timestamp);
+});
+
+test("allocation date parsing accepts valid dates and rejects invalid or missing values", () => {
+  assert.equal(businessDateStart("2026-08-21")?.toISOString(), "2026-08-21T07:00:00.000Z");
+  assert.equal(businessDateStart("2026-02-29"), null);
+  assert.equal(businessDateStart("2024-02-29")?.toISOString(), "2024-02-29T08:00:00.000Z");
+  assert.equal(businessDateStart("2026-02-30"), null);
+  assert.equal(businessDateStart(""), null);
+  assert.equal(businessDateStart(undefined), null);
 });

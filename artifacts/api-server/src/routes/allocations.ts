@@ -6,6 +6,7 @@ import {
 import { eq, and, isNull, inArray, or, sql } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
+import { businessDateStart } from "../lib/business-date";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -122,10 +123,17 @@ router.get("/allocations", authenticate, async (req: AuthenticatedRequest, res):
 router.post("/allocations", authenticate, requireRole("managing_director", "manager", "receptionist"), async (req: AuthenticatedRequest, res): Promise<void> => {
   try {
     const { userId: issuedById, companyId, branchId: userBranchId } = req.user!;
-    const { sellerId, breadType, quantity, branchId: bodyBranchId, notes } = req.body;
+    const { sellerId, breadType, quantity, allocationDate: allocationDateInput, branchId: bodyBranchId, notes } = req.body;
 
     if (!sellerId || !breadType || !quantity) {
       res.status(400).json({ error: "sellerId, breadType, and quantity are required" }); return;
+    }
+    if (!allocationDateInput) {
+      res.status(400).json({ error: "allocationDate is required" }); return;
+    }
+    const allocationDate = businessDateStart(allocationDateInput);
+    if (!allocationDate) {
+      res.status(400).json({ error: "allocationDate must be a valid date in YYYY-MM-DD format" }); return;
     }
 
     const [seller] = await db
@@ -197,7 +205,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     const [allocation] = await db.insert(sellerAllocationsTable).values({
       companyId, branchId, sellerId: sellerIdNumber, issuedById,
       productId: product.id, breadType: product.name, quantity: quantityNumber, notes: notes ?? null,
-      allocationDate: new Date(),
+      allocationDate,
     }).returning();
 
     const [[sellerRow], [branchRow], [issuerRow]] = await Promise.all([
@@ -206,7 +214,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
       db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, allocation.issuedById)),
     ]);
 
-    await logAudit({ req, userId: issuedById, companyId, action: "ALLOCATION_CREATED", entityType: "allocation", entityId: allocation.id, details: `Allocated ${quantity}x ${breadType} to ${sellerRow?.fullName}`, branchId });
+    await logAudit({ req, userId: issuedById, companyId, action: "ALLOCATION_CREATED", entityType: "allocation", entityId: allocation.id, details: `Allocated ${quantity}x ${breadType} to ${sellerRow?.fullName} for ${allocationDateInput}`, branchId });
     res.status(201).json(formatAllocation(allocation, sellerRow?.fullName ?? "Unknown", issuerRow?.fullName ?? "Unknown", branchRow?.name ?? "Unknown"));
   } catch (err) {
     console.error("POST /allocations error:", err);

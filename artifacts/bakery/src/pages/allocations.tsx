@@ -241,6 +241,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [sellerId, setSellerId] = useState("");
   const [breadType, setBreadType] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [allocationDate, setAllocationDate] = useState(() => businessDateFor());
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
@@ -286,6 +287,9 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     if (!sellerId || !breadType || !quantity || parseInt(quantity) < 1) {
       toast({ title: "Fill in all required fields", variant: "destructive" }); return;
     }
+    if (!allocationDate) {
+      toast({ title: "Select an allocation date", variant: "destructive" }); return;
+    }
     setSubmitting(true);
     const token = localStorage.getItem("nmb_token");
     try {
@@ -293,7 +297,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
-        body: JSON.stringify({ sellerId, breadType, quantity: parseInt(quantity), notes: notes || null, branchId: activeBranch?.id ?? null }),
+        body: JSON.stringify({ sellerId, breadType, quantity: parseInt(quantity), allocationDate, notes: notes || null, branchId: activeBranch?.id ?? null }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -330,6 +334,19 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
             {sellers.length === 0 && <p className="text-xs text-amber-600 mt-1">No suppliers found. Create a user with the Supplier role first.</p>}
+          </div>
+
+          <div>
+            <label htmlFor="allocation-date" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Allocation date *</label>
+            <Input
+              id="allocation-date"
+              type="date"
+              value={allocationDate}
+              onChange={e => setAllocationDate(e.target.value)}
+              className="rounded-xl bg-muted border-0 focus-visible:ring-2 focus-visible:ring-amber-400"
+              required
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">Choose the business date this bread was issued.</p>
           </div>
 
           <div>
