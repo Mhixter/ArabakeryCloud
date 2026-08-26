@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { API_BASE } from "@/lib/api";
 import { generatePdf } from "@/lib/pdf";
 import { getStoredCompany } from "@/lib/auth";
-import { businessDateFor } from "@/lib/business-date";
+import { businessDateFor, businessDateTimestamp, formatBusinessDateTime } from "@/lib/business-date";
 
 function todayStr() { return businessDateFor(); }
 
@@ -70,6 +70,7 @@ export default function ProductionPage() {
     breadType: "",
     quantityProduced: "",
     wasteQuantity: "",
+    productionDate: todayStr(),
     branchId: user?.branchId?.toString() ?? "",
     notes: "",
   });
@@ -87,16 +88,20 @@ export default function ProductionPage() {
   const createProduction = useCreateProduction();
 
   const handleCreate = () => {
-    if (!form.breadType || !form.quantityProduced || !form.branchId) {
+    if (!form.breadType || !form.quantityProduced || !form.branchId || !form.productionDate) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
+    const productionDate = form.productionDate === todayStr()
+      ? new Date().toISOString()
+      : businessDateTimestamp(form.productionDate);
     createProduction.mutate(
       { data: {
         breadType: form.breadType,
         quantityProduced: parseInt(form.quantityProduced),
         wasteQuantity: parseInt(form.wasteQuantity || "0"),
         branchId: parseInt(form.branchId),
+        productionDate,
         notes: form.notes || null,
       }},
       {
@@ -104,7 +109,7 @@ export default function ProductionPage() {
           toast({ title: "Production batch recorded" });
           queryClient.invalidateQueries({ queryKey: getListProductionQueryKey({}) });
           setShowNew(false);
-          setForm({ breadType: "", quantityProduced: "", wasteQuantity: "", branchId: user?.branchId?.toString() ?? "", notes: "" });
+           setForm({ breadType: "", quantityProduced: "", wasteQuantity: "", productionDate: todayStr(), branchId: user?.branchId?.toString() ?? "", notes: "" });
         },
         onError: (err) => {
           const msg = (err as { data?: { error?: string } })?.data?.error ?? "Failed to record batch";
@@ -219,7 +224,7 @@ export default function ProductionPage() {
                       title: `Batches (${visibleBatches.length} records)`,
                       headers: ["Date", "Bread Type", "Produced", "Waste", "Net", "Efficiency", "Staff", "Branch", "Notes"],
                       rows: visibleBatches.map(b => [
-                        format(new Date(b.productionDate), "dd/MM/yyyy HH:mm"),
+                        formatBusinessDateTime(b.productionDate),
                         b.breadType,
                         b.quantityProduced,
                         b.wasteQuantity,
@@ -270,7 +275,7 @@ export default function ProductionPage() {
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {batch.staffName} · {batch.branchName} · {format(new Date(batch.productionDate), "dd MMM, HH:mm")}
+                        {batch.staffName} · {batch.branchName} · {formatBusinessDateTime(batch.productionDate)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 text-right">
@@ -309,6 +314,16 @@ export default function ProductionPage() {
                 </SelectContent>
               </Select>
             </div>
+             <div className="space-y-1.5">
+               <Label>Production date</Label>
+               <Input
+                 type="date"
+                 value={form.productionDate}
+                 onChange={(e) => setForm({ ...form, productionDate: e.target.value })}
+                 data-testid="input-production-date"
+               />
+               <p className="text-xs text-muted-foreground">Choose the Lagos business date this bread was produced.</p>
+             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Quantity Produced</Label>

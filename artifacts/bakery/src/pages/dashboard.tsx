@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
-import { businessDateFor } from "@/lib/business-date";
+import { businessDateFor, formatBusinessTime } from "@/lib/business-date";
 import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -816,7 +816,7 @@ function ProductionDashboard() {
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
                   onClick={() => downloadCSV(todayBatches.map((b, i) => ({
                     "#": i + 1,
-                    Time: format(new Date(b.productionDate), "HH:mm"),
+                    Time: formatBusinessTime(b.productionDate),
                     "Bread Type": b.breadType,
                     Produced: b.quantityProduced,
                     Waste: b.wasteQuantity,
@@ -857,7 +857,7 @@ function ProductionDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-foreground truncate">{batch.breadType}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(batch.productionDate), "HH:mm")} · {batch.quantityProduced} baked · {batch.wasteQuantity} waste
+                        {formatBusinessTime(batch.productionDate)} · {batch.quantityProduced} baked · {batch.wasteQuantity} waste
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">

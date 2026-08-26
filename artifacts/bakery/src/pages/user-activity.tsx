@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { API_BASE } from "@/lib/api";
+import { formatBusinessDateTime } from "@/lib/business-date";
 
 /* ── Types ── */
 type UserSummary = {
@@ -192,7 +193,7 @@ function ProductionDetail({ d }: { d: UserDetail }) {
                   <span className="text-muted-foreground ml-1.5">produced: {b.quantityProduced}</span>
                   {b.wasteQuantity > 0 && <span className="text-red-500 ml-1.5">waste: {b.wasteQuantity}</span>}
                 </div>
-                <span className="text-muted-foreground">{format(new Date(b.productionDate), "dd/MM/yy")}</span>
+                <span className="text-muted-foreground">{formatBusinessDateTime(b.productionDate)}</span>
               </div>
             ))}
           </div>
