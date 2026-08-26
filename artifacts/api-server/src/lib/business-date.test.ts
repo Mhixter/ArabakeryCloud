@@ -10,12 +10,12 @@ import {
 
 const BUSINESS_DATE = "2026-08-21";
 
-test("business day boundaries are the exact inclusive America/Los_Angeles range", () => {
+test("business day boundaries are the exact inclusive Africa/Lagos range", () => {
   const { start, end } = businessDateRange(BUSINESS_DATE);
 
-  assert.equal(BUSINESS_TIMEZONE, "America/Los_Angeles");
-  assert.equal(start.toISOString(), "2026-08-21T07:00:00.000Z");
-  assert.equal(end.toISOString(), "2026-08-22T06:59:59.999Z");
+  assert.equal(BUSINESS_TIMEZONE, "Africa/Lagos");
+  assert.equal(start.toISOString(), "2026-08-20T23:00:00.000Z");
+  assert.equal(end.toISOString(), "2026-08-21T22:59:59.999Z");
 
   assert.equal(businessDateFor(new Date(start.getTime() - 1)), "2026-08-20");
   assert.equal(businessDateFor(start), BUSINESS_DATE);
@@ -26,10 +26,10 @@ test("business day boundaries are the exact inclusive America/Los_Angeles range"
 test("date-only API filters include both boundary instants", () => {
   const startRange = queryDateRange(BUSINESS_DATE);
   const endRange = queryDateRange(BUSINESS_DATE);
-  const justBeforeStart = new Date("2026-08-21T06:59:59.999Z");
-  const exactStart = new Date("2026-08-21T07:00:00.000Z");
-  const exactEnd = new Date("2026-08-22T06:59:59.999Z");
-  const justAfterEnd = new Date("2026-08-22T07:00:00.000Z");
+  const justBeforeStart = new Date("2026-08-20T22:59:59.999Z");
+  const exactStart = new Date("2026-08-20T23:00:00.000Z");
+  const exactEnd = new Date("2026-08-21T22:59:59.999Z");
+  const justAfterEnd = new Date("2026-08-21T23:00:00.000Z");
 
   assert.equal(exactStart >= startRange.start && exactStart <= endRange.end, true);
   assert.equal(exactEnd >= startRange.start && exactEnd <= endRange.end, true);
@@ -37,10 +37,10 @@ test("date-only API filters include both boundary instants", () => {
   assert.equal(justAfterEnd <= endRange.end, false);
 });
 
-test("records around UTC midnight keep the same Los Angeles business date across reports", () => {
+test("records around UTC midnight keep the same Lagos business date across reports", () => {
   const nearMidnightRecords = [
-    { kind: "sale", recordedAt: new Date("2026-08-21T23:59:59.999Z") },
-    { kind: "production", recordedAt: new Date("2026-08-22T00:00:00.001Z") },
+    { kind: "sale", recordedAt: new Date("2026-08-20T23:59:59.999Z") },
+    { kind: "production", recordedAt: new Date("2026-08-21T00:00:00.001Z") },
   ];
 
   assert.deepEqual(
@@ -63,9 +63,9 @@ test("timestamp query values preserve their instant instead of becoming calendar
 });
 
 test("allocation date parsing accepts valid dates and rejects invalid or missing values", () => {
-  assert.equal(businessDateStart("2026-08-21")?.toISOString(), "2026-08-21T07:00:00.000Z");
+  assert.equal(businessDateStart("2026-08-21")?.toISOString(), "2026-08-20T23:00:00.000Z");
   assert.equal(businessDateStart("2026-02-29"), null);
-  assert.equal(businessDateStart("2024-02-29")?.toISOString(), "2024-02-29T08:00:00.000Z");
+  assert.equal(businessDateStart("2024-02-29")?.toISOString(), "2024-02-28T23:00:00.000Z");
   assert.equal(businessDateStart("2026-02-30"), null);
   assert.equal(businessDateStart(""), null);
   assert.equal(businessDateStart(undefined), null);

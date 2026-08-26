@@ -1,4 +1,4 @@
-export const BUSINESS_TIMEZONE = "America/Los_Angeles";
+export const BUSINESS_TIMEZONE = "Africa/Lagos";
 
 export function businessDateFor(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

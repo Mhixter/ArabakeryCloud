@@ -8,11 +8,12 @@ import { HandCoins, Users, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { getStoredUser } from "@/lib/auth";
 import { API_BASE } from "@/lib/api";
+import { BUSINESS_TIMEZONE } from "@/lib/business-date";
 import { useToast } from "@/hooks/use-toast";
 import { SettleSupplierDialog, type SupplierAllocationItem } from "@/components/settle-supplier-dialog";
 
 function toLocalDateStr(d: Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(d);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIMEZONE }).format(d);
 }
 
 export default function SupplierSettlementsPage() {
