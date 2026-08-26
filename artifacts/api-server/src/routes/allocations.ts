@@ -162,12 +162,16 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
       .from(branchesTable)
       .where(and(eq(branchesTable.id, branchId), eq(branchesTable.companyId, companyId)));
     if (!branch) { res.status(400).json({ error: "Selected branch is not available for this company" }); return; }
-    const [product] = await db.select().from(productsTable).where(and(
+    const productCandidates = await db.select().from(productsTable).where(and(
       eq(productsTable.companyId, companyId),
       eq(productsTable.isActive, true),
       sql`lower(trim(${productsTable.name})) = lower(trim(${breadType}))`,
       sql`(${productsTable.branchId} = ${branchId} OR ${productsTable.branchId} IS NULL)`,
     ));
+    /* Prefer the selected branch's product when a company has duplicate
+       product names across branches. */
+    const product = productCandidates.find(candidate => candidate.branchId === branchId)
+      ?? productCandidates.find(candidate => candidate.branchId == null);
     if (!product) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
 
     /*

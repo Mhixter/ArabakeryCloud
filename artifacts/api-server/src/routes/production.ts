@@ -40,12 +40,22 @@ router.post("/production", authenticate, async (req: AuthenticatedRequest, res):
   const { breadType, productId: requestedProductId, quantityProduced, wasteQuantity, branchId, notes, productionDate } = req.body;
   const user = req.user!;
   if ((!breadType && !requestedProductId) || !quantityProduced || branchId == null) { res.status(400).json({ error: "productId or breadType, quantityProduced, and branchId are required" }); return; }
-  const [product] = await db.select().from(productsTable).where(and(
+  const productionBranchId = Number.parseInt(String(branchId), 10);
+  if (!Number.isInteger(productionBranchId) || productionBranchId < 1) {
+    res.status(400).json({ error: "branchId must be a valid positive number" }); return;
+  }
+  const productCandidates = await db.select().from(productsTable).where(and(
     eq(productsTable.companyId, companyId),
     requestedProductId ? eq(productsTable.id, parseInt(requestedProductId)) : eq(productsTable.name, breadType),
+    or(eq(productsTable.branchId, productionBranchId), isNull(productsTable.branchId)),
   ));
+  /* Prefer a branch-specific product over a company-wide product when names
+     overlap. This keeps production, allocation, and stock rows on one product
+     identity for the selected branch. */
+  const product = productCandidates.find(candidate => candidate.branchId === productionBranchId)
+    ?? productCandidates.find(candidate => candidate.branchId == null);
   if (!product || !product.isActive) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
-  const [batch] = await db.insert(productionBatchesTable).values({ companyId, productId: product.id, breadType: product.name, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: parseInt(branchId), notes: notes ?? null, productionDate: productionDate ? new Date(productionDate) : new Date() }).returning();
+  const [batch] = await db.insert(productionBatchesTable).values({ companyId, productId: product.id, breadType: product.name, quantityProduced: parseInt(quantityProduced), wasteQuantity: parseInt(wasteQuantity ?? 0), staffId: user.userId, branchId: productionBranchId, notes: notes ?? null, productionDate: productionDate ? new Date(productionDate) : new Date() }).returning();
   const [staff] = await db.select().from(usersTable).where(eq(usersTable.id, user.userId));
   const [branch] = await db.select().from(branchesTable).where(eq(branchesTable.id, batch.branchId));
   await logAudit({ req, userId: user.userId, companyId, action: "PRODUCTION_RECORDED", entityType: "production", entityId: batch.id, details: `${breadType}: produced ${quantityProduced}, waste ${wasteQuantity ?? 0}`, branchId: batch.branchId });
