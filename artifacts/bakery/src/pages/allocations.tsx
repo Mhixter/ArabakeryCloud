@@ -256,7 +256,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     setStockError("");
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/products${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(`${API_BASE}/api/reports/product-dashboard${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(async r => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
