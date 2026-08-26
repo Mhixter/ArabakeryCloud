@@ -7,3 +7,4 @@
 - [Quick Sale Weekly Acceptance](quick-sale-weekly-acceptance.md) — Managing Directors review manager Quick Sales by day and accept one immutable weekly total
 - [Legacy Return Schema](legacy-return-schema.md) — older deployments may lack return_date and deleted_at; reports must select stable return fields explicitly
 - [Managing Director Sales Visibility](director-sales-visibility.md) — hide director-created sales from user-facing reports while retaining them for stock flow
+- [Branch Product Identity](branch-product-identity.md) — resolve duplicate product names against the selected branch before calculating stock
