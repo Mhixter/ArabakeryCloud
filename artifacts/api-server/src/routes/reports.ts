@@ -356,6 +356,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const selectedDate = queryDate ?? businessDateFor();
   const { start: todayStart, end: todayEnd } = businessDateRange(selectedDate);
+  const productKey = (value: string) => value.trim().toLowerCase();
   const weekStart = (() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
   })();
@@ -383,7 +384,9 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
       preferredProductByName.set(nameKey, product);
     }
   }
-  const displayProducts = Array.from(preferredProductByName.values());
+  const displayProducts = stockBranchFilter
+    ? Array.from(preferredProductByName.values())
+    : activeProducts;
 
   const todayConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, todayStart), lte(salesTable.saleDate, todayEnd)];
   if (branchFilter) todayConds.push(eq(salesTable.branchId, branchFilter));
@@ -449,7 +452,6 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   }).from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
-  const productKey = (value: string) => value.trim().toLowerCase();
   const transactionProductKey = (productId: number | null, name: string) => {
     const productByName = preferredProductByName.get(productKey(name));
     const productByTransactionId = productId == null ? undefined : productById.get(productId);
