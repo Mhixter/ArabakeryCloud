@@ -406,7 +406,12 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     eq(productReturnsTable.status, "approved" as const),
   ];
   if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
-  const allReturns = await db.select().from(productReturnsTable).where(and(...returnsConds));
+  const allReturns = await db.select({
+    productId: productReturnsTable.productId,
+    breadType: productReturnsTable.breadType,
+    quantity: productReturnsTable.quantity,
+    reason: productReturnsTable.reason,
+  }).from(productReturnsTable).where(and(...returnsConds));
   const RESTORABLE = ["not_sold", "wrong_item", "other"];
   const DAMAGED    = ["damaged", "expired"];
   const productKey = (value: string) => value.trim().toLowerCase();

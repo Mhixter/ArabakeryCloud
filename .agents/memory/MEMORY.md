@@ -5,3 +5,4 @@
 - [Business Date Rule](business-date-rule.md) — operational day boundaries use the explicit Africa/Lagos timezone across API filters and UI grouping
 - [Daily Closing Settlement](daily-closing-settlement.md) — physical closing counts are settled as separate manager stock sales; supplier allocations remain unchanged
 - [Quick Sale Weekly Acceptance](quick-sale-weekly-acceptance.md) — Managing Directors review manager Quick Sales by day and accept one immutable weekly total
+- [Legacy Return Schema](legacy-return-schema.md) — older deployments may lack return_date and deleted_at; reports must select stable return fields explicitly
