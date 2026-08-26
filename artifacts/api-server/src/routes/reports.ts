@@ -397,16 +397,23 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  /* Stock is an all-time balance. The week window is only for KPI/report
-     summaries; limiting this query to the week makes older production vanish
-     from Dashboard stock and makes allocation availability incorrectly zero. */
-  const prodConds: any[] = [eq(productionBatchesTable.companyId, companyId), isNull(productionBatchesTable.deletedAt)];
+  /* Stock is the balance at the end of the selected business day. Future
+     production must not be available when planning a historical allocation. */
+  const prodConds: any[] = [
+    eq(productionBatchesTable.companyId, companyId),
+    isNull(productionBatchesTable.deletedAt),
+    lte(productionBatchesTable.productionDate, todayEnd),
+  ];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
 
   /* Join sales with cashier role so we can split direct vs supplier sales.
      Supplier sales are WITHIN allocated bread — counting both would double-subtract. */
-  const allSalesConds = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId)];
+  const allSalesConds = [
+    isNull(salesTable.deletedAt),
+    eq(salesTable.companyId, companyId),
+    lte(salesTable.saleDate, todayEnd),
+  ];
   if (stockBranchFilter) allSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
   const allSalesEver = await db
     .select({ sale: salesTable, cashierRole: usersTable.role })
@@ -418,6 +425,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const returnsConds = [
     eq(productReturnsTable.companyId, companyId),
     eq(productReturnsTable.status, "approved" as const),
+    lte(productReturnsTable.createdAt, todayEnd),
   ];
   if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
   const allReturns = await db.select({
@@ -436,7 +444,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allocConds = [
     eq(sellerAllocationsTable.companyId, companyId),
     isNull(sellerAllocationsTable.deletedAt),
-    eq(sellerAllocationsTable.isCleared, false),
+    lte(sellerAllocationsTable.allocationDate, todayEnd),
   ];
   if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
