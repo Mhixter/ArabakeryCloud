@@ -73,7 +73,7 @@ interface Return {
 
 interface StockItem { productId: number; name: string; remaining: number }
 interface Seller { id: number; fullName: string; agentId: string }
-interface Product { id: number; name: string; isActive: boolean }
+interface Product { id: number; name: string; branchId?: number | null; isActive: boolean }
 
 const RETURN_REASONS = [
   { value: "not_sold", label: "Not Sold" },
@@ -277,7 +277,16 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     ]).then(([s, p, dash]) => {
       if (requestId !== stockRequestRef.current) return;
       setSellers(s);
-      setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
+      const branchProducts = (p as Product[]).filter((pr: Product) => pr.isActive);
+      const productsByName = new Map<string, Product>();
+      for (const product of branchProducts) {
+        const key = product.name.trim().toLowerCase();
+        const existing = productsByName.get(key);
+        if (!existing || (activeBranch?.id && product.branchId === activeBranch.id && existing.branchId !== activeBranch.id)) {
+          productsByName.set(key, product);
+        }
+      }
+      setProducts(Array.from(productsByName.values()));
       setStock(Array.isArray(dash?.remaining) ? dash.remaining as StockItem[] : []);
     }).catch((error) => {
       if (controller.signal.aborted || requestId !== stockRequestRef.current) return;
