@@ -1,0 +1,36 @@
+sw.js:1 workbox Precaching 3 files. 9 files are already cached.
+sw.js:1 workbox During precaching cleanup, 3 cached requests were deleted.
+sw.js:1 workbox Router is responding to: /api/push/vapid-public-key
+sw.js:1 workbox Router is responding to: /api/allocations?branchId=14
+sw.js:1 workbox Router is responding to: /api/returns?branchId=14
+sw.js:1 workbox Router is responding to: /api/products
+sw.js:1 workbox Using je to respond to '/api/products'
+sw.js:1 workbox Router is responding to: /favicon.svg
+sw.js:1 workbox Using ee to respond to '/api/push/vapid-public-key'
+sw.js:1 workbox The request for '/api/push/vapid-public-key' returned a response that does not meet the criteria for being cached.
+sw.js:1 workbox Using ee to respond to '/api/returns?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/allocations?branchId=14'
+sw.js:1 workbox Router is responding to: /api/allocations/sellers
+sw.js:1 workbox Router is responding to: /api/products?branchId=14
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard?branchId=14&date=2026-08-26
+sw.js:1 workbox Using je to respond to '/api/products?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/allocations/sellers'
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=14&date=2026-08-26'
+sw.js:1 workbox Router is responding to: /api/allocations/sellers
+sw.js:1 workbox Router is responding to: /api/products?branchId=14
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard?branchId=14&date=2026-08-02
+sw.js:1 workbox Using je to respond to '/api/products?branchId=14'
+sw.js:1 workbox Using ee to respond to '/api/allocations/sellers'
+sw.js:1 workbox Router is responding to: /api/allocations/sellers
+sw.js:1 workbox Router is responding to: /api/products?branchId=14
+sw.js:1 workbox Router is responding to: /api/reports/product-dashboard?branchId=14&date=2026-08-25
+sw.js:1 workbox Using je to respond to '/api/products?branchId=14'
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=14&date=2026-08-02'
+sw.js:1 workbox Using ee to respond to '/api/allocations/sellers'
+sw.js:1 workbox Using Fe to respond to '/api/reports/product-dashboard?branchId=14&date=2026-08-25'
+index-BEDYpEc5.js:227 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+login:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
+api/push/vapid-public-key:1  Failed to load resource: the server responded with a status of 503 ()
