@@ -237,6 +237,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [products, setProducts] = useState<Product[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [stockLoaded, setStockLoaded] = useState(false);
+  const [stockError, setStockError] = useState("");
   const [sellerId, setSellerId] = useState("");
   const [breadType, setBreadType] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -251,18 +252,27 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     const sellersUrl = `${API_BASE}/api/allocations/sellers`;
     /* Stock must match the branch selected for this allocation. The API
        validates the same branch again when the allocation is submitted. */
+    setStockError("");
     Promise.all([
       fetch(sellersUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(`${API_BASE}/api/reports/product-dashboard${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/api/reports/product-dashboard${activeBranch?.id ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error ?? `Stock request failed (${r.status})`);
+        }
+        return r.json();
+      }),
     ]).then(([s, p, dash]) => {
       setSellers(s);
       setProducts((p as Product[]).filter((pr: Product) => pr.isActive));
       setStock(Array.isArray(dash?.remaining) ? dash.remaining as StockItem[] : []);
-    }).catch(() => {
+    }).catch((error) => {
       setStock([]);
+      setStockError(error instanceof Error ? error.message : "Could not load production stock");
+      toast({ title: "Could not load production stock", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
     }).finally(() => setStockLoaded(true));
-  }, [activeBranch]);
+  }, [activeBranch, toast]);
 
   const selectedStock = stock.find(s => s.name.trim().toLowerCase() === breadType.trim().toLowerCase());
   const availableQty = selectedStock?.remaining ?? null;
@@ -344,7 +354,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
             {breadType && availableQty === null && stockLoaded && (
               <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-600">
                 <AlertCircle size={12} />
-                No stock record found for this product. Record production using the exact product name.
+                {stockError || "No stock record found for this product. Record production using the exact product name."}
               </div>
             )}
           </div>
