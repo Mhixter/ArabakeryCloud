@@ -1,0 +1,141 @@
+[{
+  "id": 1,
+  "bread_type": "NOKIA",
+  "current_timestamp": "2026-08-24 21:54:57.727+00",
+  "corrected_timestamp": "2026-08-23 21:54:57.727+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 2,
+  "bread_type": "BLACK BERRY",
+  "current_timestamp": "2026-08-24 21:55:23.132+00",
+  "corrected_timestamp": "2026-08-23 21:55:23.132+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 3,
+  "bread_type": "SUPER",
+  "current_timestamp": "2026-08-24 21:55:58.07+00",
+  "corrected_timestamp": "2026-08-23 21:55:58.07+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 4,
+  "bread_type": "SUPER SPECIAL",
+  "current_timestamp": "2026-08-24 21:56:20.898+00",
+  "corrected_timestamp": "2026-08-23 21:56:20.898+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 5,
+  "bread_type": "NEW SERIES",
+  "current_timestamp": "2026-08-24 21:56:42.723+00",
+  "corrected_timestamp": "2026-08-23 21:56:42.723+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 6,
+  "bread_type": "RICH TEA",
+  "current_timestamp": "2026-08-24 21:57:57.075+00",
+  "corrected_timestamp": "2026-08-23 21:57:57.075+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 7,
+  "bread_type": "RANGLES",
+  "current_timestamp": "2026-08-24 21:58:24.935+00",
+  "corrected_timestamp": "2026-08-23 21:58:24.935+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 9,
+  "bread_type": "5 IN 1",
+  "current_timestamp": "2026-08-24 21:59:35.254+00",
+  "corrected_timestamp": "2026-08-23 21:59:35.254+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 10,
+  "bread_type": "Butter bliss",
+  "current_timestamp": "2026-08-24 22:00:24.132+00",
+  "corrected_timestamp": "2026-08-23 22:00:24.132+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 12,
+  "bread_type": "SHORT CAKE",
+  "current_timestamp": "2026-08-24 22:43:06.123+00",
+  "corrected_timestamp": "2026-08-23 22:43:06.123+00",
+  "current_lagos_date": "2026-08-24",
+  "corrected_lagos_date": "2026-08-23"
+}, {
+  "id": 23,
+  "bread_type": "NOKIA",
+  "current_timestamp": "2026-08-25 21:16:25.011+00",
+  "corrected_timestamp": "2026-08-24 21:16:25.011+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 25,
+  "bread_type": "BLACK BERRY",
+  "current_timestamp": "2026-08-25 21:17:32.542+00",
+  "corrected_timestamp": "2026-08-24 21:17:32.542+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 26,
+  "bread_type": "SUPER",
+  "current_timestamp": "2026-08-25 21:18:03.487+00",
+  "corrected_timestamp": "2026-08-24 21:18:03.487+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 27,
+  "bread_type": "SUPER SPECIAL",
+  "current_timestamp": "2026-08-25 21:18:32.753+00",
+  "corrected_timestamp": "2026-08-24 21:18:32.753+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 29,
+  "bread_type": "5 IN 1",
+  "current_timestamp": "2026-08-25 21:31:46.551+00",
+  "corrected_timestamp": "2026-08-24 21:31:46.551+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 30,
+  "bread_type": "RANGLES",
+  "current_timestamp": "2026-08-25 21:32:19.072+00",
+  "corrected_timestamp": "2026-08-24 21:32:19.072+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 31,
+  "bread_type": "NEW SERIES",
+  "current_timestamp": "2026-08-25 21:33:01.962+00",
+  "corrected_timestamp": "2026-08-24 21:33:01.962+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 32,
+  "bread_type": "CHIZABLE",
+  "current_timestamp": "2026-08-25 21:33:31.471+00",
+  "corrected_timestamp": "2026-08-24 21:33:31.471+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 33,
+  "bread_type": "SHORT CAKE",
+  "current_timestamp": "2026-08-25 21:34:25.617+00",
+  "corrected_timestamp": "2026-08-24 21:34:25.617+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}, {
+  "id": 34,
+  "bread_type": "RICH TEA",
+  "current_timestamp": "2026-08-25 21:30:46.509+00",
+  "corrected_timestamp": "2026-08-24 21:30:46.509+00",
+  "current_lagos_date": "2026-08-25",
+  "corrected_lagos_date": "2026-08-24"
+}]
