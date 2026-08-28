@@ -92,9 +92,7 @@ export default function ProductionPage() {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
-    const productionDate = form.productionDate === todayStr()
-      ? new Date().toISOString()
-      : businessDateTimestamp(form.productionDate);
+    const productionDate = businessDateTimestamp(form.productionDate);
     createProduction.mutate(
       { data: {
         breadType: form.breadType,

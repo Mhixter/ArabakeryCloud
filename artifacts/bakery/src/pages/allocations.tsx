@@ -373,7 +373,9 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
               className="rounded-xl bg-muted border-0 focus-visible:ring-2 focus-visible:ring-amber-400"
               required
             />
-            <p className="text-xs text-muted-foreground mt-1.5">Choose the business date this bread was issued.</p>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Choose the business date this bread was issued. Stock includes production from this day and earlier, including yesterday’s production when allocating today.
+            </p>
           </div>
 
           <div>

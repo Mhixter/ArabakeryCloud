@@ -5,6 +5,7 @@ import {
   businessDateFor,
   businessDateRange,
   businessDateStart,
+  businessDateTimestamp,
   queryDateRange,
 } from "./business-date";
 
@@ -69,4 +70,23 @@ test("allocation date parsing accepts valid dates and rejects invalid or missing
   assert.equal(businessDateStart("2026-02-30"), null);
   assert.equal(businessDateStart(""), null);
   assert.equal(businessDateStart(undefined), null);
+});
+
+test("production from the previous Lagos day is available for the next day's allocation", () => {
+  const productionOnPreviousDay = new Date("2026-08-23T12:00:00+01:00");
+  const productionOnAllocationDay = new Date("2026-08-24T12:00:00+01:00");
+  const productionAfterAllocationDay = new Date("2026-08-25T12:00:00+01:00");
+  const allocationEnd = businessDateRange("2026-08-24").end;
+
+  assert.equal(productionOnPreviousDay <= allocationEnd, true);
+  assert.equal(productionOnAllocationDay <= allocationEnd, true);
+  assert.equal(productionAfterAllocationDay <= allocationEnd, false);
+});
+
+test("date-only production input is anchored inside the selected Lagos business day", () => {
+  assert.equal(
+    businessDateTimestamp("2026-08-23")?.toISOString(),
+    "2026-08-23T11:00:00.000Z",
+  );
+  assert.equal(businessDateTimestamp("2026-02-30"), null);
 });

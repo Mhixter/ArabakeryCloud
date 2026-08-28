@@ -45,6 +45,12 @@ export function businessDateStart(value: unknown): Date | null {
   return businessDateRange(value).start;
 }
 
+/** Anchor a date-only production entry safely inside that Lagos business day. */
+export function businessDateTimestamp(value: string): Date | null {
+  const start = businessDateStart(value);
+  return start ? new Date(start.getTime() + 12 * 60 * 60 * 1000) : null;
+}
+
 function isLeapYear(year: number) {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
