@@ -68,8 +68,8 @@ function generateReceiptNumber(): string {
 }
 
 router.get("/quick-sale-settlements", authenticate, requireRole("managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
-  const businessDate = String(req.query.businessDate ?? "");
-  const branchId = req.query.branchId && !isNaN(parseInt(String(req.query.branchId))) ? parseInt(String(req.query.branchId)) : req.user!.branchId;
+  const businessDate = String(req.body.businessDate ?? "");
+  const branchId = req.body.branchId ? parseInt(String(req.body.branchId)) : req.user!.branchId;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate) || !branchId) { res.status(400).json({ error: "A valid business date and branch are required" }); return; }
   try {
     const range = businessDateRange(businessDate);
@@ -85,18 +85,28 @@ router.get("/quick-sale-settlements", authenticate, requireRole("managing_direct
     byDate.set(businessDate, { amount: 0, count: 0, entries: [] });
     for (const row of rows) {
       const date = businessDateFor(row.sale.saleDate);
-      const day = byDate.get(date);
+    const day = byDate.get(businessDate)!;
       if (!day) continue;
       const amount = Number(row.sale.totalAmount);
       day.amount += amount;
       day.count += 1;
       day.entries.push({ id: row.sale.id, amount, paymentMethod: row.sale.paymentMethod, recordedBy: row.cashierName ?? "Manager", saleDate: row.sale.saleDate.toISOString(), notes: row.sale.notes });
     }
-    const [accepted] = await db.select().from(quickSaleSettlementsTable).where(and(
-      eq(quickSaleSettlementsTable.companyId, req.user!.companyId),
-      eq(quickSaleSettlementsTable.branchId, branchId),
-      eq(quickSaleSettlementsTable.businessDate, businessDate),
-    ));
+    const [accepted] = await db.transaction(async tx => {
+      let settlement = existing;
+      if (!settlement) {
+        [settlement] = await tx.insert(quickSaleSettlementsTable).values({
+          companyId: req.user!.companyId, branchId, weekStart: businessDate, weekEnd: businessDate, businessDate, amount: totalAmount.toFixed(2),
+          paymentMethod, notes: req.body.notes ? String(req.body.notes).trim() : null, acceptedById: req.user!.userId,
+        }).returning();
+      }
+      if (stockClearingRows.length > 0) await tx.insert(salesTable).values(stockClearingRows);
+      const [updated] = await tx.update(quickSaleSettlementsTable).set({
+        stockClearedAt: new Date(),
+        stockClearedProducts: stockClearingRows.length,
+      }).where(eq(quickSaleSettlementsTable.id, settlement.id)).returning();
+      return [updated];
+    });
     const day = byDate.get(businessDate)!;
     res.json({ businessDate, branchId, day: { date: businessDate, ...day }, totalAmount: day.amount, accepted: accepted ? { ...accepted, amount: Number(accepted.amount) } : null });
   } catch (err) {
@@ -120,7 +130,7 @@ router.post("/quick-sale-settlements/accept", authenticate, requireRole("managin
         sql`lower(trim(${salesTable.breadType})) = 'quick sale'`,
         gte(salesTable.saleDate, range.start), lte(salesTable.saleDate, range.end),
       ));
-    const totalAmount = quickSales.reduce((sum, row) => sum + Number(row.sale.totalAmount), 0);
+  const totalAmount = parseFloat(amount);
     if (totalAmount <= 0) { res.status(400).json({ error: "There are no manager Quick Sales to accept for this day" }); return; }
     const [existing] = await db.select().from(quickSaleSettlementsTable).where(and(
       eq(quickSaleSettlementsTable.companyId, req.user!.companyId), eq(quickSaleSettlementsTable.branchId, branchId), eq(quickSaleSettlementsTable.businessDate, businessDate),
@@ -252,7 +262,7 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { branchId, startDate, endDate } = req.query as { branchId?: string; startDate?: string; endDate?: string };
 
-  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers()];
+  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
 
   if (role === "supplier") {
     /* Sellers only see their own sales */
@@ -268,13 +278,10 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   if (startDate) conditions.push(gte(salesTable.saleDate, queryDateRange(startDate).start));
   if (endDate) conditions.push(lte(salesTable.saleDate, queryDateRange(endDate).end));
 
-  const sales = await db
-    .select({ sale: salesTable, cashierName: usersTable.fullName, cashierRole: usersTable.role, branchName: branchesTable.name, branchPhone: branchesTable.phone, branchAddress: branchesTable.address })
-    .from(salesTable)
+  const sales = (await db.select({ sale: salesTable }).from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
-    .leftJoin(branchesTable, eq(salesTable.branchId, branchesTable.id))
-    .where(and(...conditions))
-    .orderBy(salesTable.saleDate);
+    .where(and(...conditions)))
+    .map(({ sale }) => sale);
 
   res.json(sales.map(({ sale, cashierName, cashierRole, branchName, branchPhone, branchAddress }) => formatSale(sale, cashierName ?? "Unknown", branchName ?? "Unknown", cashierRole ?? undefined, branchPhone, branchAddress)));
 });
@@ -289,7 +296,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   }
 
   const qty = parseInt(quantity);
-  let effectiveBranchId = parseInt(branchId) || userBranchId;
+  const effectiveBranchId = parseInt(branchId) || userBranchId || 1;
   if (!effectiveBranchId) {
     res.status(400).json({ error: "Select a branch before recording a sale" });
     return;
@@ -340,8 +347,8 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
       db.select().from(salesTable).where(and(eq(salesTable.cashierId, userId), eq(salesTable.productId, product.id), isNull(salesTable.deletedAt))),
     ]);
 
-    const totalAllocated = allocations.reduce((s, a) => s + a.quantity, 0);
-    const totalSold = myPastSales.reduce((s, s2) => s + s2.quantity, 0);
+    const totalAllocated = allAllocations.reduce((s, a) => s + a.quantity, 0);
+    const totalSold = allSales.reduce((s, s2) => s + (s2.cashierRole === "supplier" ? 0 : s2.sale.quantity), 0);
     const canSell = totalAllocated - totalSold;
 
     if (qty > canSell) {
@@ -376,7 +383,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   }
 
   const price = parseFloat(pricePerUnit);
-  const totalAmount = qty * price;
+  const totalAmount = parseFloat(amount);
   const receiptNumber = generateReceiptNumber();
 
   /* Resolve branchId: use request body value, else user's branchId.
@@ -393,11 +400,20 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   effectiveBranchId = effectiveBranchId || 1;
 
   const [sale] = await db.insert(salesTable).values({
-    companyId, receiptNumber, productId: product.id, breadType: product.name, quantity: qty,
-    pricePerUnit: price.toString(), totalAmount: totalAmount.toString(),
-    costAmount: "0", profitAmount: totalAmount.toString(),
-    paymentMethod, cashierId: userId, branchId: effectiveBranchId,
-    notes: notes ?? null, saleDate: new Date(),
+    companyId,
+    receiptNumber,
+    productId: null,
+    breadType: "Quick Sale",
+    quantity: 1,
+    pricePerUnit: totalAmount.toString(),
+    totalAmount: totalAmount.toString(),
+    costAmount: "0",
+    profitAmount: totalAmount.toString(),
+    paymentMethod: pm as "cash" | "transfer",
+    cashierId: userId,
+    branchId: effectiveBranchId,
+    notes: notes ?? null,
+    saleDate: new Date(),
   }).returning();
 
   const [[cashier], [branch]] = await Promise.all([
@@ -405,22 +421,19 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
     db.select().from(branchesTable).where(eq(branchesTable.id, sale.branchId)),
   ]);
 
-  await logAudit({ req, userId, companyId, action: "SALE_CREATED", entityType: "sale", entityId: sale.id, details: `${breadType} x${qty} @ ${price} = ${totalAmount} (${paymentMethod})`, branchId: sale.branchId });
+  await logAudit({
+    req, userId, companyId,
+    action: "QUICK_SALE_CREATED",
+    entityType: "sale",
+    entityId: sale.id,
+    details: `Quick Sale ₦${totalAmount} (${pm})`,
+    branchId: sale.branchId,
+  });
 
-  if (role === "supplier") {
-    notifyManagers(companyId, {
-      title: "New Supplier Sale",
-      body: `${cashier?.fullName ?? "A supplier"} sold ${qty}× ${breadType} — ₦${totalAmount.toLocaleString()}`,
-      url: "/sales",
-      tag: `sale-${sale.id}`,
-    }).catch(() => {});
-  }
-
-  res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown", undefined, branch?.phone, branch?.address));
+  res.status(201).json(formatSale(sale, cashier?.fullName ?? "Unknown", branch?.name ?? "Unknown", role, branch?.phone, branch?.address));
 });
 
-/* ── Quick Sale (manager / managing_director only) ── */
-router.post("/sales/quick", authenticate, requireRole("manager", "managing_director"), async (req: AuthenticatedRequest, res): Promise<void> => {
+router.get("/sales/daily-summary", authenticate, async (req: AuthenticatedRequest, res): Promise<void> => {
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { amount, paymentMethod, branchId, notes } = req.body;
 
