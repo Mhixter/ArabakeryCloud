@@ -296,7 +296,7 @@ router.post("/sales", authenticate, async (req: AuthenticatedRequest, res): Prom
   }
 
   const qty = parseInt(quantity);
-  const effectiveBranchId = parseInt(branchId) || userBranchId || 1;
+  let effectiveBranchId = parseInt(branchId) || userBranchId || 1;
   if (!effectiveBranchId) {
     res.status(400).json({ error: "Select a branch before recording a sale" });
     return;
