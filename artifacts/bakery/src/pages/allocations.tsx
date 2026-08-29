@@ -262,6 +262,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
     const query = new URLSearchParams();
     if (activeBranch?.id) query.set("branchId", String(activeBranch.id));
     if (allocationDate) query.set("date", allocationDate);
+    query.set("scope", "allocation");
     const stockUrl = `${API_BASE}/api/reports/product-dashboard?${query.toString()}`;
     const requestOptions: RequestInit = { headers: h, credentials: "include", signal: controller.signal };
     Promise.all([
@@ -303,6 +304,9 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const selectedStock = stock.find(s => selectedProduct && s.productId === selectedProduct.id)
     ?? stock.find(s => s.name.trim().toLowerCase() === breadType.trim().toLowerCase());
   const availableQty = selectedStock?.remaining ?? null;
+  const allocationDateLabel = allocationDate
+    ? format(new Date(`${allocationDate}T12:00:00`), "dd MMM yyyy")
+    : "selected date";
   const enteredQty = quantity ? parseInt(quantity) : 0;
   const overStock = availableQty !== null && enteredQty > availableQty;
   const stockForProduct = (product: Product) =>
@@ -374,7 +378,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
               required
             />
             <p className="text-xs text-muted-foreground mt-1.5">
-              Choose the business date this bread was issued. Stock includes production from this day and earlier, including yesterday’s production when allocating today.
+              Stock is separated by production date. Only production and same-day movements for {allocationDateLabel} are available for this allocation.
             </p>
           </div>
 
@@ -394,7 +398,7 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
             {breadType && availableQty !== null && (
               <div className={`flex items-center gap-1.5 mt-1.5 text-xs font-medium ${availableQty === 0 ? "text-red-600" : availableQty < 10 ? "text-amber-600" : "text-emerald-600"}`}>
                 <AlertCircle size={12} />
-                {availableQty === 0 ? "No stock available — log production first" : `${availableQty} units available to allocate`}
+                {availableQty === 0 ? `No stock available for ${allocationDateLabel} — log production for this date first` : `${availableQty} units available for ${allocationDateLabel}`}
               </div>
             )}
             {breadType && availableQty === null && stockLoaded && (

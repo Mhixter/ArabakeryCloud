@@ -3,7 +3,7 @@ import {
   db, sellerAllocationsTable, usersTable, branchesTable,
   salesTable, productionBatchesTable, productsTable, productReturnsTable,
 } from "@workspace/db";
-import { eq, and, isNull, inArray, or, sql, lte } from "drizzle-orm";
+import { eq, and, isNull, inArray, or, sql, gte, lte } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { businessDateRange, businessDateStart } from "../lib/business-date";
@@ -135,7 +135,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     if (!allocationDate) {
       res.status(400).json({ error: "allocationDate must be a valid date in YYYY-MM-DD format" }); return;
     }
-    const allocationDateEnd = businessDateRange(allocationDateInput).end;
+    const allocationDateRange = businessDateRange(allocationDateInput);
 
     const [seller] = await db
       .select()
@@ -176,18 +176,19 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     if (!product) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
 
     /*
-     * Stock check mirrors the product dashboard:
-     * in-store = net produced + restorable returns - direct sales - uncleared allocations.
+     * Allocation stock is a separate business-date bucket:
+     * in-store = same-day net produced + same-day restorable returns
+     *            - same-day direct sales - same-day allocations.
      * Supplier sales are already part of allocated stock and must not reduce store stock.
      */
     const [production, sales, existingAllocations, approvedReturns] = await Promise.all([
-      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, branchId), lte(productionBatchesTable.productionDate, allocationDateEnd), or(eq(productionBatchesTable.productId, product.id), and(isNull(productionBatchesTable.productId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${product.name}))`)), isNull(productionBatchesTable.deletedAt))),
+      db.select().from(productionBatchesTable).where(and(eq(productionBatchesTable.companyId, companyId), eq(productionBatchesTable.branchId, branchId), gte(productionBatchesTable.productionDate, allocationDateRange.start), lte(productionBatchesTable.productionDate, allocationDateRange.end), or(eq(productionBatchesTable.productId, product.id), and(isNull(productionBatchesTable.productId), sql`lower(trim(${productionBatchesTable.breadType})) = lower(trim(${product.name}))`)), isNull(productionBatchesTable.deletedAt))),
       db.select({ sale: salesTable, cashierRole: usersTable.role })
         .from(salesTable)
         .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
-         .where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, branchId), lte(salesTable.saleDate, allocationDateEnd), or(eq(salesTable.productId, product.id), and(isNull(salesTable.productId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${product.name}))`)), isNull(salesTable.deletedAt))),
-      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, branchId), lte(sellerAllocationsTable.allocationDate, allocationDateEnd), or(eq(sellerAllocationsTable.productId, product.id), and(isNull(sellerAllocationsTable.productId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${product.name}))`)), isNull(sellerAllocationsTable.deletedAt))),
-      db.select().from(productReturnsTable).where(and(eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.branchId, branchId), lte(productReturnsTable.createdAt, allocationDateEnd), or(eq(productReturnsTable.productId, product.id), and(isNull(productReturnsTable.productId), sql`lower(trim(${productReturnsTable.breadType})) = lower(trim(${product.name}))`)), eq(productReturnsTable.status, "approved" as const))),
+         .where(and(eq(salesTable.companyId, companyId), eq(salesTable.branchId, branchId), gte(salesTable.saleDate, allocationDateRange.start), lte(salesTable.saleDate, allocationDateRange.end), or(eq(salesTable.productId, product.id), and(isNull(salesTable.productId), sql`lower(trim(${salesTable.breadType})) = lower(trim(${product.name}))`)), isNull(salesTable.deletedAt))),
+      db.select().from(sellerAllocationsTable).where(and(eq(sellerAllocationsTable.companyId, companyId), eq(sellerAllocationsTable.branchId, branchId), gte(sellerAllocationsTable.allocationDate, allocationDateRange.start), lte(sellerAllocationsTable.allocationDate, allocationDateRange.end), or(eq(sellerAllocationsTable.productId, product.id), and(isNull(sellerAllocationsTable.productId), sql`lower(trim(${sellerAllocationsTable.breadType})) = lower(trim(${product.name}))`)), isNull(sellerAllocationsTable.deletedAt))),
+      db.select().from(productReturnsTable).where(and(eq(productReturnsTable.companyId, companyId), eq(productReturnsTable.branchId, branchId), gte(productReturnsTable.createdAt, allocationDateRange.start), lte(productReturnsTable.createdAt, allocationDateRange.end), or(eq(productReturnsTable.productId, product.id), and(isNull(productReturnsTable.productId), sql`lower(trim(${productReturnsTable.breadType})) = lower(trim(${product.name}))`)), eq(productReturnsTable.status, "approved" as const))),
     ]);
 
     const totalProduced = production.reduce((s, b) => s + b.quantityProduced - b.wasteQuantity, 0);

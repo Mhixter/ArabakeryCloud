@@ -348,6 +348,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const { companyId, role, branchId: userBranchId } = req.user!;
   const { branchId: queryBranchId, date: queryDate, scope } = req.query as { branchId?: string; date?: string; scope?: string };
+  const allocationStockScope = scope === "allocation";
   const branchFilter = queryBranchId && !isNaN(parseInt(queryBranchId))
     ? parseInt(queryBranchId)
     : userBranchId;
@@ -413,12 +414,18 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  /* Stock is the balance at the end of the selected business day. Future
-     production must not be available when planning a historical allocation. */
+  /*
+   * The normal dashboard uses a balance through the selected day. Allocation
+   * planning is different: each production date is its own stock bucket, so
+   * August 25 stock must not be included when allocating against August 26.
+   */
+  const stockDateConditions = <T>(column: T) => allocationStockScope
+    ? [gte(column as any, todayStart), lte(column as any, todayEnd)]
+    : [lte(column as any, todayEnd)];
   const prodConds: any[] = [
     eq(productionBatchesTable.companyId, companyId),
     isNull(productionBatchesTable.deletedAt),
-    lte(productionBatchesTable.productionDate, todayEnd),
+    ...stockDateConditions(productionBatchesTable.productionDate),
   ];
   if (stockBranchFilter) prodConds.push(eq(productionBatchesTable.branchId, stockBranchFilter));
   const allProduction = await db.select().from(productionBatchesTable).where(and(...prodConds));
@@ -428,7 +435,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allSalesConds = [
     isNull(salesTable.deletedAt),
     eq(salesTable.companyId, companyId),
-    lte(salesTable.saleDate, todayEnd),
+    ...stockDateConditions(salesTable.saleDate),
   ];
   if (stockBranchFilter) allSalesConds.push(eq(salesTable.branchId, stockBranchFilter));
   const allSalesEver = await db
@@ -441,7 +448,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const returnsConds = [
     eq(productReturnsTable.companyId, companyId),
     eq(productReturnsTable.status, "approved" as const),
-    lte(productReturnsTable.createdAt, todayEnd),
+    ...stockDateConditions(productReturnsTable.createdAt),
   ];
   if (stockBranchFilter) returnsConds.push(eq(productReturnsTable.branchId, stockBranchFilter));
   const allReturns = await db.select({
@@ -471,7 +478,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
   const allocConds = [
     eq(sellerAllocationsTable.companyId, companyId),
     isNull(sellerAllocationsTable.deletedAt),
-    lte(sellerAllocationsTable.allocationDate, todayEnd),
+    ...stockDateConditions(sellerAllocationsTable.allocationDate),
   ];
   if (stockBranchFilter) allocConds.push(eq(sellerAllocationsTable.branchId, stockBranchFilter));
   const activeAllocations = await db.select().from(sellerAllocationsTable).where(and(...allocConds));
@@ -571,6 +578,7 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
     .where(eq(productIdentityBackfillIssuesTable.companyId, companyId));
 
   res.json({
+    stockDate: selectedDate,
     activeProductCount: activeProducts.length,
     today: {
       totalAmount: todaySales.reduce((s, x) => s + parseFloat(x.sale.totalAmount as unknown as string), 0),

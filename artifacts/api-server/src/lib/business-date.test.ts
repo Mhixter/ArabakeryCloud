@@ -72,15 +72,15 @@ test("allocation date parsing accepts valid dates and rejects invalid or missing
   assert.equal(businessDateStart(undefined), null);
 });
 
-test("production from the previous Lagos day is available for the next day's allocation", () => {
+test("production-date allocation buckets exclude adjacent Lagos business days", () => {
   const productionOnPreviousDay = new Date("2026-08-23T12:00:00+01:00");
   const productionOnAllocationDay = new Date("2026-08-24T12:00:00+01:00");
   const productionAfterAllocationDay = new Date("2026-08-25T12:00:00+01:00");
-  const allocationEnd = businessDateRange("2026-08-24").end;
+  const allocationRange = businessDateRange("2026-08-24");
 
-  assert.equal(productionOnPreviousDay <= allocationEnd, true);
-  assert.equal(productionOnAllocationDay <= allocationEnd, true);
-  assert.equal(productionAfterAllocationDay <= allocationEnd, false);
+  assert.equal(productionOnPreviousDay >= allocationRange.start && productionOnPreviousDay <= allocationRange.end, false);
+  assert.equal(productionOnAllocationDay >= allocationRange.start && productionOnAllocationDay <= allocationRange.end, true);
+  assert.equal(productionAfterAllocationDay >= allocationRange.start && productionAfterAllocationDay <= allocationRange.end, false);
 });
 
 test("date-only production input is anchored inside the selected Lagos business day", () => {
