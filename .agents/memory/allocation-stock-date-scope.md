@@ -1,10 +1,10 @@
 ---
 name: Allocation stock date scope
-description: Product availability for a supplier allocation is calculated at the selected business-day end.
+description: Allocation availability uses an exact selected Lagos business-date bucket.
 ---
 
-Allocation planning uses the selected business date as an inclusive cutoff: production, direct sales, supplier allocations, and approved returns through that business-day end determine the quantity available for that date.
+Allocation planning uses the selected business date as an exact bucket: production, direct sales, supplier allocations, and approved restorable returns within that Lagos business day determine the quantity available for that date. Unused stock does not automatically carry into another allocation date.
 
-**Why:** An all-time balance counts future production when planning historical allocations and can show a misleading quantity beside the selected product.
+**Why:** A cumulative cutoff makes August 25 and August 26 indistinguishable when staff need to allocate against a specific production date.
 
-**How to apply:** Pass the date to the stock endpoint, use the same cutoff in allocation submission validation, preserve branch/product identity, and discard stale UI responses when the date changes.
+**How to apply:** Pass an allocation scope plus date to the stock endpoint, use the same exact range in allocation submission validation, preserve branch/product identity, and discard stale UI responses when the date changes.
