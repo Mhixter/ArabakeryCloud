@@ -10,7 +10,7 @@ Offline POSTs to /api/sales, /api/production, /api/expenses write directly to De
 
 **Why:** The old approach queued raw HTTP requests but didn't add pending records to the local DB tables, so list views showed empty/stale data when offline. Now pending records appear immediately in list views via the Dexie GET fallback.
 
-**How to apply:** offline-intercept.ts handles this in handleOfflineMutation(). Sync is done by syncPendingRecords() in sync-service.ts — reads pending rows, POSTs to server, deletes the negative-ID record, saves server record as 'synced'. use-offline.ts calls both syncPendingRecords() and drainQueue() on reconnect for backward compat.
+**How to apply:** offline-intercept.ts handles this in handleOfflineMutation(). Sync is done by syncPendingRecords() in sync-service.ts — reads pending rows, POSTs to server, deletes the negative-ID record, saves server record as 'synced'. Date-bearing mutations must preserve their user-selected date through both local storage and sync. use-offline.ts calls both syncPendingRecords() and drainQueue() on reconnect for backward compat.
 
 ## Offline auth counter
 storeOfflineSession() sets offlineLoginsRemaining:7. verifyOfflineLogin() decrements it; returns null when exhausted. getOfflineLoginInfo() lets login.tsx show the counter without consuming a login. storeOfflineSession() resets counter to 7 on every successful online login.

@@ -75,7 +75,9 @@ async function handleOfflineMutation(
         quantityProduced: produced,
         wasteQuantity:    waste,
         netQuantity:      produced - waste,
-        productionDate:   new Date().toISOString(),
+        // Preserve the date selected in the production form while offline so
+        // syncing later does not move a past batch into the current day.
+        productionDate:   body.productionDate ? String(body.productionDate) : new Date().toISOString(),
         staffName:        (user?.fullName as string | undefined) ?? null,
         branchName:       (branch?.name as string | undefined) ?? (user?.branchName as string | undefined) ?? null,
         branchId:         body.branchId ? Number(body.branchId) : ((user?.branchId as number | undefined) ?? null),

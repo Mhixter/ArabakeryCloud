@@ -309,6 +309,7 @@ export async function syncPendingRecords(): Promise<{ success: number; failed: n
           breadType:        batch.breadType,
           quantityProduced: batch.quantityProduced,
           wasteQuantity:    batch.wasteQuantity,
+          productionDate:   batch.productionDate,
           branchId:         batch.branchId,
           notes:            batch.notes,
         };
