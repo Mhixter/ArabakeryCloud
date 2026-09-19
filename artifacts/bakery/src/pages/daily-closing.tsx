@@ -43,23 +43,36 @@ export default function DailyClosingPage() {
   useEffect(() => { load(); }, [activeBranch?.id, date]);
 
   async function ensureDraft() {
-    if (closing) return closing;
+    if (closing) return { closing, lines };
     const res = await fetch(`${API_BASE}/api/daily-closings`, {
       method: "POST", headers, body: JSON.stringify({ branchId: activeBranch?.id, businessDate: date }),
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Could not start closing");
     const created = await res.json();
     setClosing(created.closing);
-    setLines(created.lines ?? []);
-    return created.closing as Closing;
+    const createdLines = (created.lines ?? []) as Line[];
+    setLines(createdLines);
+    return { closing: created.closing as Closing, lines: createdLines };
   }
   async function save(submit = false) {
     if (!activeBranch) return;
     setSaving(true);
     try {
-      const draft = await ensureDraft();
+      const { closing: draft, lines: draftLines } = await ensureDraft();
+      /*
+       * A new closing starts from movement rows without database IDs. Merge
+       * the user's counts/reasons onto the persisted draft rows so PATCH uses
+       * real daily_closing_lines IDs instead of undefined/NaN.
+       */
+      const payloadLines = draftLines.map(serverLine => {
+        const editedLine = lines.find(line =>
+          line.productId === serverLine.productId
+          || (line.productId == null && serverLine.productId == null && line.productName === serverLine.productName),
+        );
+        return editedLine ? { ...serverLine, ...editedLine, id: serverLine.id } : serverLine;
+      });
       const res = await fetch(`${API_BASE}/api/daily-closings/${draft.id}`, {
-        method: "PATCH", headers, body: JSON.stringify({ submit, lines }),
+        method: "PATCH", headers, body: JSON.stringify({ submit, lines: payloadLines }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not save closing");
@@ -116,8 +129,32 @@ export default function DailyClosingPage() {
                     const expected = counted ? Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - closingStock) : null;
                     const variance = expected === null ? null : expected - line.recordedSales;
                     return <tr key={line.id ?? line.productName} className="border-b last:border-0">
-                      <td className="p-3 font-medium">{line.productName}<div className="text-[11px] text-muted-foreground">{line.openingStock} opening · +{line.produced} baked · -{line.allocated} allocated</div></td>
-                       <td className="p-3"><Input type="number" min="0" disabled={!editable} placeholder="Enter count" value={counted ? line.closingStock : ""} onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, counted: true, closingStock: Math.max(0, parseInt(e.target.value) || 0), calculatedSales: 0, variance: 0 } : item))} /></td>
+                       <td className="p-3 font-medium">
+                         {line.productName}
+                         <div className="text-[11px] text-muted-foreground">{line.openingStock} opening · +{line.produced} baked · -{line.allocated} allocated</div>
+                         {counted && variance !== 0 && (
+                           <div className="mt-2">
+                             <Input
+                               value={line.varianceReason ?? ""}
+                               disabled={!editable}
+                               placeholder="Reason for variance (required)"
+                               aria-label={`Reason for ${line.productName} variance`}
+                               onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, varianceReason: e.target.value } : item))}
+                             />
+                           </div>
+                         )}
+                       </td>
+                       <td className="p-3">
+                         <Input
+                           type="number"
+                           min="0"
+                           disabled={!editable}
+                           placeholder="Enter count"
+                           value={counted ? line.closingStock : ""}
+                           onChange={e => setLines(prev => prev.map((item, i) => i === index ? { ...item, counted: true, closingStock: Math.max(0, parseInt(e.target.value) || 0), calculatedSales: 0 } : item))}
+                         />
+                         {counted && variance !== 0 && <div className="mt-1 text-[11px] text-amber-700">Expected {expected} sales · recorded {line.recordedSales}</div>}
+                       </td>
                     </tr>;
                   })}</tbody>
                 </table>

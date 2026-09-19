@@ -320,10 +320,14 @@ router.patch("/daily-closings/:id", authenticate, requireRole(...editableRoles),
   if (reasonError) { res.status(400).json({ error: reasonError }); return; }
   for (const input of lines) {
     if (!input.counted) continue;
+    const lineId = Number(input.id);
+    if (!Number.isInteger(lineId) || lineId < 1) {
+      res.status(400).json({ error: "Closing lines are out of date. Reload the closing and try again." }); return;
+    }
     const { closingStock, calculatedSales, variance, varianceReason } = calculateClosingLine(input);
     await db.update(dailyClosingLinesTable).set({
       closingStock, counted: true, calculatedSales, variance, varianceReason, updatedAt: new Date(),
-    }).where(and(eq(dailyClosingLinesTable.id, Number(input.id)), eq(dailyClosingLinesTable.closingId, id)));
+    }).where(and(eq(dailyClosingLinesTable.id, lineId), eq(dailyClosingLinesTable.closingId, id)));
   }
   const status = nextClosingStatus(closing.status as "draft" | "submitted" | "approved", Boolean(req.body.submit));
   const [updated] = await db.update(dailyClosingsTable).set({
