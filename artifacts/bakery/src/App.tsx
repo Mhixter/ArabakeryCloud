@@ -23,6 +23,7 @@ import AllocationsPage from "@/pages/allocations";
 import ExpensesPage from "@/pages/expenses";
 import WorkersPage from "@/pages/workers";
 import QuickSaleSettlementPage from "@/pages/quick-sale-settlement";
+import DailyClosingPage from "@/pages/daily-closing";
 import SupplierSettlementsPage from "@/pages/supplier-settlements";
 import StockByProductPage from "@/pages/stock-by-product";
 import Layout from "@/components/layout";
@@ -164,6 +165,7 @@ function Router() {
           whenever the active branch changes — clean data, no stale state. */}
       <Route path="/dashboard"><Protected><BranchedPage><DashboardPage /></BranchedPage></Protected></Route>
       <Route path="/quick-sale-settlement"><ProtectedRole roles={["managing_director"]}><BranchedPage><QuickSaleSettlementPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/daily-closing"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><DailyClosingPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/supplier-settlements"><ProtectedRole roles={["managing_director"]}><BranchedPage><SupplierSettlementsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/stock-by-product"><Protected><BranchedPage><StockByProductPage /></BranchedPage></Protected></Route>
       <Route path="/sales"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><SalesPage /></BranchedPage></ProtectedRole></Route>

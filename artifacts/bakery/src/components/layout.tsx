@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ShoppingCart, Factory, Package, BarChart3,
   Users, ScrollText, Settings, LogOut, Wheat, AlertTriangle,
   Building2, CreditCard, MoreHorizontal, X, ChevronRight, Sandwich, Download,
-  PackageCheck, Activity, Receipt, Users2, DoorOpen, HandCoins,
+  PackageCheck, Activity, Receipt, Users2, DoorOpen, HandCoins, ClipboardCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ interface NavItem { href: string; label: string; icon: React.ElementType; roles:
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard",        label: "Dashboard",    icon: LayoutDashboard, roles: ["managing_director","manager","receptionist","production_staff","supplier"] },
   { href: "/quick-sale-settlement", label: "Quick Sale Settlement", icon: HandCoins, roles: ["managing_director"] },
+  { href: "/daily-closing",    label: "Daily Closing",  icon: ClipboardCheck, roles: ["managing_director","manager","receptionist"] },
   { href: "/supplier-settlements", label: "Supplier Settlements", icon: HandCoins, roles: ["managing_director"] },
   { href: "/stock-by-product", label: "Production & Stock", icon: Factory, roles: ["managing_director","manager","receptionist","production_staff","supplier"] },
   { href: "/sales",            label: "Sales",         icon: ShoppingCart,    roles: ["managing_director","manager","receptionist","supplier"] },
