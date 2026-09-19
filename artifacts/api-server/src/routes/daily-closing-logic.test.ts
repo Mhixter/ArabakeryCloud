@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   calculateClosingLine,
+  calculateUnassignedSales,
   canApproveClosing,
   canEditClosing,
   hasClosingForDate,
@@ -26,6 +27,18 @@ test("stock reconciliation uses opening + production + returns - allocations - c
     variance: 4,
     varianceReason: null,
   });
+});
+
+test("unassigned sales reconcile bulk sales without consuming physical closing stock", () => {
+  assert.equal(calculateUnassignedSales({
+    productName: "Milk Bread",
+    openingStock: 0,
+    produced: 100,
+    returned: 0,
+    allocated: 70,
+    recordedSales: 10,
+    closingStock: 15,
+  }), 5);
 });
 
 test("closing stock cannot be negative and variance reasons are trimmed", () => {

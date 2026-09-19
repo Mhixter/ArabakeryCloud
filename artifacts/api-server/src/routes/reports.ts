@@ -4,6 +4,7 @@ import { eq, and, or, isNull, gte, lte, desc, sql } from "drizzle-orm";
 import { authenticate, AuthenticatedRequest, requireRole } from "../middlewares/authMiddleware";
 import { calculateInStoreStock, calculateSupplierStock, countBreadUnits } from "../lib/stock-calculations";
 import { businessDateFor, businessDateRange, queryDateRange } from "../lib/business-date";
+import { closingProductKey, latestPriorClosingStock } from "../lib/stock-carryover";
 
 const router: IRouter = Router();
 
@@ -15,6 +16,8 @@ function visibleSaleForUsers() {
 
 function isStockClearingSale(sale: typeof salesTable.$inferSelect) {
   return sale.notes?.startsWith("[Quick Sale stock settlement]") ||
+    sale.notes?.startsWith("[Quick Sale stock reconciliation]") ||
+    sale.notes?.startsWith("[Daily Closing stock reconciliation]") ||
     sale.notes?.startsWith("[In-stock settlement]");
 }
 
@@ -357,6 +360,9 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const selectedDate = queryDate ?? businessDateFor();
   const { start: todayStart, end: todayEnd } = businessDateRange(selectedDate);
+  const priorClosingStock = allocationStockScope && stockBranchFilter
+    ? await latestPriorClosingStock(companyId, stockBranchFilter, selectedDate)
+    : new Map<string, number>();
   const productKey = (value: string) => value.trim().toLowerCase();
   const weekStart = (() => {
     const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
@@ -537,7 +543,11 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
 
   const remaining = displayProducts.map(p => {
     const key = `product:${p.id}`;
+    const openingStock  = priorClosingStock.get(key)
+      ?? priorClosingStock.get(closingProductKey(null, p.name))
+      ?? 0;
     const produced      = productionByType.get(key) ?? 0;
+    const availableProduced = openingStock + produced;
     const totalAllocated = totalAllocatedByType.get(key) ?? 0;
     const directSold    = directSalesByType.get(key) ?? 0;
     const supplierSold  = supplierSalesByType.get(key) ?? 0;
@@ -551,18 +561,20 @@ router.get("/reports/product-dashboard", authenticate, async (req: Authenticated
      *   produced → store → [sold directly] OR [allocated to suppliers]
      *   allocated → suppliers → [sold by suppliers] OR [returned: restored back / damaged wasted]
      *
-     * In-store = net_produced + restorable_returns - direct_sales - total_allocated
+     * In-store = opening carryover + net_produced + restorable_returns
+     *            - direct_sales - total_allocated
      *   (allocations remove bread from store; restorable returns bring some back)
      *
      * With-suppliers = total_allocated - supplier_sales - all_approved_returns
      *   (what suppliers currently hold, net of what they sold or gave back)
      */
-     const inStore       = calculateInStoreStock({ produced, restorableReturns: restored, directSales: directSold, allocated: totalAllocated });
+      const inStore       = calculateInStoreStock({ produced: availableProduced, restorableReturns: restored, directSales: directSold, allocated: totalAllocated });
      const withSuppliers = calculateSupplierStock(totalAllocated, supplierSold, allReturned);
 
     return {
       productId: p.id,
       name: p.name,
+      openingStock,
       produced,
       sold: totalSold,        // all sales (for display as "X sold total")
       restored,

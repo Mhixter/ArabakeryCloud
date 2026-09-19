@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardCheck, Save, CheckCircle2, HandCoins } from "lucide-react";
+import { ClipboardCheck, Save, CheckCircle2, ArrowRight } from "lucide-react";
 import { businessDateFor } from "@/lib/business-date";
 
 type Line = {
@@ -29,10 +29,6 @@ export default function DailyClosingPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [settling, setSettling] = useState(false);
-  const [settlementAmount, setSettlementAmount] = useState("");
-  const [settlementPaymentMethod, setSettlementPaymentMethod] = useState<"cash" | "transfer">("cash");
-  const [settlementNotes, setSettlementNotes] = useState("");
   const headers = { Authorization: `Bearer ${getToken() ?? ""}`, "Content-Type": "application/json" };
 
   async function load() {
@@ -79,28 +75,6 @@ export default function DailyClosingPage() {
     if (!res.ok) { toast({ title: "Could not approve closing", variant: "destructive" }); return; }
     toast({ title: "Closing approved" }); await load();
   }
-  async function settleRemainingStock() {
-    if (!closing) return;
-    const amount = Number(settlementAmount);
-    if (!Number.isFinite(amount) || amount < 0) {
-      toast({ title: "Enter the amount collected from the manager", variant: "destructive" });
-      return;
-    }
-    setSettling(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/daily-closings/${closing.id}/settle-stock`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ amountSettled: amount, paymentMethod: settlementPaymentMethod, notes: settlementNotes.trim() || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Could not settle remaining stock");
-      toast({ title: "Remaining stock settled", description: `${data.totalUnits} units were removed from in-store stock. Allocations were not changed.` });
-      await load();
-    } catch (error) {
-      toast({ title: "Stock settlement failed", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
-    } finally { setSettling(false); }
-  }
   const editable = !closing || closing.status === "draft";
   const totalVariance = lines.reduce((sum, line) => sum + (line.counted ? line.variance : 0), 0);
   const isManagingDirector = getStoredUser()?.role === "managing_director";
@@ -111,7 +85,7 @@ export default function DailyClosingPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Daily Closing</h1>
-          <p className="text-sm text-muted-foreground mt-1">Count physical stock and reconcile expected store sales.</p>
+            <p className="text-sm text-muted-foreground mt-1">Count physical stock so unexplained bulk sales can be reconciled and the remaining bread can carry into the next business day.</p>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="closing-date" className="text-sm">Business date</Label>
@@ -124,7 +98,7 @@ export default function DailyClosingPage() {
           <Card className="border-amber-200 bg-amber-50/50">
             <CardContent className="p-4 flex items-center gap-3 text-sm">
               <ClipboardCheck className="text-amber-600" size={20} />
-              <span><strong>{activeBranch.name}</strong> · {date}. Count the stock remaining after production and allocations. Allocations are not changed by this closing.</span>
+               <span><strong>{activeBranch.name}</strong> · {date}. Count the stock remaining after production, product sales, and allocations. The approved count becomes the next day’s opening stock; allocations are not changed.</span>
               {closing && <Badge className="ml-auto" variant={closing.status === "approved" ? "default" : "secondary"}>{closing.status}</Badge>}
             </CardContent>
           </Card>
@@ -160,20 +134,19 @@ export default function DailyClosingPage() {
               {editable && <Button onClick={() => save(true)} disabled={saving || !lines.length}><Save size={15} className="mr-2" />Submit for approval</Button>}
             </div>
           </div>
-          {isManagingDirector && closing && (closing.status === "submitted" || closing.status === "approved") && !closing.stockSettledAt && (
-            <Card className="border-emerald-200 bg-emerald-50/50">
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} className="text-emerald-700" />Settle remaining stock</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">Collect the funds from the manager, then settle the {remainingUnits.toLocaleString()} counted units. This does not change allocations.</p>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div><Label htmlFor="closing-settlement-amount">Amount collected (₦)</Label><Input id="closing-settlement-amount" type="number" min="0" step="any" value={settlementAmount} onChange={e => setSettlementAmount(e.target.value)} placeholder="0.00" /></div>
-                  <div><Label>Payment method</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={settlementPaymentMethod} onChange={e => setSettlementPaymentMethod(e.target.value as "cash" | "transfer")}><option value="cash">Cash</option><option value="transfer">Bank transfer</option></select></div>
-                  <div><Label htmlFor="closing-settlement-notes">Notes</Label><Input id="closing-settlement-notes" value={settlementNotes} onChange={e => setSettlementNotes(e.target.value)} placeholder="Receipt/reference (optional)" /></div>
-                </div>
-                <Button onClick={settleRemainingStock} disabled={settling || remainingUnits === 0}><HandCoins size={15} className="mr-2" />{settling ? "Settling…" : "Confirm stock settlement"}</Button>
-              </CardContent>
-            </Card>
-          )}
+           {isManagingDirector && closing && (closing.status === "submitted" || closing.status === "approved") && !closing.stockSettledAt && (
+             <Card className="border-emerald-200 bg-emerald-50/50">
+               <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowRight size={18} className="text-emerald-700" />Next: reconcile the day’s Quick Sales</CardTitle></CardHeader>
+               <CardContent className="space-y-3">
+                 <p className="text-sm text-muted-foreground">
+                   {remainingUnits.toLocaleString()} physical units will remain available as the next business day’s opening stock. Open Quick Sale Settlement to reconcile only the unexplained bulk-sale quantities.
+                 </p>
+                 <a href={`/quick-sale-settlement?date=${date}&branchId=${activeBranch.id}`} className="inline-flex items-center rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800">
+                   Open Quick Sale Settlement <ArrowRight size={15} className="ml-2" />
+                 </a>
+               </CardContent>
+             </Card>
+           )}
           {closing?.stockSettledAt && <p className="text-sm text-emerald-700 font-medium">Remaining stock settled: ₦{Number(closing.stockSettledAmount ?? 0).toLocaleString()} by the Managing Director. Allocations were unchanged.</p>}
         </>
       )}

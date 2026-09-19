@@ -41,6 +41,13 @@ export function calculateClosingLine(line: ClosingLineInput): ClosingLineCalcula
   };
 }
 
+/** Product quantity not explained by recorded product sales after the physical count. */
+export function calculateUnassignedSales(line: ClosingLineInput): number {
+  const closingStock = Math.max(0, Number.parseInt(String(line.closingStock ?? 0), 10) || 0);
+  const calculatedSales = Math.max(0, line.openingStock + line.produced + line.returned - line.allocated - closingStock);
+  return Math.max(0, calculatedSales - line.recordedSales);
+}
+
 export function validateSubmission(lines: Array<ClosingLineInput & { id?: number }>): string | null {
   for (const line of lines) {
     if (!line.counted) return `A physical closing count is required for ${line.productName}`;

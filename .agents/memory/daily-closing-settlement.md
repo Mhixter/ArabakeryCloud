@@ -3,8 +3,8 @@ name: Daily Closing Settlement
 description: The operational distinction between physical closing stock settlement and supplier allocation settlement
 ---
 
-In-store settlement is a Managing Director-only dashboard workflow organized by business date and product. The Managing Director settles the entire remaining quantity as a separate manager stock sale; supplier allocation rows must remain unchanged. Each product/date keeps an uncleared or cleared history state.
+Daily closing is the physical source of truth for end-of-day in-store stock. A submitted/approved closing keeps its counted product quantities as the next business day's opening balance. Quick Sale acceptance may add zero-revenue reconciliation rows for only the unexplained product quantities; supplier allocation rows remain unchanged.
 
-**Why:** Allocated stock and remaining in-store stock are different responsibilities and must not be cleared together or settlement of one can distort supplier inventory history. The manager needs a simple date-based handover record rather than a separate physical-count approval page.
+**Why:** Allocated stock and remaining in-store stock are different responsibilities, and amount-only Quick Sales cannot identify product types. Carrying the physical count forward preserves inventory while still reconciling bulk sales without assigning money to a guessed product.
 
-**How to apply:** Keep allocation settlement in the Allocations flow. The dashboard settlement should only create separate stock-sale records for the full remaining product quantity, with amount, payment method, notes, and audit activity, and should be idempotent per product/date.
+**How to apply:** Require all closing lines to be physically counted before Quick Sale acceptance. Use the latest submitted/approved prior closing for allocation opening stock, calculate residual quantities per product, and keep reconciliation rows at zero revenue with audit metadata.

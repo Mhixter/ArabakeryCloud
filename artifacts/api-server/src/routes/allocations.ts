@@ -7,6 +7,7 @@ import { eq, and, isNull, inArray, or, sql, gte, lte } from "drizzle-orm";
 import { authenticate, requireRole, AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { logAudit } from "../lib/audit";
 import { businessDateRange, businessDateStart } from "../lib/business-date";
+import { closingProductKey, latestPriorClosingStock } from "../lib/stock-carryover";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -174,6 +175,7 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
     const product = productCandidates.find(candidate => candidate.branchId === branchId)
       ?? productCandidates.find(candidate => candidate.branchId == null);
     if (!product) { res.status(400).json({ error: `"${breadType}" is not an active product.` }); return; }
+    const priorClosingStock = await latestPriorClosingStock(companyId, branchId, allocationDateInput);
 
     /*
      * Allocation stock is a separate business-date bucket:
@@ -198,7 +200,10 @@ router.post("/allocations", authenticate, requireRole("managing_director", "mana
       (sum, r) => sum + (["not_sold", "wrong_item", "other"].includes(r.reason) ? r.quantity : 0),
       0,
     );
-    const remaining = totalProduced + restorableReturned - directSold - totalAllocated;
+    const openingStock = priorClosingStock.get(closingProductKey(product.id, product.name))
+      ?? priorClosingStock.get(closingProductKey(null, product.name))
+      ?? 0;
+    const remaining = openingStock + totalProduced + restorableReturned - directSold - totalAllocated;
 
     if (quantityNumber > remaining) {
       res.status(400).json({

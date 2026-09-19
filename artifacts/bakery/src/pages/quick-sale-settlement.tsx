@@ -39,7 +39,10 @@ function currency(value: number) {
 export default function QuickSaleSettlementPage() {
   const { activeBranch } = useActiveBranch();
   const { toast } = useToast();
-  const [businessDate, setBusinessDate] = useState(businessDateFor());
+  const initialDate = new URLSearchParams(window.location.search).get("date");
+  const [businessDate, setBusinessDate] = useState(
+    initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : businessDateFor(),
+  );
   const [data, setData] = useState<SettlementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
@@ -120,9 +123,9 @@ export default function QuickSaleSettlementPage() {
             </CardContent>
           </Card>
            <Card className="border-amber-200">
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} />Accept daily settlement</CardTitle><CardDescription>Accept this day’s amount and clear only the in-store stock remaining at the end of this business day. Supplier allocations remain unchanged.</CardDescription></CardHeader>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><HandCoins size={18} />Accept daily settlement</CardTitle><CardDescription>Submit the physical Daily Closing first. Acceptance reconciles only bulk/Quick Sale quantities that are not explained by product sales; counted stock remains available for the next business day.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-               {data?.accepted?.stockClearedAt ? <div className="flex items-center gap-2 text-emerald-700 font-medium"><CheckCircle2 size={18} />Accepted {currency(data.accepted.amount)} by {data.accepted.paymentMethod}; cleared {data.accepted.stockClearedProducts} product stock balances.</div> : (
+               {data?.accepted?.stockClearedAt ? <div className="flex items-center gap-2 text-emerald-700 font-medium"><CheckCircle2 size={18} />Accepted {currency(data.accepted.amount)} by {data.accepted.paymentMethod}; reconciled {data.accepted.stockClearedProducts} product quantities. Physical closing stock carries forward.</div> : (
                 <div className="flex flex-wrap items-end gap-3">
                   <div><Label>Payment method</Label><select className="h-10 rounded-md border bg-background px-3 text-sm" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as "cash" | "transfer")}><option value="cash">Cash</option><option value="transfer">Transfer</option></select></div>
                   <div><Label htmlFor="weekly-notes">Notes / reference</Label><Input id="weekly-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" /></div>

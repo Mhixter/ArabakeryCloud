@@ -71,7 +71,7 @@ interface Return {
   returnDate: string;
 }
 
-interface StockItem { productId: number; name: string; remaining: number }
+interface StockItem { productId: number; name: string; remaining: number; openingStock?: number }
 interface Seller { id: number; fullName: string; agentId: string }
 interface Product { id: number; name: string; branchId?: number | null; isActive: boolean }
 
@@ -401,6 +401,11 @@ function AllocationForm({ onClose, onCreated }: { onClose: () => void; onCreated
                 {availableQty === 0 ? `No stock available for ${allocationDateLabel} — log production for this date first` : `${availableQty} units available for ${allocationDateLabel}`}
               </div>
             )}
+            {breadType && selectedStock?.openingStock ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                Includes {selectedStock.openingStock} unit{selectedStock.openingStock === 1 ? "" : "s"} carried forward from the previous closing.
+              </p>
+            ) : null}
             {breadType && availableQty === null && stockLoaded && (
               <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-600">
                 <AlertCircle size={12} />
