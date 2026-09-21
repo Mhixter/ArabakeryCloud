@@ -453,6 +453,7 @@ export default function AllocationsPage() {
   const { activeBranch } = useActiveBranch();
 
   const [tab, setTab] = useState<"allocations" | "returns">("allocations");
+  const [allocationDateFilter, setAllocationDateFilter] = useState(businessDateFor());
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [returns, setReturns] = useState<Return[]>([]);
   const [loading, setLoading] = useState(true);
@@ -496,6 +497,7 @@ export default function AllocationsPage() {
         const pm = new Map<string, number>();
         for (const p of (prods as { name: string; pricePerUnit: number }[])) {
           pm.set(p.name, p.pricePerUnit);
+          pm.set(p.name.trim().toLowerCase(), p.pricePerUnit);
         }
         setProductPrices(pm);
       })
@@ -607,9 +609,23 @@ export default function AllocationsPage() {
     }
   };
 
-  const totalQty = allocations.reduce((s, a) => s + a.quantity, 0);
   const todayReturns = returns.filter(r => new Date(r.returnDate).toDateString() === new Date().toDateString());
   const pendingReturns = returns.filter(r => r.status === "pending");
+  const visibleAllocations = allocationDateFilter
+    ? allocations.filter(a => businessDateFor(new Date(a.allocationDate)) === allocationDateFilter)
+    : allocations;
+  const visibleAllocationQty = visibleAllocations.reduce((s, a) => s + a.quantity, 0);
+  const totalAllocationValue = visibleAllocations.reduce(
+    (s, a) => s + (productPrices.get(a.breadType.trim().toLowerCase()) ?? productPrices.get(a.breadType) ?? 0) * a.quantity,
+    0,
+  );
+  const visibleOutstandingQty = visibleAllocations.filter(a => !a.isCleared).reduce((s, a) => s + a.quantity, 0);
+  const allocationFilterLabel = allocationDateFilter
+    ? (allocationDateFilter === businessDateFor()
+      ? "Today"
+      : format(new Date(`${allocationDateFilter}T12:00:00`), "d MMM yyyy"))
+    : "All Time";
+  const formatNaira = (amount: number) => `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6" data-testid="page-allocations">
@@ -653,26 +669,76 @@ export default function AllocationsPage() {
         ))}
       </div>
 
+      {tab === "allocations" && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label htmlFor="allocation-date-filter" className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date:</label>
+            <Input
+              id="allocation-date-filter"
+              type="date"
+              value={allocationDateFilter}
+              onChange={event => {
+                setAllocationDateFilter(event.target.value);
+                setSelectedSeller(null);
+              }}
+              className="w-40 h-8 text-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={allocationDateFilter === businessDateFor() ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                setAllocationDateFilter(businessDateFor());
+                setSelectedSeller(null);
+              }}
+            >
+              Today
+            </Button>
+            <Button
+              variant={!allocationDateFilter ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                setAllocationDateFilter("");
+                setSelectedSeller(null);
+              }}
+            >
+              All Time
+            </Button>
+          </div>
+          <Badge variant="secondary" className="text-xs">{allocationFilterLabel}</Badge>
+        </div>
+      )}
+
       {/* Summary cards */}
-      {tab === "allocations" && !loading && allocations.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {tab === "allocations" && !loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="rounded-2xl border border-border/70 shadow-sm bg-card">
             <CardContent className="p-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Allocation records</p>
-              <p className="text-2xl font-bold tracking-tight">{allocations.length}</p>
+              <p className="text-2xl font-bold tracking-tight">{visibleAllocations.length}</p>
             </CardContent>
           </Card>
           <Card className="rounded-2xl border border-border/70 shadow-sm bg-card">
             <CardContent className="p-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Units allocated</p>
-              <p className="text-2xl font-bold tracking-tight">{totalQty}</p>
+              <p className="text-2xl font-bold tracking-tight">{visibleAllocationQty}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-amber-200 bg-amber-50/70 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Total amount allocated</p>
+              <p className="text-2xl font-bold tracking-tight text-amber-950">{formatNaira(totalAllocationValue)}</p>
+              <p className="text-xs text-amber-800/70 mt-1">{allocationFilterLabel}</p>
             </CardContent>
           </Card>
           <Card className="rounded-2xl border border-amber-200 bg-amber-50/70 shadow-sm">
             <CardContent className="p-4">
               <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Outstanding units</p>
               <p className="text-2xl font-bold tracking-tight text-amber-950">
-                {allocations.filter(a => !a.isCleared).reduce((s, a) => s + a.quantity, 0)}
+                {visibleOutstandingQty}
               </p>
             </CardContent>
           </Card>
@@ -697,11 +763,11 @@ export default function AllocationsPage() {
                   </CardDescription>
                 </div>
               </div>
-              {allocations.length > 0 && (
+              {visibleAllocations.length > 0 && (
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs flex-shrink-0"
                   onClick={() => {
                     const company = getStoredCompany();
-                    const rows = [...allocations].reverse();
+                     const rows = [...visibleAllocations].reverse();
                     generatePdf({
                       title: "Allocation History",
                       companyName: company?.name ?? "Bakery",
@@ -720,7 +786,7 @@ export default function AllocationsPage() {
                         ]),
                         totals: ["", "", rows.reduce((s, a) => s + a.quantity, 0).toString(), "", "", "", ""],
                       }],
-                      filename: `allocations-${format(new Date(), "yyyy-MM-dd")}.pdf`,
+                       filename: `allocations-${allocationDateFilter || format(new Date(), "yyyy-MM-dd")}.pdf`,
                     });
                   }}>
                   <Download size={12} /> Download PDF
@@ -731,7 +797,7 @@ export default function AllocationsPage() {
           <CardContent className="p-0">
             {loading ? (
               <div className="p-4 space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
-            ) : allocations.length === 0 ? (
+            ) : visibleAllocations.length === 0 ? (
               <div className="text-center py-14 text-muted-foreground">
                 <PackageCheck size={32} className="mx-auto mb-3 opacity-20" />
                 <p className="text-sm font-medium">No allocations yet</p>
@@ -745,7 +811,7 @@ export default function AllocationsPage() {
             ) : isSeller ? (
               /* ── Supplier's own allocation list (flat) ── */
               <div className="divide-y divide-border/50">
-                {[...allocations].reverse().map(alloc => (
+                 {[...visibleAllocations].reverse().map(alloc => (
                   <div key={alloc.id} className="px-4 py-3 hover:bg-muted/20 transition-colors">
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -769,7 +835,7 @@ export default function AllocationsPage() {
             ) : selectedSeller ? (
               /* ── Supplier detail drill-down ── */
               (() => {
-                const sellerAllocs = allocations.filter(a => a.sellerName === selectedSeller);
+                 const sellerAllocs = visibleAllocations.filter(a => a.sellerName === selectedSeller);
                 // Group by breadType within this supplier
                 const byType = new Map<string, { qty: number; latestDate: string; ids: number[] }>();
                 for (const a of sellerAllocs) {
@@ -1039,7 +1105,7 @@ export default function AllocationsPage() {
               (() => {
                 // Group by sellerName
                 const sellerMap = new Map<string, { sellerName: string; branchName: string; allocations: Allocation[] }>();
-                for (const alloc of allocations) {
+                 for (const alloc of visibleAllocations) {
                   const key = alloc.sellerName;
                   if (!sellerMap.has(key)) sellerMap.set(key, { sellerName: alloc.sellerName, branchName: alloc.branchName, allocations: [] });
                   sellerMap.get(key)!.allocations.push(alloc);

@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Factory, TrendingDown, Download, Clock } from "lucide-react";
+import { Plus, Factory, TrendingDown, Download, Clock, Banknote } from "lucide-react";
 import { useSubscription } from "@/components/subscription-guard";
 import { format } from "date-fns";
 
@@ -43,12 +43,21 @@ function downloadCSV(rows: Record<string, string | number>[], filename: string) 
   URL.revokeObjectURL(url);
 }
 
-function useProducts() {
+interface ProductPrice {
+  id: number;
+  name: string;
+  branchId?: number | null;
+  pricePerUnit: number;
+  isActive: boolean;
+}
+
+function useProducts(branchId: number | null) {
   const token = getToken();
-  return useQuery<{ id: number; name: string; isActive: boolean }[]>({
-    queryKey: ["products"],
+  return useQuery<ProductPrice[]>({
+    queryKey: ["products", branchId],
     queryFn: async () => {
-      const res = await fetch(API_BASE + "/api/products", { headers: { Authorization: `Bearer ${token}` } });
+      const query = branchId ? `?branchId=${branchId}` : "";
+      const res = await fetch(API_BASE + "/api/products" + query, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return [];
       return res.json();
     },
@@ -58,12 +67,12 @@ function useProducts() {
 export default function ProductionPage() {
   const user = getStoredUser();
   const { isExpired } = useSubscription();
-  const { data: products } = useProducts();
-  const activeProducts = products?.filter(p => p.isActive) ?? [];
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { activeBranch } = useActiveBranch();
   const branchParam = activeBranch?.id ?? null;
+  const { data: products } = useProducts(branchParam);
+  const activeProducts = products?.filter(p => p.isActive) ?? [];
   const [showNew, setShowNew] = useState(false);
 
   const [form, setForm] = useState({
@@ -128,6 +137,22 @@ export default function ProductionPage() {
   const statProduced = visibleBatches.reduce((s, b) => s + b.quantityProduced, 0);
   const statWaste    = visibleBatches.reduce((s, b) => s + b.wasteQuantity, 0);
   const statNet      = statProduced - statWaste;
+  const productById = new Map((products ?? []).map(product => [product.id, product]));
+  const productByName = new Map<string, ProductPrice>();
+  for (const product of products ?? []) {
+    const key = product.name.trim().toLowerCase();
+    const existing = productByName.get(key);
+    if (!existing || (activeBranch?.id && product.branchId === activeBranch.id && existing.branchId !== activeBranch.id)) {
+      productByName.set(key, product);
+    }
+  }
+  const productionValue = visibleBatches.reduce((sum, batch) => {
+    const productId = (batch as typeof batch & { productId?: number }).productId;
+    const product = (productId ? productById.get(productId) : undefined)
+      ?? productByName.get(batch.breadType.trim().toLowerCase());
+    return sum + Math.max(0, batch.netQuantity) * (product?.pricePerUnit ?? 0);
+  }, 0);
+  const formatNaira = (amount: number) => `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const isFilterToday = filterDate === todayStr();
   const filterLabel   = filterDate
@@ -178,11 +203,12 @@ export default function ProductionPage() {
       </div>
 
       {/* Stats for selected date */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: `Produced — ${filterLabel}`, value: statProduced, unit: "units", icon: Factory, accent: "bg-slate-950" },
           { label: `Net — ${filterLabel}`,      value: statNet,      unit: "units", icon: Factory, accent: "bg-emerald-600" },
           { label: `Waste — ${filterLabel}`,    value: statWaste,    unit: "units", icon: TrendingDown, accent: statWaste > 0 ? "bg-red-500" : "bg-slate-400" },
+          { label: `Production value — ${filterLabel}`, value: formatNaira(productionValue), unit: "net units × unit price", icon: Banknote, accent: "bg-amber-500" },
         ].map(s => {
           const Icon = s.icon;
           return (
