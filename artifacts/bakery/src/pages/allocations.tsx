@@ -489,15 +489,20 @@ export default function AllocationsPage() {
     Promise.all([
       fetch(allUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(retUrl, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
-      fetch(API_BASE + "/api/products", { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/api/products${activeBranch ? `?branchId=${activeBranch.id}` : ""}`, { headers: h, credentials: "include" }).then(r => r.ok ? r.json() : []),
     ])
       .then(([a, r, prods]) => {
         setAllocations(a);
         setReturns(r);
         const pm = new Map<string, number>();
-        for (const p of (prods as { name: string; pricePerUnit: number }[])) {
-          pm.set(p.name, p.pricePerUnit);
-          pm.set(p.name.trim().toLowerCase(), p.pricePerUnit);
+        for (const p of (prods as { name: string; pricePerUnit: number; branchId?: number | null }[])) {
+          const key = p.name.trim().toLowerCase();
+          const existing = pm.get(key);
+          const isSelectedBranch = activeBranch?.id != null && p.branchId === activeBranch.id;
+          if (existing === undefined || isSelectedBranch) {
+            pm.set(key, p.pricePerUnit);
+            pm.set(p.name, p.pricePerUnit);
+          }
         }
         setProductPrices(pm);
       })
