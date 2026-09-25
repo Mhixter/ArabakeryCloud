@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "wouter";
 import { useActiveBranch } from "@/lib/branch-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -644,17 +645,21 @@ export default function AllocationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/allocations/history" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-allocation-history">
+            History
+          </Link>
+          {!isSeller && <Link href="/allocations/returns/review" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-return-review">Review returns</Link>}
           {isSeller && (
-            <Button size="sm" variant="outline" onClick={() => setShowReturnForm(true)}>
+            <Link href="/allocations/returns/new" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-new-return">
               <RotateCcw size={14} className="mr-1.5" />
               Return
-            </Button>
+            </Link>
           )}
           {canCreate && (
-            <Button size="sm" className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold" onClick={() => setShowForm(true)}>
+            <Link href="/allocations/new" className="inline-flex h-9 items-center justify-center rounded-md bg-amber-400 px-3 text-sm font-bold text-slate-950 hover:bg-amber-300" data-testid="link-new-allocation">
               <Plus size={14} className="mr-1.5" />
               New Allocation
-            </Button>
+            </Link>
           )}
         </div>
       </div>
@@ -808,9 +813,9 @@ export default function AllocationsPage() {
                 <p className="text-sm font-medium">No allocations yet</p>
                 <p className="text-xs mt-1">{isSeller ? "Ask your receptionist to allocate bread." : "Create an allocation to assign bread to a supplier."}</p>
                 {canCreate && (
-                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowForm(true)}>
+                  <Link href="/allocations/new" className="mt-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-empty-new-allocation">
                     <Plus size={13} className="mr-1.5" />New Allocation
-                  </Button>
+                  </Link>
                 )}
               </div>
             ) : isSeller ? (
@@ -1225,9 +1230,9 @@ export default function AllocationsPage() {
                   </Button>
                 )}
                 {isSeller && (
-                  <Button size="sm" variant="outline" onClick={() => setShowReturnForm(true)}>
+                  <Link href="/allocations/returns/new" className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-muted" data-testid="link-tab-new-return">
                     <RotateCcw size={13} className="mr-1.5" />Return
-                  </Button>
+                  </Link>
                 )}
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "wouter";
 import { getToken, getStoredUser, getStoredCompany } from "@/lib/auth";
 import { useActiveBranch } from "@/lib/branch-context";
 import { useToast } from "@/hooks/use-toast";
@@ -220,16 +221,16 @@ export default function ExpensesPage() {
         </div>
         <div className="flex gap-2">
           {canManage && (
-            <Button size="sm" variant="outline" onClick={() => setCatDialog(true)}>
+            <Link href="/expenses/categories/new" className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-new-expense-category">
               <Tag size={13} className="mr-1.5" /> Category
-            </Button>
+            </Link>
           )}
           <Button size="sm" variant="outline" onClick={exportPdf} disabled={expenses.length === 0}>
             <Download size={13} className="mr-1.5" /> PDF
           </Button>
-          <Button size="sm" onClick={openAdd}>
+          <Link href="/expenses/new" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90" data-testid="link-new-expense">
             <Plus size={14} className="mr-1.5" /> Add Expense
-          </Button>
+          </Link>
         </div>
       </div>
 
@@ -330,7 +331,7 @@ export default function ExpensesPage() {
             <div className="text-center py-12 text-muted-foreground">
               <Receipt size={32} className="mx-auto mb-2 opacity-20" />
               <p className="text-sm">No expenses recorded in this period.</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={openAdd}>Record First Expense</Button>
+               <Link href="/expenses/new" className="mt-3 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-empty-new-expense">Record First Expense</Link>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
@@ -356,7 +357,7 @@ export default function ExpensesPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <p className="font-bold text-sm">{fmtCurrency(parseFloat(e.amount))}</p>
-                    <button onClick={() => openEdit(e)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
+                     <Link href={`/expenses/${e.id}/edit`} className="inline-flex p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground" data-testid={`link-edit-expense-${e.id}`}><Pencil size={13} /></Link>
                     <button onClick={() => setDeleteId(e.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500"><Trash2 size={13} /></button>
                   </div>
                 </div>

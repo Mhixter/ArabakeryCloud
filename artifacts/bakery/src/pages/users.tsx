@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { API_BASE } from "@/lib/api";
 import { useActiveBranch } from "@/lib/branch-context";
 import {
@@ -184,10 +185,10 @@ export default function UsersPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Manage staff accounts and permissions</p>
         </div>
         {!isManager && (
-          <Button onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-new-user">
+          <Link href="/users/new" className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${isExpired ? "pointer-events-none opacity-50" : ""}`} data-testid="link-new-user" aria-disabled={isExpired}>
             <Plus size={16} className="mr-2" />
             Add User
-          </Button>
+          </Link>
         )}
       </div>
 
@@ -238,32 +239,24 @@ export default function UsersPage() {
                         <div className="flex items-center gap-1">
                           {/* managers can reset passwords for non-MD users only */}
                           {(!isManager || user.role !== "managing_director") && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
+                            <Link
+                              href={`/users/${user.id}/reset`}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted ${isExpired ? "pointer-events-none opacity-50" : ""}`}
                               title="Reset Password"
-                              disabled={isExpired}
-                              onClick={() => { setResetUser(user); setNewPassword(""); }}
+                              data-testid={`link-reset-user-${user.id}`}
                             >
                               <KeyRound size={13} />
-                            </Button>
+                            </Link>
                           )}
                           {!isManager && (
                             <>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                data-testid={`button-edit-user-${user.id}`}
-                                disabled={isExpired}
-                                onClick={() => {
-                                  setEditUser({ id: user.id, fullName: user.fullName, role: user.role, branchId: user.branchId ?? null });
-                                  setEditForm({ fullName: user.fullName, role: user.role, branchId: user.branchId?.toString() ?? "", password: "" });
-                                }}
+                              <Link
+                                href={`/users/${user.id}/edit`}
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted ${isExpired ? "pointer-events-none opacity-50" : ""}`}
+                                data-testid={`link-edit-user-${user.id}`}
                               >
                                 <Pencil size={13} />
-                              </Button>
+                              </Link>
                               <Button
                                 size="icon"
                                 variant="ghost"

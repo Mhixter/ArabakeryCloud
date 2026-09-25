@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "wouter";
 import { getToken, getStoredUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +57,10 @@ export default function WorkersPage() {
       const res = await fetch(API_BASE + "/api/worker-categories", { headers: apiHeaders() });
       const cats = res.ok ? await res.json() : [];
       setCategories(cats);
-      if (cats.length && !selectedCat) setSelectedCat(cats[0]);
+      const requestedCategoryId = new URLSearchParams(window.location.search).get("categoryId");
+      const requestedCategory = requestedCategoryId ? cats.find((c: WorkerCategory) => String(c.id) === requestedCategoryId) : null;
+      if (requestedCategory) setSelectedCat(requestedCategory);
+      else if (cats.length && !selectedCat) setSelectedCat(cats[0]);
     } finally { setLoading(false); }
   }, []);
 
@@ -152,9 +156,9 @@ export default function WorkersPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Manage worker categories and staff list</p>
         </div>
         {isDirector && (
-          <Button size="sm" onClick={openAddCat}>
+          <Link href="/workers/categories/new" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90" data-testid="link-new-worker-category">
             <Plus size={14} className="mr-1.5" /> Add Category
-          </Button>
+          </Link>
         )}
       </div>
 
@@ -173,7 +177,7 @@ export default function WorkersPage() {
               <div className="text-center py-10 text-muted-foreground">
                 <Tag size={28} className="mx-auto mb-2 opacity-20" />
                 <p className="text-sm">No categories yet.</p>
-                {isDirector && <Button variant="outline" size="sm" className="mt-3" onClick={openAddCat}>Add First Category</Button>}
+                {isDirector && <Link href="/workers/categories/new" className="mt-3 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-empty-new-worker-category">Add First Category</Link>}
               </div>
             ) : (
               <div className="divide-y divide-border/50">
@@ -186,7 +190,7 @@ export default function WorkersPage() {
                     </div>
                     {isDirector && (
                       <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => openEditCat(cat)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
+                         <Link href={`/workers/categories/${cat.id}/edit?categoryId=${cat.id}`} className="inline-flex p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground" data-testid={`link-edit-worker-category-${cat.id}`}><Pencil size={13} /></Link>
                         <button onClick={() => setDeleteConfirm({ type: "cat", id: cat.id })} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500"><Trash2 size={13} /></button>
                       </div>
                     )}
@@ -207,9 +211,9 @@ export default function WorkersPage() {
                 {selectedCat ? `Workers — ${selectedCat.name}` : "Select a category"}
               </CardTitle>
               {isDirector && selectedCat && (
-                <Button size="sm" variant="outline" onClick={openAddWorker}>
+                <Link href={`/workers/new?categoryId=${selectedCat.id}`} className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-new-worker">
                   <Plus size={13} className="mr-1" /> Add Worker
-                </Button>
+                </Link>
               )}
             </div>
           </CardHeader>
@@ -223,7 +227,7 @@ export default function WorkersPage() {
               <div className="text-center py-12 text-muted-foreground">
                 <Users size={32} className="mx-auto mb-2 opacity-20" />
                 <p className="text-sm">No workers in this category yet.</p>
-                {isDirector && <Button variant="outline" size="sm" className="mt-3" onClick={openAddWorker}>Add First Worker</Button>}
+                {isDirector && <Link href={`/workers/new?categoryId=${selectedCat.id}`} className="mt-3 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted" data-testid="link-empty-new-worker">Add First Worker</Link>}
               </div>
             ) : (
               <div className="divide-y divide-border/50">
@@ -242,7 +246,7 @@ export default function WorkersPage() {
                     </div>
                     {isDirector && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={() => openEditWorker(w)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
+                         <Link href={`/workers/${w.id}/edit?categoryId=${selectedCat.id}`} className="inline-flex p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground" data-testid={`link-edit-worker-${w.id}`}><Pencil size={13} /></Link>
                         <button onClick={() => setDeleteConfirm({ type: "worker", id: w.id })} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500"><Trash2 size={13} /></button>
                       </div>
                     )}

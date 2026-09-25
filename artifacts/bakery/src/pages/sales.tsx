@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import {
   useListSales, useCreateSale, useListBranches,
   getListSalesQueryKey, getGetDailySalesSummaryQueryKey,
@@ -658,15 +659,15 @@ export default function SalesPage() {
         </div>
         <div className="flex items-center gap-2">
           {isManager && (
-            <Button variant="outline" onClick={openQuickSaleModal} disabled={isExpired} data-testid="button-quick-sale">
+            <Link href="/sales/quick" className={`inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted ${isExpired ? "pointer-events-none opacity-50" : ""}`} data-testid="link-quick-sale" aria-disabled={isExpired}>
               <Plus size={16} className="mr-2" />
               Quick Sale
-            </Button>
+            </Link>
           )}
-          <Button onClick={() => setShowNewSale(true)} disabled={isExpired} data-testid="button-new-sale">
+          <Link href="/sales/new" className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${isExpired ? "pointer-events-none opacity-50" : ""}`} data-testid="link-new-sale" aria-disabled={isExpired}>
             <Plus size={16} className="mr-2" />
             New Sale
-          </Button>
+          </Link>
         </div>
       </div>
 

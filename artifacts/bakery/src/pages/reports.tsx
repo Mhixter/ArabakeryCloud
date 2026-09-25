@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import { API_BASE } from "@/lib/api";
 import { useActiveBranch } from "@/lib/branch-context";
 import { getToken, getStoredUser, getStoredCompany } from "@/lib/auth";
@@ -442,7 +443,15 @@ function AnalyticsTab() {
 
 /* ────────── Main Reports Page ────────── */
 export default function ReportsPage() {
-  const [tab, setTab] = useState<"analytics" | "weekly">("analytics");
+  const [location, setLocation] = useLocation();
+  const [tab, setTab] = useState<"analytics" | "weekly">(location.endsWith("/weekly") ? "weekly" : "analytics");
+  useEffect(() => {
+    setTab(location.endsWith("/weekly") ? "weekly" : "analytics");
+  }, [location]);
+  const changeTab = (next: "analytics" | "weekly") => {
+    setTab(next);
+    setLocation(next === "weekly" ? "/reports/weekly" : "/reports/analytics");
+  };
 
   return (
     <div className="space-y-5" data-testid="page-reports">
@@ -456,12 +465,12 @@ export default function ReportsPage() {
       {/* Tab switcher */}
       <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit">
         <button
-          onClick={() => setTab("analytics")}
+           onClick={() => changeTab("analytics")}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab === "analytics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
           <BarChart3 size={14} /> Analytics
         </button>
         <button
-          onClick={() => setTab("weekly")}
+           onClick={() => changeTab("weekly")}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab === "weekly" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
           <FileText size={14} /> Weekly Report
         </button>

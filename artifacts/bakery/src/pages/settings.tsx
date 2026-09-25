@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { API_BASE } from "@/lib/api";
 import {
   useListBranches,
@@ -100,10 +101,10 @@ export default function SettingsPage() {
               <CardTitle className="text-base">Branches</CardTitle>
               <CardDescription className="mt-0.5">Manage your bakery locations</CardDescription>
             </div>
-            <Button size="sm" onClick={() => setShowNew(true)} data-testid="button-add-branch">
+            <Link href="/settings/branches/new" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90" data-testid="link-add-branch">
               <Plus size={14} className="mr-1.5" />
               Add Branch
-            </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -135,18 +136,13 @@ export default function SettingsPage() {
                       <TableCell className="text-muted-foreground">{branch.phone ?? "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            data-testid={`button-edit-branch-${branch.id}`}
-                            onClick={() => {
-                              setEditBranch({ id: branch.id, name: branch.name, address: branch.address ?? null, phone: branch.phone ?? null });
-                              setEditForm({ name: branch.name, address: branch.address ?? "", phone: branch.phone ?? "" });
-                            }}
-                          >
+                           <Link
+                            href={`/settings/branches/${branch.id}/edit`}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted"
+                            data-testid={`link-edit-branch-${branch.id}`}
+                           >
                             <Pencil size={13} />
-                          </Button>
+                           </Link>
                           <Button
                             size="icon"
                             variant="ghost"

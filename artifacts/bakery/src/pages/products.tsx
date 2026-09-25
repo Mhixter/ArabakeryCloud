@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getToken, getStoredUser } from "@/lib/auth";
 import { API_BASE } from "@/lib/api";
@@ -138,10 +139,10 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Products</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage bread types used in production and sales</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setShowNew(true); }} disabled={!canWrite} data-testid="button-add-product">
+        <Link href="/products/new" className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${!canWrite ? "pointer-events-none opacity-50" : ""}`} data-testid="link-add-product" aria-disabled={!canWrite}>
           <Plus size={16} className="mr-2" />
           Add Product
-        </Button>
+        </Link>
       </div>
 
       {/* Stats row */}
@@ -228,10 +229,9 @@ export default function ProductsPage() {
                       </Button>
                     )}
                     {canWrite && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(product)}
-                        data-testid={`button-edit-product-${product.id}`}>
+                      <Link href={`/products/${product.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" data-testid={`link-edit-product-${product.id}`}>
                         <Pencil size={14} />
-                      </Button>
+                      </Link>
                     )}
                     {canDelete && (
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"

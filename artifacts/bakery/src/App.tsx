@@ -12,6 +12,15 @@ import SalesPage from "@/pages/sales";
 import ProductionPage from "@/pages/production";
 import InventoryPage from "@/pages/inventory";
 import ReportsPage from "@/pages/reports";
+import {
+  NewSalePage, NewProductionPage, NewAllocationPage, AllocationHistoryPage,
+  NewProductPage, EditProductPage, NewInventoryPage, EditInventoryPage, AdjustInventoryPage,
+  NewExpensePage, EditExpensePage, NewExpenseCategoryPage,
+  NewWorkerPage, EditWorkerPage, NewWorkerCategoryPage,
+  EditWorkerCategoryPage,
+  NewUserPage, EditUserPage, ResetUserPage, NewBranchPage, EditBranchPage,
+  ReturnReviewPage,
+} from "@/pages/action-pages";
 import UsersPage from "@/pages/users";
 import AuditLogsPage from "@/pages/audit-logs";
 import UserActivityPage from "@/pages/user-activity";
@@ -169,17 +178,43 @@ function Router() {
       <Route path="/supplier-settlements"><ProtectedRole roles={["managing_director"]}><BranchedPage><SupplierSettlementsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/stock-by-product"><Protected><BranchedPage><StockByProductPage /></BranchedPage></Protected></Route>
       <Route path="/sales"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><SalesPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/sales/new"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><NewSalePage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/sales/quick"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><NewSalePage quick /></BranchedPage></ProtectedRole></Route>
       <Route path="/production"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><ProductionPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/production/new"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><NewProductionPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/inventory"><ProtectedRole roles={["managing_director","manager","production_staff"]}><BranchedPage><InventoryPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/inventory/new"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><NewInventoryPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/inventory/:id/edit"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><EditInventoryPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/inventory/:id/adjust"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><AdjustInventoryPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/reports"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/reports/analytics"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/reports/weekly"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><ReportsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/users"><ProtectedRole roles={["managing_director","manager"]}><UsersPage /></ProtectedRole></Route>
       <Route path="/audit-logs"><ProtectedRole roles={["managing_director"]}><AuditLogsPage /></ProtectedRole></Route>
       <Route path="/user-activity"><ProtectedRole roles={["managing_director"]}><UserActivityPage /></ProtectedRole></Route>
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
+      <Route path="/products/new"><ProtectedRole roles={["managing_director","manager"]}><NewProductPage /></ProtectedRole></Route>
+      <Route path="/products/:id/edit"><ProtectedRole roles={["managing_director","manager"]}><EditProductPage /></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/allocations/new"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><NewAllocationPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/allocations/history"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationHistoryPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/allocations/returns/new"><ProtectedRole roles={["supplier"]}><BranchedPage><NewAllocationPage returns /></BranchedPage></ProtectedRole></Route>
+      <Route path="/allocations/returns/review"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><ReturnReviewPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/expenses"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><ExpensesPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/expenses/new"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><NewExpensePage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/expenses/:id/edit"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><EditExpensePage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/expenses/categories/new"><ProtectedRole roles={["managing_director","manager"]}><BranchedPage><NewExpenseCategoryPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/workers"><ProtectedRole roles={["managing_director","manager","receptionist"]}><WorkersPage /></ProtectedRole></Route>
+      <Route path="/workers/new"><ProtectedRole roles={["managing_director"]}><NewWorkerPage /></ProtectedRole></Route>
+      <Route path="/workers/:id/edit"><ProtectedRole roles={["managing_director"]}><EditWorkerPage /></ProtectedRole></Route>
+      <Route path="/workers/categories/new"><ProtectedRole roles={["managing_director"]}><NewWorkerCategoryPage /></ProtectedRole></Route>
+      <Route path="/workers/categories/:id/edit"><ProtectedRole roles={["managing_director"]}><EditWorkerCategoryPage /></ProtectedRole></Route>
+      <Route path="/users/new"><ProtectedRole roles={["managing_director"]}><NewUserPage /></ProtectedRole></Route>
+      <Route path="/users/:id/edit"><ProtectedRole roles={["managing_director"]}><EditUserPage /></ProtectedRole></Route>
+      <Route path="/users/:id/reset"><ProtectedRole roles={["managing_director","manager"]}><ResetUserPage /></ProtectedRole></Route>
       <Route path="/settings"><ProtectedRole roles={["managing_director"]}><SettingsPage /></ProtectedRole></Route>
+      <Route path="/settings/branches/new"><ProtectedRole roles={["managing_director"]}><NewBranchPage /></ProtectedRole></Route>
+      <Route path="/settings/branches/:id/edit"><ProtectedRole roles={["managing_director"]}><EditBranchPage /></ProtectedRole></Route>
       <Route path="/company-settings"><ProtectedRole roles={["managing_director"]}><CompanySettingsPage /></ProtectedRole></Route>
       <Route path="/subscription"><ProtectedRole roles={["managing_director"]}><SubscriptionPage /></ProtectedRole></Route>
       <Route component={NotFound} />

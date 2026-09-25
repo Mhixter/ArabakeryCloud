@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListProduction, useCreateProduction, useListBranches, getListProductionQueryKey,
@@ -166,10 +167,10 @@ export default function ProductionPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Production</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Record and track daily bread batches</p>
         </div>
-        <Button onClick={() => setShowNew(true)} size="sm" disabled={isExpired} data-testid="button-new-batch">
+        <Link href="/production/new" className={`inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 ${isExpired ? "pointer-events-none opacity-50" : ""}`} data-testid="link-new-batch" aria-disabled={isExpired}>
           <Plus size={14} className="mr-1.5" />
           Record Batch
-        </Button>
+        </Link>
       </div>
 
       {/* Date filter */}

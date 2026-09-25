@@ -296,7 +296,7 @@ function SellerDashboard() {
                 Install
               </Button>
             )}
-            <Button onClick={() => setLocation("/sales")} size="sm">
+            <Button onClick={() => setLocation("/sales/new")} size="sm">
               <Plus size={14} className="mr-1.5" />
               Record Sale
             </Button>

@@ -129,7 +129,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
         <div className="flex items-stretch h-[60px]">
           {primaryTabs.map(item => {
             const Icon = item.icon;
-            const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
+            const isActive = location === item.href || location.startsWith(`${item.href}/`) || (item.href === "/dashboard" && location === "/");
             return (
               <Link key={item.href} href={item.href} className="flex-1">
                 <button
@@ -217,7 +217,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
               <div className="px-3 py-2 border-b border-slate-100">
                 {secondaryItems.map(item => {
                   const Icon = item.icon;
-                  const isActive = location === item.href;
+                  const isActive = location === item.href || location.startsWith(`${item.href}/`);
                   return (
                     <Link key={item.href} href={item.href}>
                       <button onClick={() => setMoreOpen(false)}
@@ -240,7 +240,7 @@ function MobileBottomNav({ ls }: { ls: ReturnType<typeof useLayoutState> }) {
               <div className="px-3 py-2 border-b border-slate-100">
                 {visibleNav.map(item => {
                   const Icon = item.icon;
-                  const isActive = location === item.href;
+                   const isActive = location === item.href || location.startsWith(`${item.href}/`);
                   return (
                     <Link key={item.href} href={item.href}>
                       <button onClick={() => setMoreOpen(false)}
@@ -315,7 +315,7 @@ function TopNavLayout({ children, ls, banner }: { children: React.ReactNode; ls:
         <nav className="hidden lg:flex flex-1 items-center gap-0.5 overflow-x-auto" data-testid="sidebar-nav">
           {visibleNav.map(item => {
             const Icon = item.icon;
-            const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
+            const isActive = location === item.href || location.startsWith(`${item.href}/`) || (item.href === "/dashboard" && location === "/");
             return (
               <Link key={item.href} href={item.href}>
                 <button
@@ -441,7 +441,7 @@ function SidebarLayout({ children, ls, banner }: { children: React.ReactNode; ls
       )} data-testid="sidebar-nav">
         {visibleNav.map(item => {
           const Icon = item.icon;
-          const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
+            const isActive = location === item.href || location.startsWith(`${item.href}/`) || (item.href === "/dashboard" && location === "/");
           return (
             <Link key={item.href} href={item.href}>
               <button

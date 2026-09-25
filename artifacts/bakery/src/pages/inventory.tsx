@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { useActiveBranch } from "@/lib/branch-context";
 import {
   useListInventory, useCreateInventoryItem, useUpdateInventoryItem,
@@ -41,6 +42,7 @@ function StatusBadge({ low }: { low: boolean }) {
 export default function InventoryPage() {
   const user = getStoredUser();
   const { isExpired } = useSubscription();
+  const canWrite = !isExpired && (user?.role === "managing_director" || user?.role === "manager");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { activeBranch } = useActiveBranch();
@@ -135,10 +137,10 @@ export default function InventoryPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Inventory</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage raw materials and stock levels</p>
         </div>
-        <Button size="sm" onClick={() => setShowNew(true)} disabled={isExpired} data-testid="button-add-item">
+        {canWrite && <Link href="/inventory/new" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90" data-testid="link-add-item">
           <Plus size={14} className="mr-1.5" />
           Add Item
-        </Button>
+        </Link>}
       </div>
 
       {/* Summary cards */}
@@ -208,15 +210,15 @@ export default function InventoryPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <StatusBadge low={item.isLowStock} />
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAdjustItem(item as InventoryItem)} data-testid={`button-adjust-${item.id}`}>
+                    {canWrite && <Link href={`/inventory/${item.id}/adjust`} className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted" data-testid={`link-adjust-${item.id}`}>
                       <ArrowUpDown size={13} />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item as InventoryItem)} data-testid={`button-edit-${item.id}`}>
+                    </Link>}
+                    {canWrite && <Link href={`/inventory/${item.id}/edit`} className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted" data-testid={`link-edit-${item.id}`}>
                       <Pencil size={13} />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(item.id)} data-testid={`button-delete-${item.id}`}>
+                    </Link>}
+                    {canWrite && <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(item.id)} data-testid={`button-delete-${item.id}`}>
                       <Trash2 size={13} />
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
               ))}
