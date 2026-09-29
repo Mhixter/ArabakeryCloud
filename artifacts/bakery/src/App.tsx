@@ -29,6 +29,7 @@ import CompanySettingsPage from "@/pages/company-settings";
 import SubscriptionPage from "@/pages/subscription";
 import ProductsPage from "@/pages/products";
 import AllocationsPage from "@/pages/allocations";
+import SupplierAllocationActivityPage from "@/pages/supplier-allocation-activity";
 import ExpensesPage from "@/pages/expenses";
 import WorkersPage from "@/pages/workers";
 import QuickSaleSettlementPage from "@/pages/quick-sale-settlement";
@@ -195,6 +196,8 @@ function Router() {
       <Route path="/products"><ProtectedRole roles={["managing_director","manager","receptionist"]}><ProductsPage /></ProtectedRole></Route>
       <Route path="/products/new"><ProtectedRole roles={["managing_director","manager"]}><NewProductPage /></ProtectedRole></Route>
       <Route path="/products/:id/edit"><ProtectedRole roles={["managing_director","manager"]}><EditProductPage /></ProtectedRole></Route>
+      <Route path="/allocations/suppliers/:sellerId/:date"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><SupplierAllocationActivityPage /></BranchedPage></ProtectedRole></Route>
+      <Route path="/allocations/suppliers/:sellerId"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><SupplierAllocationActivityPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/allocations"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationsPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/allocations/new"><ProtectedRole roles={["managing_director","manager","receptionist"]}><BranchedPage><NewAllocationPage /></BranchedPage></ProtectedRole></Route>
       <Route path="/allocations/history"><ProtectedRole roles={["managing_director","manager","receptionist","supplier"]}><BranchedPage><AllocationHistoryPage /></BranchedPage></ProtectedRole></Route>

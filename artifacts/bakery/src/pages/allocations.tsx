@@ -648,6 +648,11 @@ export default function AllocationsPage() {
           <Link href="/allocations/history" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-allocation-history">
             History
           </Link>
+          {isSeller && user?.id != null && (
+            <Link href={`/allocations/suppliers/${user.id}`} className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-supplier-activity">
+              My activity
+            </Link>
+          )}
           {!isSeller && <Link href="/allocations/returns/review" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-return-review">Review returns</Link>}
           {isSeller && (
             <Link href="/allocations/returns/new" className="inline-flex h-9 items-center justify-center rounded-md border border-white/30 px-3 text-sm font-medium text-white hover:bg-white/10" data-testid="link-new-return">
@@ -1113,11 +1118,11 @@ export default function AllocationsPage() {
             ) : (
               /* ── Manager: Supplier list (click to drill down) ── */
               (() => {
-                // Group by sellerName
-                const sellerMap = new Map<string, { sellerName: string; branchName: string; allocations: Allocation[] }>();
+                // Group by supplier identity; names are not guaranteed to be unique.
+                const sellerMap = new Map<string, { sellerId?: number; sellerName: string; branchName: string; allocations: Allocation[] }>();
                  for (const alloc of visibleAllocations) {
-                  const key = alloc.sellerName;
-                  if (!sellerMap.has(key)) sellerMap.set(key, { sellerName: alloc.sellerName, branchName: alloc.branchName, allocations: [] });
+                  const key = String(alloc.sellerId ?? alloc.sellerName);
+                  if (!sellerMap.has(key)) sellerMap.set(key, { sellerId: alloc.sellerId, sellerName: alloc.sellerName, branchName: alloc.branchName, allocations: [] });
                   sellerMap.get(key)!.allocations.push(alloc);
                 }
                 const supplierGroups = Array.from(sellerMap.values()).sort((a, b) => a.sellerName.localeCompare(b.sellerName));
@@ -1139,12 +1144,11 @@ export default function AllocationsPage() {
                         a.allocationDate > latest ? a.allocationDate : latest, group.allocations[0]?.allocationDate ?? "");
 
                       return (
-                        <div
-                          key={group.sellerName}
-                          className="w-full px-4 py-4 hover:bg-muted/20 transition-colors text-left"
-                          onClick={() => setSelectedSeller(group.sellerName)}
-                          role="button"
-                          tabIndex={0}
+                        <Link
+                          key={group.sellerId ?? group.sellerName}
+                          href={`/allocations/suppliers/${group.sellerId}`}
+                          className="block w-full px-4 py-4 text-left transition-colors hover:bg-muted/20"
+                          data-testid={`supplier-allocation-link-${group.sellerId ?? "unknown"}`}
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isFullyCleared ? "bg-emerald-100 text-emerald-800" : "bg-slate-950 text-amber-400"}`}>
@@ -1171,7 +1175,7 @@ export default function AllocationsPage() {
                             </div>
                             <ChevronRight size={16} className="text-muted-foreground/50 flex-shrink-0" />
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

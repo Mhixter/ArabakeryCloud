@@ -211,7 +211,8 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   const { userId, role, companyId, branchId: userBranchId } = req.user!;
   const { branchId, startDate, endDate } = req.query as { branchId?: string; startDate?: string; endDate?: string };
 
-  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers(), gte(salesTable.saleDate, startOfDay), lte(salesTable.saleDate, endOfDay)];
+  const defaultRange = !startDate && !endDate ? businessDateRange(businessDateFor()) : null;
+  const conditions = [isNull(salesTable.deletedAt), eq(salesTable.companyId, companyId), visibleSaleForUsers()];
 
   if (role === "supplier") {
     /* Sellers only see their own sales */
@@ -225,7 +226,9 @@ router.get("/sales", authenticate, async (req: AuthenticatedRequest, res): Promi
   }
 
   if (startDate) conditions.push(gte(salesTable.saleDate, queryDateRange(startDate).start));
+  else if (defaultRange) conditions.push(gte(salesTable.saleDate, defaultRange.start));
   if (endDate) conditions.push(lte(salesTable.saleDate, queryDateRange(endDate).end));
+  else if (defaultRange) conditions.push(lte(salesTable.saleDate, defaultRange.end));
 
   const sales = (await db.select({ sale: salesTable }).from(salesTable)
     .leftJoin(usersTable, eq(salesTable.cashierId, usersTable.id))
