@@ -20,7 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 
 type FormState = Record<string, string>;
 
@@ -50,9 +51,7 @@ function ActionShell({ title, description, back = "/dashboard", children }: { ti
   return (
     <div className="mx-auto max-w-3xl space-y-6" data-testid="page-action">
       <div className="flex items-center gap-3">
-        <Link href={back} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground" data-testid="link-action-back">
-          <ArrowLeft size={16} />
-        </Link>
+        <BackLink href={back} ariaLabel={`Back from ${title}`} testId="link-action-back" />
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Ara Bakery Cloud</p>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>

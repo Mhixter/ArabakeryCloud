@@ -879,9 +879,11 @@ export default function AllocationsPage() {
                     <div className="px-4 py-3 border-b border-border/50 flex items-center gap-3">
                       <button
                         onClick={() => setSelectedSeller(null)}
-                        className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                        aria-label="Back to all suppliers"
+                        data-testid="button-back-to-suppliers"
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
-                        <ArrowLeft size={15} />
+                        <ArrowLeft size={20} />
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">

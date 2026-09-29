@@ -3,21 +3,21 @@ import { Link, useParams } from "wouter";
 import { format } from "date-fns";
 import {
   ArrowDownRight,
-  ArrowLeft,
   ArrowUpRight,
   Building2,
   CalendarDays,
   CheckCircle2,
   CircleAlert,
+  HandCoins,
   PackageCheck,
   RotateCcw,
   Store,
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BackLink } from "@/components/back-link";
 import { useActiveBranch } from "@/lib/branch-context";
 import { API_BASE } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
@@ -68,6 +68,13 @@ interface ReturnRecord {
   status: "pending" | "approved" | "rejected";
   returnDate: string;
   notes?: string | null;
+}
+
+interface ProductPriceRecord {
+  id: number;
+  name: string;
+  pricePerUnit?: number | string | null;
+  branchId?: number | null;
 }
 
 interface ActivityData {
@@ -208,6 +215,39 @@ function quantityTotal(items: Array<{ quantity: number }>) {
   return items.reduce((total, item) => total + Number(item.quantity || 0), 0);
 }
 
+function productPriceForAllocation(
+  allocation: AllocationRecord,
+  products: ProductPriceRecord[],
+  activeBranchId?: number,
+): number | null {
+  const priceValue = (product: ProductPriceRecord | undefined) => {
+    if (!product || product.pricePerUnit == null || product.pricePerUnit === "") return null;
+    const price = Number(product.pricePerUnit);
+    return Number.isFinite(price) && price >= 0 ? price : null;
+  };
+
+  if (allocation.productId != null) {
+    const productById = products.find(product => Number(product.id) === Number(allocation.productId));
+    const exactPrice = priceValue(productById);
+    if (exactPrice !== null) return exactPrice;
+  }
+
+  const name = normalizedProductName(allocation.breadType);
+  const matchingProducts = products.filter(product => normalizedProductName(product.name) === name);
+  const branchId = allocation.branchId == null ? activeBranchId : Number(allocation.branchId);
+  const branchProduct = branchId == null
+    ? undefined
+    : matchingProducts.find(product => product.branchId != null && Number(product.branchId) === branchId);
+  const companyProduct = matchingProducts.find(product => product.branchId == null);
+  return priceValue(branchProduct) ?? priceValue(companyProduct);
+}
+
+function formatNaira(amount: number | null) {
+  return amount === null
+    ? "—"
+    : `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function returnStatusLabel(status: ReturnRecord["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
@@ -252,6 +292,8 @@ export default function SupplierAllocationActivityPage() {
   const canView = Number.isInteger(sellerId) && sellerId > 0 && (!isSupplier || Number(user?.id) === sellerId);
   const validDate = isDateKey(dateKey);
   const [data, setData] = useState<ActivityData>(emptyActivity);
+  const [products, setProducts] = useState<ProductPriceRecord[]>([]);
+  const [pricesUnavailable, setPricesUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -265,13 +307,24 @@ export default function SupplierAllocationActivityPage() {
     const load = async () => {
       setLoading(true);
       setError("");
+      setPricesUnavailable(false);
       try {
         const branchQuery = activeBranch?.id
           ? `?${new URLSearchParams({ branchId: String(activeBranch.id) })}`
           : "";
-        const [allAllocations, allReturns] = await Promise.all([
+        const productsPromise = getJson<unknown>(`/api/products${branchQuery}`, controller.signal)
+          .then(value => {
+            try {
+              return { products: asArray<ProductPriceRecord>(value, "products"), unavailable: false };
+            } catch {
+              return { products: [], unavailable: true };
+            }
+          })
+          .catch(() => ({ products: [], unavailable: true }));
+        const [allAllocations, allReturns, productResult] = await Promise.all([
           getJson<unknown>(`/api/allocations${branchQuery}`, controller.signal),
           getJson<unknown>(`/api/returns${branchQuery}`, controller.signal),
+          productsPromise,
         ]);
         const allocations = asArray<AllocationRecord>(allAllocations, "allocations")
           .filter(allocation => Number(allocation.sellerId) === sellerId);
@@ -288,6 +341,8 @@ export default function SupplierAllocationActivityPage() {
           .filter(sale => Number(sale.cashierId) === sellerId);
 
         setData({ allocations, sales, returns });
+        setProducts(productResult.products);
+        setPricesUnavailable(productResult.unavailable);
       } catch (cause) {
         if (controller.signal.aborted) return;
         setError(cause instanceof Error ? cause.message : "Could not load supplier activity");
@@ -318,6 +373,16 @@ export default function SupplierAllocationActivityPage() {
     () => makeProductActivities(supplierAllocations, supplierSales, supplierReturns),
     [supplierAllocations, supplierSales, supplierReturns],
   );
+  const totalAllocatedAmount = useMemo(() => {
+    if (pricesUnavailable && supplierAllocations.length > 0) return null;
+    let total = 0;
+    for (const allocation of supplierAllocations) {
+      const unitPrice = productPriceForAllocation(allocation, products, activeBranch?.id);
+      if (unitPrice === null) return null;
+      total += unitPrice * Number(allocation.quantity || 0);
+    }
+    return total;
+  }, [activeBranch?.id, pricesUnavailable, products, supplierAllocations]);
   const dayKeys = useMemo(() => {
     const keys = new Set([
       ...data.allocations.map(item => getBusinessDate(item.allocationDate)),
@@ -338,9 +403,9 @@ export default function SupplierAllocationActivityPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             {isSupplier ? "You can only view your own supplier activity." : "Check the supplier link and try again."}
           </p>
-          <Button asChild variant="outline" className="mt-4">
-            <Link href={isSupplier ? `/allocations/suppliers/${user?.id}` : "/allocations"}>Back to allocations</Link>
-          </Button>
+          <BackLink href={isSupplier ? `/allocations/suppliers/${user?.id}` : "/allocations"} className="mt-4">
+            Back to allocations
+          </BackLink>
         </CardContent>
       </Card>
     );
@@ -353,9 +418,7 @@ export default function SupplierAllocationActivityPage() {
           <CircleAlert className="mx-auto mb-3 text-red-600" size={24} />
           <h1 className="font-semibold">Could not load supplier activity</h1>
           <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-          <Button asChild variant="outline" className="mt-4">
-            <Link href="/allocations">Back to allocations</Link>
-          </Button>
+          <BackLink href="/allocations" className="mt-4">Back to allocations</BackLink>
         </CardContent>
       </Card>
     );
@@ -370,17 +433,18 @@ export default function SupplierAllocationActivityPage() {
     return (
       <div className="space-y-5" data-testid="supplier-date-activity">
         <div className="rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-lg shadow-slate-950/10 sm:px-6">
-          <Link
+          <BackLink
             href={`/allocations/suppliers/${sellerId}`}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-300 transition-colors hover:text-white"
+            tone="inverse"
+            className="mb-4 w-fit"
           >
-            <ArrowLeft size={15} /> Back to {supplierName}
-          </Link>
+            Back to {supplierName}
+          </BackLink>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300">Supplier activity</p>
               <h1 className="text-2xl font-bold tracking-tight text-white">{formatBusinessDate(dateKey, true)}</h1>
-              <p className="mt-1 text-sm text-slate-300">{supplierName} · Business date</p>
+              <p className="mt-1 text-sm text-slate-300">{supplierName}</p>
             </div>
             <Badge variant="outline" className={outstandingCount
               ? "border-amber-300/50 bg-amber-400/10 text-amber-200"
@@ -390,10 +454,26 @@ export default function SupplierAllocationActivityPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard label="Allocated" value={allocatedUnits} icon={<PackageCheck size={16} />} tone="amber" />
           <MetricCard label="Supplier sales" value={soldUnits} icon={<ArrowUpRight size={16} />} tone="blue" />
           <MetricCard label="Returns submitted" value={returnedUnits} icon={<RotateCcw size={16} />} tone="violet" />
+          <Card className="col-span-2 h-full rounded-2xl border-amber-200 bg-amber-50/80 shadow-sm lg:col-span-1">
+            <CardContent className="flex h-full items-center gap-3 p-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <HandCoins size={17} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Total allocated amount</p>
+                <p className="mt-0.5 text-2xl font-bold leading-tight text-amber-950" data-testid="metric-total-allocation-amount">
+                  {formatNaira(totalAllocatedAmount)}
+                </p>
+                {totalAllocatedAmount === null && (
+                  <p className="mt-0.5 text-[10px] font-medium text-amber-800/80">Price unavailable</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {productActivities.length === 0 ? (
@@ -408,7 +488,6 @@ export default function SupplierAllocationActivityPage() {
           <div className="space-y-3">
             <div>
               <h2 className="text-base font-bold">Product movements</h2>
-              <p className="text-sm text-muted-foreground">Allocation clearing is shown separately from sales and returns.</p>
             </div>
             {productActivities.map(activity => (
               <ProductActivityCard key={activity.key} activity={activity} />
@@ -422,14 +501,14 @@ export default function SupplierAllocationActivityPage() {
   return (
     <div className="space-y-5" data-testid="supplier-activity">
       <div className="rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-lg shadow-slate-950/10 sm:px-6">
-        <Link href="/allocations" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-300 transition-colors hover:text-white">
-          <ArrowLeft size={15} /> Supplier allocations
-        </Link>
+        <BackLink href="/allocations" tone="inverse" className="mb-4 w-fit">
+          Supplier allocations
+        </BackLink>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300">Supplier account activity</p>
             <h1 className="text-2xl font-bold tracking-tight text-white">{supplierName}</h1>
-            <p className="mt-1 text-sm text-slate-300">Allocations, sales, and returns by business date</p>
+            <p className="mt-1 text-sm text-slate-300">Allocations, sales, and returns</p>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <Users size={15} />
@@ -585,7 +664,6 @@ function ProductActivityCard({ activity }: { activity: ProductActivity }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{quantityTotal(activity.allocations)} allocated</Badge>
           <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">{quantityTotal(activity.sales)} sold</Badge>
           <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">{quantityTotal(activity.returns)} returned</Badge>
         </div>
